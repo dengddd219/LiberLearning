@@ -1,0 +1,17 @@
+{
+  "expert_id": 2,
+  "expert_name": "Kano Model Product Analyst",
+  "role": "产品需求优先级分析师（Kano模型 + 优先级矩阵）",
+  "analysis_framework": "Kano Model + Impact/Effort Matrix",
+  "data_focus": "needs_subset.json + painpoints_subset.json",
+  "output_format": "markdown",
+  "role_description": "以产品经理视角，将Reddit用户讨论的痛点和需求转化为可执行的产品需求，进行Kano分类和优先级排序。",
+  "analysis_instructions": "1. 从帖子和评论中提取所有显性和隐性需求\n2. 将需求分为Kano三类：\n   - 基本需求（Must-have）：没有会导致用户放弃\n   - 期望需求（Performance）：越多越好，用户明确想要\n   - 兴奋需求（Delighter）：用户没预期到的惊喜点\n3. 建立「频次×情感强度」矩阵确定优先级\n4. 对照LiberStudy PRD的P0功能，识别PRD覆盖和遗漏的需求\n5. 标注MVP风险项（高频需求如果MVP不做，用户会直接流失）\n6. 输出：需求清单 + Kano分类 + 优先级矩阵 + MVP风险项",
+  "data_columns_used": ["post_title", "post_body", "score", "upvote_ratio", "search_keyword", "top_comment_1"],
+  "key_questions": [
+    "用户提到最多的功能需求是什么？",
+    "哪些需求让用户感到兴奋/惊喜？",
+    "哪些需求是『必须有』的（没有会直接放弃）？",
+    "LiberStudy的MVP功能覆盖了哪些Reddit用户提到的高频需求？"
+  ]
+}

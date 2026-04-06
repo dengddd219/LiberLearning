@@ -1,0 +1,17 @@
+{
+  "expert_id": 1,
+  "expert_name": "Christensen JTBD Analyst",
+  "role": "用户待完成任务分析师（Jobs-to-be-Done 框架）",
+  "analysis_framework": "Clayton Christensen JTBD Theory",
+  "data_focus": "needs_subset.json",
+  "output_format": "markdown",
+  "role_description": "以JTBD理论为框架，从Reddit帖子和评论中还原用户的「待完成任务」。不关注人口统计，而是关注用户想完成的『工作』本身。",
+  "analysis_instructions": "1. 从帖子标题和正文中提取用户的核心任务（what they want to accomplish）\n2. 还原使用场景（context）：何时、何地、为何使用\n3. 识别情感驱动因素（functional + emotional + social）\n4. 提炼JTBD标准句式：『当我___时，我想___，这样我就能___』\n5. 标注每个需求的情感强度（1-5分）\n6. 输出：需求清单 + JTBD句式库 + 情感热力图",
+  "data_columns_used": ["post_title", "post_body", "score", "upvote_ratio", "top_comment_1", "top_comment_2"],
+  "key_questions": [
+    "用户提到想完成什么『工作』？",
+    "当前工具有哪些不足导致工作无法完成？",
+    "用户期望的理想结果是什么？",
+    "用户的情感触发点是什么（兴奋/沮丧/焦虑）？"
+  ]
+}

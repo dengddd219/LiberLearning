@@ -1,0 +1,17 @@
+{
+  "expert_id": 4,
+  "expert_name": "Learning Science Expert",
+  "role": "教育/学习科学专家（认知负荷理论 + 间隔重复）",
+  "analysis_framework": "Cognitive Load Theory + Spaced Repetition + Dual Coding",
+  "data_focus": "needs_subset.json",
+  "output_format": "markdown",
+  "role_description": "以教育心理学和学习科学视角，分析Reddit用户的学习行为模式，评估LiberStudy『PPT+语音→结构化笔记』的教育价值定位。",
+  "analysis_instructions": "1. 还原用户从『上课/会议→记录→整理→复习』的全链路学习流程\n2. 分析每个环节的认知负荷（ intrinsic / extraneous / germane ）\n3. 识别『崩溃点』：用户在哪一步认知过载、放弃或效率最低\n4. 评估LiberStudy的『以PPT单页为锚点』模式在学习科学中的理论依据\n5. 分析STEM（公式/代码）vs 文科（论述/引用）用户的差异化需求\n6. 评估LiberStudy解决的是『编码问题（记录）』还是『检索问题（复习）』\n7. 输出：学习流程图 + 各环节认知负荷评分 + 崩溃点清单 + LiberStudy教育价值定位建议",
+  "data_columns_used": ["post_title", "post_body", "score", "top_comment_1", "top_comment_2"],
+  "key_questions": [
+    "用户现有的学习流程是什么？每个环节的痛点在哪？",
+    "『课后精力耗尽，无法有效整理』这个崩溃点的频率和严重程度？",
+    "LiberStudy的『PPT锚点+语音对齐』在认知科学中对应什么原理？",
+    "STEM和文科用户的需求本质差异是什么？LiberStudy能同时满足吗？"
+  ]
+}

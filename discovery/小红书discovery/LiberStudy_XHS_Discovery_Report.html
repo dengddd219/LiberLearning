@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>LiberStudy 小红书用户调研综合分析报告</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { background: #FAF8F5; }
+body {
+  max-width: 1200px; margin: 0 auto;
+  padding: 40px 48px;
+  font-family: -apple-system, 'Helvetica Neue', 'PingFang SC', Arial, sans-serif;
+  background: #FAF8F5; color: #1A1A1A;
+}
+h1 { font-size: 42px; font-weight: 800; color: #1A1A1A; margin-bottom: 8px; }
+h2 { font-size: 26px; font-weight: 700; color: #1A1A1A; margin: 48px 0 20px; border-left: 5px solid #FF6B6B; padding-left: 14px; }
+h3 { font-size: 18px; font-weight: 700; color: #333; margin: 24px 0 12px; }
+p { font-size: 15px; line-height: 1.8; color: #444; margin-bottom: 12px; }
+.subtitle { font-size: 16px; color: #888; margin-bottom: 40px; }
+.top-stripe { height: 5px; background: #FF6B6B; margin-bottom: 40px; border-radius: 2px; }
+.kpi-row { display: flex; gap: 20px; margin-bottom: 32px; }
+.kpi-card {
+  flex: 1; background: #FFFFFF; border: 2px solid #E8E0D8;
+  border-radius: 12px; padding: 24px 20px; text-align: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.kpi-value { font-size: 48px; font-weight: 900; color: #FF6B6B; }
+.kpi-label { font-size: 14px; color: #888; margin-top: 6px; }
+.kpi-sub { font-size: 12px; color: #AAA; margin-top: 4px; }
+.charts-row { display: flex; gap: 20px; margin-bottom: 32px; }
+.chart-card {
+  flex: 1; background: #FFFFFF; border: 2px solid #E8E0D8;
+  border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.chart-title { font-size: 15px; font-weight: 700; color: #333; margin-bottom: 16px; text-align: center; }
+.findings-grid { display: flex; flex-direction: column; gap: 16px; margin-bottom: 32px; }
+.findings-intro { font-size: 16px; color: #555; line-height: 1.9; margin-bottom: 28px; background: #FFF9F0; border-left: 4px solid #FF6B6B; padding: 16px 20px; border-radius: 0 8px 8px 0; }
+.insight-card {
+  background: #FFFFFF; border: 2px solid #E8E0D8;
+  border-radius: 12px; padding: 20px 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.insight-title { font-size: 16px; font-weight: 800; color: #1A1A1A; margin-bottom: 8px; }
+.insight-title span { color: #FF6B6B; margin-right: 8px; }
+.insight-body { font-size: 14px; color: #555; line-height: 1.8; }
+.quote-block {
+  background: #F9F5F0; border-left: 4px solid #FF6B6B;
+  padding: 14px 20px; margin: 12px 0; border-radius: 0 8px 8px 0;
+  font-size: 14px; color: #555; font-style: italic;
+  line-height: 1.8;
+}
+.quote-source { font-size: 12px; color: #AAA; font-style: normal; margin-top: 6px; text-align: right; }
+.priority-table { width: 100%; border-collapse: separate; border-spacing: 0; border: 2px solid #E8E0D8; border-radius: 10px; overflow: hidden; margin-bottom: 24px; }
+.priority-table th { background: #1A1A1A; color: #FFD700; padding: 12px 16px; font-size: 13px; font-weight: 700; text-align: left; }
+.priority-table td { padding: 11px 16px; font-size: 14px; color: #333; border-bottom: 1px solid #F0EBE6; }
+.priority-table tr:last-child td { border-bottom: none; }
+.priority-table tr:hover td { background: #FFFBF5; }
+.tag { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+.tag-p0 { background: #FF6B6B; color: #FFF; }
+.tag-p1 { background: #FFD93D; color: #333; }
+.tag-p2 { background: #6BCB77; color: #FFF; }
+.tag-basic { background: #1A1A1A; color: #FFF; }
+.tag-exp { background: #4D96FF; color: #FFF; }
+.tag-excite { background: #C75B3A; color: #FFF; }
+.summary-box { background: #1A1A1A; color: #FFF; border-radius: 12px; padding: 24px 28px; margin: 32px 0; }
+.summary-box h3 { color: #FFD700; font-size: 16px; margin-bottom: 16px; }
+.summary-box ul { list-style: none; padding: 0; }
+.summary-box li { font-size: 14px; color: #DDD; line-height: 2.1; padding-left: 20px; position: relative; }
+.summary-box li::before { content: '→'; position: absolute; left: 0; color: #FF6B6B; }
+.footer { text-align: center; padding: 40px 0 20px; color: #AAA; font-size: 12px; border-top: 1px solid #E8E0D8; margin-top: 48px; }
+.print-hint { position: fixed; bottom: 8pt; right: 12pt; font-size: 6.5pt; color: #CCC; }
+</style>
+</head>
+<body>
+
+<div class="top-stripe"></div>
+
+<h1>LiberStudy 小红书用户调研综合分析报告</h1>
+<p class="subtitle">237条帖子 · 1,501条评论 · 12个关键词 · 2026年4月</p>
+
+<h2>数据看板</h2>
+
+<div class="kpi-row">
+  <div class="kpi-card">
+    <p class="kpi-value">237</p>
+    <p class="kpi-label">有效帖子</p>
+    <p class="kpi-sub">209文字 + 28视频</p>
+  </div>
+  <div class="kpi-card">
+    <p class="kpi-value">1,501</p>
+    <p class="kpi-label">评论总数</p>
+    <p class="kpi-sub">均长24字/条</p>
+  </div>
+  <div class="kpi-card">
+    <p class="kpi-value">12</p>
+    <p class="kpi-label">关键词分类</p>
+    <p class="kpi-sub">3大维度覆盖</p>
+  </div>
+  <div class="kpi-card">
+    <p class="kpi-value">776</p>
+    <p class="kpi-label">平均点赞</p>
+    <p class="kpi-sub">最高7,169赞</p>
+  </div>
+</div>
+
+<div class="charts-row">
+  <div class="chart-card">
+    <p class="chart-title">关键词分布（帖子数）</p>
+    <div id="chart-keywords" style="height:320px;"></div>
+  </div>
+  <div class="chart-card">
+    <p class="chart-title">关键词分布（评论数）</p>
+    <div id="chart-comments" style="height:320px;"></div>
+  </div>
+</div>
+
+<div class="charts-row">
+  <div class="chart-card">
+    <p class="chart-title">三大维度覆盖对比</p>
+    <div id="chart-dimensions" style="height:280px;"></div>
+  </div>
+  <div class="chart-card">
+    <p class="chart-title">帖子类型 vs 平均点赞</p>
+    <div id="chart-type-likes" style="height:280px;"></div>
+  </div>
+</div>
+
+<h2>十大核心发现</h2>
+<p class="findings-intro">
+基于JTBD用户研究、Kano需求分析、竞品感知分析、学习科学、行为心理学5位专家的并行深度分析，综合提炼出以下核心发现。这些发现将指导LiberStudy的MVP功能优先级与产品定位。
+</p>
+
+<div class="findings-grid">
+
+  <div class="insight-card">
+    <p class="insight-title"><span>01</span>「对着PPT补笔记崩溃」是真实未被满足的核心场景</p>
+    <p class="insight-body">
+这是数据中极为突出的原生高频痛点：用户课堂边听边拍照PPT，课后无法将笔记与具体PPT页对应，2小时课程的整理需要再花2小时。所有竞品（飞书妙记/通义/Granola/NotebookLM）均未解决"哪段话对应哪一页PPT"的问题——这是LiberStudy最强的差异化切入点。
+    </p>
+    <div class="quote-block">
+"对着PPT补笔记，补到崩溃"
+<div class="quote-source">—— 小红书多篇帖子评论区高频表达</div>
+    </div>
+  </div>
+
+  <div class="insight-card">
+    <p class="insight-title"><span>02</span>65%需求集中于"课堂录音→结构化笔记→考前复习"学习链条</p>
+    <p class="insight-body">
+用户场景高度集中于这一学习链路，核心痛点是"听完课没时间整理"和"整理完来不及消化"。期末/考研复习情感强度最高（★★★★★），是用户最愿意为工具付费的场景。
+    </p>
+  </div>
+
+  <div class="insight-card">
+    <p class="insight-title"><span>03</span>多工具串联是用户默认工作流，单一工具永远不够用</p>
+    <p class="insight-body">
+"飞书妙记+Kimi"、"通义+DeepSeek"、"NotebookLM+Gemini"——用户平均需组合3-4个工具才能完成完整学习笔记流程。LiberStudy有机会成为这个一站式整合节点。
+    </p>
+    <div class="quote-block">
+"换来换去 最后变word和excel"
+<div class="quote-source">—— 评论区无奈总结</div>
+    </div>
+  </div>
+
+  <div class="insight-card">
+    <p class="insight-title"><span>04</span>「PPT页-音视频-结构化笔记」三角对齐是最大市场空白</p>
+    <p class="insight-body">
+通义、飞书妙记、夸克、讯飞听见全部在做"录音→文字→总结"的同质化竞争，但没有任何产品实现"PPT页面+音视频时间轴+结构化笔记"的三方对齐。PRD中的P0-4（Multimodal对齐）正好填补这个空白。
+    </p>
+  </div>
+
+  <div class="insight-card">
+    <p class="insight-title"><span>05</span>课后整理是认知崩溃节点，可将负荷从8/10降至4/10</p>
+    <p class="insight-body">
+认知负荷理论分析：课堂记录（6/10）→ 课后整理（9/10，最高）→ 考前复习（7/10）。LiberStudy的核心价值区间在课后整理，通过录制时自动建立跨模态索引，将课后整理从"跨模态重建"降级为"结构化输出"。
+    </p>
+  </div>
+
+  <div class="insight-card">
+    <p class="insight-title"><span>06</span>用户接受"AI初稿+人工快速校对"，可编辑性比完美更重要</p>
+    <p class="insight-body">
+现有AI笔记被高频吐槽"AI味太重"、"关键信息丢失"。用户明确表示"能导出可编辑的初稿"比"一次性生成完美PPT"更有价值。可编辑性是MVP的核心要求。
+    </p>
+    <div class="quote-block">
+"要么狗屁不通，要么很平很干"
+<div class="quote-source">—— 现有AI笔记工具的统一槽点</div>
+    </div>
+  </div>
+
+  <div class="insight-card">
+    <p class="insight-title"><span>07</span>STEM比文科更适合LiberStudy模式</p>
+    <p class="insight-body">
+STEM的公式推导有明确的PPT页面锚点（公式/图表/流程图），天然适配PPT+语音对齐；文科的论述逻辑和引用出处管理需要更复杂结构化能力。建议目标用户优先聚焦理工科大学生。
+    </p>
+  </div>
+
+  <div class="insight-card">
+    <p class="insight-title"><span>08</span>通义+飞书妙记占竞品讨论量榜首，但各自有明显短板</p>
+    <p class="insight-body">
+通义（32次）和飞书妙记（30次）是被讨论最多的工具。通义免费真香但额度有限、AI总结深度不足；飞书妙记免费门槛低但"整理太累"被高频吐槽；Granola产品设计领先但中文支持是致命伤。
+    </p>
+  </div>
+
+  <div class="insight-card">
+    <p class="insight-title"><span>09</span>产品定位应为「编码工具」而非「检索工具」</p>
+    <p class="insight-body">
+LiberStudy对应记忆研究的"编码理论"，核心价值在于丰富编码时的情境线索（PPT页面+语音时间戳），让用户能精准回溯"当时老师讲到这一页时是怎么解释的"。而非取代间隔复习（Anki/闪卡类工具）。
+    </p>
+  </div>
+
+  <div class="insight-card">
+    <p class="insight-title"><span>10</span>用户最深的恐惧是"用AI记录了≠真正学会了"</p>
+    <p class="insight-body">
+用户担忧的不是功能缺陷，而是"认知幻觉"——收集了信息但没有真正学会。笔记软件的核心价值在于降低后续提取成本和最终是否真正转化为知识。产品需要提供"溯源"能力（点击笔记可回看原始视频片段）来消除这一恐惧。
+    </p>
+  </div>
+
+</div>
+
+<h2>MVP需求优先级</h2>
+
+<table class="priority-table">
+  <tr>
+    <th style="width:60px;">优先级</th>
+    <th>需求</th>
+    <th style="width:110px;">Kano分类</th>
+    <th style="width:200px;">PRD对应</th>
+  </tr>
+  <tr>
+    <td><span class="tag tag-p0">P0</span></td>
+    <td><b>PPT页面与讲解内容自动对齐</b>（双栏联动）</td>
+    <td><span class="tag tag-basic">基本需求</span></td>
+    <td>P0-4 Multimodal对齐（核心差异化）</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-p0">P0</span></td>
+    <td><b>ASR转录准确率</b>（普通话≥92%）</td>
+    <td><span class="tag tag-basic">基本需求</span></td>
+    <td>P0-3 ASR转写（必须及格）</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-p0">P0</span></td>
+    <td><b>自动结构化笔记生成</b>（可编辑导出）</td>
+    <td><span class="tag tag-exp">期望需求</span></td>
+    <td>P0-5 笔记生成（需提升AI质量）</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-p0">P0</span></td>
+    <td><b>双栏查看</b>（Slide Nav + Notes）</td>
+    <td><span class="tag tag-exp">期望需求</span></td>
+    <td>P0-6 双栏查看（产品形态成熟）</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-p1">P1</span></td>
+    <td>时间戳快速定位与思维导图概览</td>
+    <td><span class="tag tag-exp">期望需求</span></td>
+    <td>—</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-p1">P1</span></td>
+    <td>多格式导出（TXT/MD优先，PPT次之）</td>
+    <td><span class="tag tag-exp">期望需求</span></td>
+    <td>PRD遗漏，需补充</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-p1">P1</span></td>
+    <td>移动端体验（至少可查看）</td>
+    <td><span class="tag tag-exp">期望需求</span></td>
+    <td>—</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-p2">P2</span></td>
+    <td>发言人识别</td>
+    <td><span class="tag tag-exp">期望需求</span></td>
+    <td>PRD完全未提及</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-p2">P2</span></td>
+    <td>AI课后问答、边听边标注</td>
+    <td><span class="tag tag-excite">兴奋需求</span></td>
+    <td>—</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-p2">P2</span></td>
+    <td>知识库积累、协作分享</td>
+    <td><span class="tag tag-excite">兴奋需求</span></td>
+    <td>—</td>
+  </tr>
+</table>
+
+<h2>竞品感知格局</h2>
+
+<div class="charts-row" style="margin-bottom:24px;">
+  <div class="chart-card">
+    <p class="chart-title">竞品提及频次排行（Top 10）</p>
+    <div id="chart-competitor" style="height:320px;"></div>
+  </div>
+</div>
+
+<div class="summary-box">
+  <h3>竞品定位结论</h3>
+  <ul>
+    <li><b>通义+飞书妙记</b>：转录基础设施，但整理工作全推给用户，"整理太累"是共同槽点</li>
+    <li><b>NotebookLM</b>：功能丰富但中文/PPT是重灾区，"帮我学会"的能力不足</li>
+    <li><b>Granola</b>：产品设计理念领先（周留存70%），但中文支持是致命伤</li>
+    <li><b>夸克</b>：网课+B站场景体验佳，5倍速+AI字幕是核心差异，跨场景弱</li>
+    <li><b>市场空白</b>：无任何产品同时做到"PPT页+音视频+结构化笔记"三角对齐</li>
+    <li><b>LiberStudy机会</b>：从"工具链拼接者"变成"专注学习者"的一站式整合者</li>
+  </ul>
+</div>
+
+<h2>核心用户画像</h2>
+
+<div class="charts-row" style="margin-bottom:24px;">
+  <div class="chart-card">
+    <p class="chart-title">用户群体分布</p>
+    <div id="chart-persona" style="height:280px;"></div>
+  </div>
+  <div class="chart-card" style="flex:1.5;">
+    <p class="chart-title">使用场景频率</p>
+    <div id="chart-scenes" style="height:280px;"></div>
+  </div>
+</div>
+
+<div class="findings-grid">
+  <div class="insight-card">
+    <p class="insight-title">画像A：考研医学生（最高痛感用户）</p>
+    <p class="insight-body">
+课程内容海量，每节课30-50页PPT，考试范围覆盖整本书。"老师上课讲了一堆没听清又不想整理几个小时的录音"。现有工具：飞书妙记+豆包+幕布/XMind。情感强度：★★★★★。
+    </p>
+  </div>
+  <div class="insight-card">
+    <p class="insight-title">画像B：职场PM（高频刚需用户）</p>
+    <p class="insight-body">
+每天2-4个会议，会后需输出结构化纪要。"信息全挤在一个小时里，会后再回忆，经常变成：这句话到底是谁说的？"。现有工具：飞书妙记+Kimi/ChatGPT+飞书文档。情感强度：★★★★☆。
+    </p>
+  </div>
+  <div class="insight-card">
+    <p class="insight-title">画像C：985研究生（焦虑型用户）</p>
+    <p class="insight-body">
+组会每周1-2次，导师要求PPT+口头汇报双重准备。"组会前几天就开始失眠焦虑，汇报的时候连抬头的勇气都没有"。希望工具能帮他"有底气地准备汇报"。情感强度：★★★★★。
+    </p>
+  </div>
+</div>
+
+<h2>PRD补充建议</h2>
+
+<div class="summary-box">
+  <h3>基于用户调研的PRD完善方向</h3>
+  <ul>
+    <li><b>R06发言人识别</b>：会议/课堂场景必需，PRD完全未提及，需明确第一版是否支持</li>
+    <li><b>导出格式</b>：明确TXT/MD优先（可编辑），PPT导出为次优先级，"可编辑性"比"一次性完美"更重要</li>
+    <li><b>移动端战略</b>：MVP至少保证移动端可查看，学生场景手机/iPad使用率极高</li>
+    <li><b>技术指标承诺</b>：ASR准确率≥92%、对齐准确率≥85%，应在PRD中量化</li>
+    <li><b>Granola式实时标注</b>：双栏界面中支持用户在课程中同步打字补充想法（Granola周留存70%的核心原因）</li>
+    <li><b>定价策略</b>：参考通义免费策略，MVP免费或极低定价建立用户习惯，后期按调用量计费</li>
+  </ul>
+</div>
+
+<div class="footer">
+  <p>LiberStudy 小红书用户调研综合分析报告 · 2026年4月</p>
+  <p>数据来源：小红书UGC · 5位专家并行分析 · JTBD+Kano+竞品感知+学习科学+行为心理学</p>
+</div>
+
+<p class="print-hint">Ctrl/Cmd + P 导出PDF</p>
+
+<script>
+const COLORS = ['#FF6B6B','#4D96FF','#6BCB77','#FFD93D','#C75B3A','#9B59B6','#1ABC9C','#E74C3C','#95A5A6','#2ECC71','#F39C12','#8E44AD'];
+
+const kws = ['granola app吐槽','notebook不好用','直播转文字AI','对着PPT补笔记崩溃','飞书妙记整理太累','夸克AI听网课','期末复习好方法','根据录音生成PPT','音视频双栏笔记','AI公式推导记忆','ChatGPT整理笔记','通义听悟网课'];
+const postCounts = [20,20,20,17,20,20,20,20,20,20,20,20];
+const commentCounts = [146,99,144,72,83,142,136,146,162,114,121,136];
+
+const competitors = ['通义','飞书妙记','Gemini','通义听悟','NotebookLM','夸克','豆包','ChatGPT','DeepSeek','Granola'];
+const compFreq = [32,30,28,26,25,22,18,9,9,8];
+const compColors = ['#FF6B6B','#4D96FF','#FFD93D','#FF6B6B','#4D96FF','#6BCB77','#C75B3A','#9B59B6','#95A5A6','#1ABC9C'];
+
+const personas = ['大学生/考研党','职场打工人','教师','研究生','留学生'];
+const personaValues = [45,28,12,10,5];
+
+const scenes = ['网课/直播学习','课堂录音整理','会议纪要','期末/考前突击','PPT汇报'];
+const sceneValues = [35,28,20,12,5];
+
+const chartKws = echarts.init(document.getElementById('chart-keywords'));
+chartKws.setOption({
+  tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},
+  grid:{left:120,right:20,top:10,bottom:35},
+  xAxis:{type:'value',max:25,axisLabel:{fontSize:11,color:'#888'}},
+  yAxis:{type:'category',data:kws.map(s=>s.length>12?s.substring(0,12)+'…':s),axisLabel:{fontSize:10,color:'#555'}},
+  series:[{type:'bar',data:postCounts,itemStyle:{color:p=>COLORS[p.dataIndex%COLORS.length],borderRadius:[0,4,4,0]},barMaxWidth:18}]
+});
+
+const chartCom = echarts.init(document.getElementById('chart-comments'));
+chartCom.setOption({
+  tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},
+  grid:{left:120,right:20,top:10,bottom:35},
+  xAxis:{type:'value',max:180,axisLabel:{fontSize:11,color:'#888'}},
+  yAxis:{type:'category',data:kws.map(s=>s.length>12?s.substring(0,12)+'…':s),axisLabel:{fontSize:10,color:'#555'}},
+  series:[{type:'bar',data:commentCounts,itemStyle:{color:p=>COLORS[(p.dataIndex+6)%COLORS.length],borderRadius:[0,4,4,0]},barMaxWidth:18}]
+});
+
+const chartDims = echarts.init(document.getElementById('chart-dimensions'));
+chartDims.setOption({
+  tooltip:{trigger:'item',formatter:'{b}: {c}条 ({d}%)'},
+  legend:{bottom:5,textStyle:{fontSize:12}},
+  series:[{type:'pie',radius:['40%','70%'],label:{fontSize:13,fontWeight:700},
+    data:[
+      {value:97,name:'恐惧与痛点',itemStyle:{color:'#FF6B6B'}},
+      {value:80,name:'核心需求',itemStyle:{color:'#4D96FF'}},
+      {value:60,name:'行为习惯',itemStyle:{color:'#6BCB77'}}
+    ]}]
+});
+
+const chartType = echarts.init(document.getElementById('chart-type-likes'));
+chartType.setOption({
+  tooltip:{trigger:'axis'},
+  legend:{bottom:5,textStyle:{fontSize:12}},
+  grid:{left:60,right:20,top:10,bottom:40},
+  xAxis:{type:'category',data:['文字帖子 209条','视频帖子 28条']},
+  yAxis:[
+    {type:'value',name:'数量',axisLabel:{fontSize:11}},
+    {type:'value',name:'平均点赞',axisLabel:{fontSize:11}}
+  ],
+  series:[
+    {name:'帖子数量',type:'bar',data:[209,28],itemStyle:{color:'#FF6B6B',borderRadius:[4,4,0,0]},barMaxWidth:50},
+    {name:'平均点赞',type:'line',yAxisIndex:1,data:[805,562],itemStyle:{color:'#4D96FF'},lineStyle:{width:3},symbolSize:8}
+  ]
+});
+
+const chartComp = echarts.init(document.getElementById('chart-competitor'));
+chartComp.setOption({
+  tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},
+  grid:{left:90,right:20,top:10,bottom:40},
+  xAxis:{type:'value',max:35,axisLabel:{fontSize:11,color:'#888'}},
+  yAxis:{type:'category',data:competitors,axisLabel:{fontSize:12,color:'#333'}},
+  series:[{type:'bar',data:compFreq.map((v,i)=>({value:v,itemStyle:{color:compColors[i],borderRadius:[0,4,4,0]}})),barMaxWidth:22}]
+});
+
+const chartPersona = echarts.init(document.getElementById('chart-persona'));
+chartPersona.setOption({
+  tooltip:{trigger:'item',formatter:'{b}: {d}%'},
+  legend:{bottom:5,textStyle:{fontSize:11}},
+  series:[{type:'pie',radius:['35%','65%'],label:{fontSize:12,fontWeight:700},
+    data:personaValues.map((v,i)=>({value:v,name:personas[i]+' '+v+'%',itemStyle:{color:COLORS[i]}}))}]
+});
+
+const chartScenes = echarts.init(document.getElementById('chart-scenes'));
+chartScenes.setOption({
+  tooltip:{trigger:'axis',axisPointer:{type:'shadow'}},
+  grid:{left:130,right:20,top:10,bottom:30},
+  xAxis:{type:'value',max:40,axisLabel:{fontSize:11,color:'#888'}},
+  yAxis:{type:'category',data:scenes,axisLabel:{fontSize:11,color:'#333'}},
+  series:[{type:'bar',data:sceneValues,itemStyle:{color:p=>['#FF6B6B','#4D96FF','#6BCB77','#FFD93D','#C75B3A'][p.dataIndex],borderRadius:[0,4,4,0]},barMaxWidth:30}]
+});
+
+window.addEventListener('resize',()=>{
+  chartKws.resize(); chartCom.resize(); chartDims.resize();
+  chartType.resize(); chartComp.resize(); chartPersona.resize(); chartScenes.resize();
+});
+</script>
+</body>
+</html>

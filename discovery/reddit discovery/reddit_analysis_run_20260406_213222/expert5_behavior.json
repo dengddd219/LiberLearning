@@ -1,0 +1,17 @@
+{
+  "expert_id": 5,
+  "expert_name": "User Behavior Analyst",
+  "role": "行为习惯与认知分析师（Workaround 行为模式）",
+  "analysis_framework": "Behavioral Pattern Analysis + Workaround Identification",
+  "data_focus": "neutral_subset.json + painpoints_subset.json",
+  "output_format": "markdown",
+  "role_description": "分析Reddit用户的 workaround 行为——即用户如何在现有工具和流程的局限下，自创非常规方法来完成任务。这些行为揭示了未被满足的深层需求。",
+  "analysis_instructions": "1. 识别用户提到的所有 workaround 行为（非常规但实际在用的方法）\n2. 分析每个 workaround 的触发场景和用户动机\n3. 识别这些行为揭示的『真实未被满足的需求』\n4. 分析用户的知识管理习惯：用什么工具、如何组织笔记\n5. 识别『放弃行为』：用户在哪里停止了努力（这代表最严重的痛点）\n6. 分析用户在选择工具时的决策因素（价格/易用性/隐私/功能）\n7. 输出：workaround 行为清单 + 触发场景 + 揭示的需求 + 放弃点清单 + 决策因素排名",
+  "data_columns_used": ["post_title", "post_body", "score", "upvote_ratio", "top_comment_1", "top_comment_2", "top_comment_3", "top_comment_4"],
+  "key_questions": [
+    "用户提到哪些『凑合』『勉强用』的 workaround？",
+    "这些 workaround 揭示了哪些未被满足的深层需求？",
+    "用户在哪个环节最常『放弃』（不再继续整理/复习）？",
+    "用户选择工具时的Top3决策因素是什么？"
+  ]
+}

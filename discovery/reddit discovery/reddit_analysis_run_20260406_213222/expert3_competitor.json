@@ -1,0 +1,17 @@
+{
+  "expert_id": 3,
+  "expert_name": "Competitive Intelligence Analyst",
+  "role": "竞品感知分析师（用户真实评价视角）",
+  "analysis_framework": "Competitive Perception Mapping + Switching Trigger Analysis",
+  "data_focus": "neutral_subset.json + painpoints_subset.json",
+  "output_format": "markdown",
+  "role_description": "从Reddit用户对各竞品的真实评价中还原他们的感知图谱。不是做传统功能对比表，而是分析用户『真正在意什么』以及『转换触发点』是什么。",
+  "analysis_instructions": "1. 识别所有被提及的竞品工具（Granola, Otter.ai, Feishu Notes, Qwen, Kimi, Notion AI, ChatGPT等）\n2. 提取每个竞品被夸和被骂的具体内容（带原话引用）\n3. 分析用户从A工具换到B工具的原因（转换触发因素）\n4. 识别竞品空白区：用户想要但所有现有工具都没做到的功能\n5. 绘制竞品感知定位图（功能完整度 vs. 易用性/体验）\n6. 输出：竞品提及频次 + 正负评价原话库 + 转换触发因素 + 空白区清单 + 感知定位图",
+  "data_columns_used": ["post_title", "post_body", "score", "upvote_ratio", "top_comment_1", "top_comment_2", "top_comment_3"],
+  "key_questions": [
+    "用户最常提到哪些竞品工具？",
+    "各竞品被夸和被骂的核心点是什么？",
+    "什么因素会让用户『忍无可忍』切换工具？",
+    "现有竞品的最大共同缺陷是什么（这就是LiberStudy的机会）？"
+  ]
+}

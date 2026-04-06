@@ -1,7 +1,7 @@
 # LiberStudy PRD
 
 > 版本: v0.1 | 作者: [你的名字] | 日期: 2026-04-05 | 状态: Draft
-
+花费： $ 18.75
 ---
 
 ## 1. Executive Summary
