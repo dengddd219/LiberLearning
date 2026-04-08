@@ -4,43 +4,52 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**LiberStudy** is a multimodal lecture/meeting knowledge structuring tool. It aligns instructor speech (ASR transcription) with PPT slides (Vision/OCR) on a per-page basis, producing structured study notes anchored to individual PPT pages.
+**LiberStudy** is a multimodal lecture knowledge structuring tool. It aligns instructor speech (ASR transcription) with PPT slides on a per-page basis, producing structured study notes anchored to individual PPT pages.
 
-Core flow: User uploads PPT + lecture video/audio → ASR transcription with timestamps → video frame sampling for slide transition detection → multimodal LLM aligns transcript segments with corresponding PPT pages → outputs structured notes in a dual-pane view (slide thumbnails on left, notes on right).
+Core flow: User uploads PPT + records audio in-browser (or uploads audio file) → ASR transcription with timestamps → user note anchors + semantic alignment builds per-page timeline → LLM generates structured notes per PPT page → outputs in a tri-pane view (slide nav + PPT canvas + notes panel).
 
 ## Current State
 
-This repository is in the **pre-code / PRD stage**. The product requirements document is in `LiberStudy-PRD.md`. No application code has been written yet.
+This repository is in the **pre-code / PRD stage**. The product requirements document is in `LiberStudy-PRD.md` (v0.2). No application code has been written yet.
 
-## Planned Tech Stack (from PRD)
+## MVP-0 Scope
 
-- **Frontend**: React or Next.js (responsive web app, desktop-first)
-- **Backend**: FastAPI (Python) or Next.js full-stack
-- **ASR**: Whisper (local) or OpenAI Whisper API
-- **PPT Understanding**: GPT-4o Vision / Qwen-VL / LLaVA
-- **Note Generation**: GPT-4o / Claude / Qwen2.5
-- **Slide Transition Detection**: OpenCV frame differencing + perceptual hash (pHash), with SSIM or CLIP as fallback if accuracy < 85%
-- **File Storage**: Local filesystem for MVP, S3/OSS for scale
+MVP-0 focuses on **Scene ② (real-time in-class recording)** as the core, with **Scene ① (post-class audio upload)** as P1. Scenes ③④ (video/screen capture) are deferred to V2.
 
-Three technical approaches (A: pure API, B: pure open-source, C: hybrid) are being evaluated. The PRD recommends starting with approach C (hybrid) for MVP.
+## Planned Tech Stack (decided)
+
+- **Frontend**: React + Vite + Tailwind CSS + shadcn/ui
+- **Backend**: FastAPI (Python)
+- **PPT Parsing & Rendering**: LibreOffice (headless, converts .ppt/.pptx to PDF) + PyMuPDF (text extraction + PNG rendering)
+- **Audio Format Conversion**: FFmpeg (WebM/Opus → WAV for ASR APIs)
+- **Chinese ASR**: Alibaba Cloud ASR API
+- **English ASR**: OpenAI Whisper API
+- **Semantic Alignment**: OpenAI text-embedding-3-small
+- **Note Generation**: Claude API (claude-sonnet)
+- **Deployment**: Local-only (localhost), API keys in .env
 
 ## Target Users
 
 Primary: Chinese university students (STEM and humanities). Secondary: professionals attending PPT-driven meetings. The product language is Chinese.
 
-## Key MVP Features (P0)
+## Key MVP-0 Features (P0)
 
-1. File upload (PPT/PPTX + MP4/WebM/MP3/WAV)
-2. PPT page transition detection via video frame analysis
+1. In-class real-time recording (browser microphone) with pin-annotation on PPT
+2. PPT file upload and parsing (.ppt/.pptx/.pdf via LibreOffice + PyMuPDF)
 3. ASR transcription with timestamps
-4. Multimodal alignment (transcript segments ↔ PPT pages)
-5. Structured note generation via LLM
-6. Dual-pane viewing interface (slide nav + notes)
+4. User note anchors + semantic alignment for per-page timeline
+5. Structured note generation via LLM (passive learning: all pages; active learning: additive on pages with user notes)
+6. Tri-pane viewing interface (slide nav + PPT canvas + notes panel) with "My Notes | AI Notes" view toggle
+
+## Key Design Decisions
+
+- **Passive + Active learning are additive, not mutually exclusive**: All pages get passive learning (bullet annotations). Pages with user notes ALSO get active learning (note expansion), layered on top.
+- **Data persistence**: IndexedDB (via Dexie.js), NOT localStorage
+- **Export**: Markdown (primary) + PDF (secondary)
 
 ## Constraints
 
 - MVP: single language only (Chinese or English), no mixed-language support
-- One PPT per video (no multi-PPT support)
-- Per-user limits: max 2 videos/day, max 120 minutes per video
-- Uploaded files auto-deleted from server within 24 hours
-- No user account system in MVP (session URL sharing instead)
+- One PPT per audio (no multi-PPT support)
+- Per-user limits: max 2 sessions/day, max 120 minutes per audio
+- Local-only deployment, all data on user's machine
