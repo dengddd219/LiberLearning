@@ -26,7 +26,7 @@ MVP-0 focuses on **Scene ② (real-time in-class recording)** as the core, with 
 - **English ASR**: OpenAI Whisper API
 - **Semantic Alignment**: OpenAI text-embedding-3-small
 - **Note Generation**: Claude API (claude-sonnet)
-- **Deployment**: Local-only (localhost), API keys in .env
+- **Deployment**: Cloud deployment (frontend + backend separated), API keys in server-side environment variables
 
 ## Target Users
 
@@ -34,7 +34,7 @@ Primary: Chinese university students (STEM and humanities). Secondary: professio
 
 ## Key MVP-0 Features (P0)
 
-1. In-class real-time recording (browser microphone) with pin-annotation on PPT
+1. In-class real-time recording (browser microphone) with inline text annotation on PPT (click to create text label in-place, no pin/connector line)
 2. PPT file upload and parsing (.ppt/.pptx/.pdf via LibreOffice + PyMuPDF)
 3. ASR transcription with timestamps
 4. User note anchors + semantic alignment for per-page timeline
@@ -43,7 +43,8 @@ Primary: Chinese university students (STEM and humanities). Secondary: professio
 
 ## Key Design Decisions
 
-- **Passive + Active learning are additive, not mutually exclusive**: All pages get passive learning (bullet annotations). Pages with user notes ALSO get active learning (note expansion), layered on top.
+- **PPT is optional**: Without PPT → active learning only (user notes + transcript). With PPT → passive learning added (AI aligns transcript to slides)
+- **PPT browsing**: Vertical scroll (all pages stacked, like a webpage), not left/right pagination
 - **Data persistence**: IndexedDB (via Dexie.js), NOT localStorage
 - **Export**: Markdown (primary) + PDF (secondary)
 
@@ -52,4 +53,4 @@ Primary: Chinese university students (STEM and humanities). Secondary: professio
 - MVP: single language only (Chinese or English), no mixed-language support
 - One PPT per audio (no multi-PPT support)
 - Per-user limits: max 2 sessions/day, max 120 minutes per audio
-- Local-only deployment, all data on user's machine
+- Cloud deployment; audio/PPT files cleaned after processing, structured notes stored in cloud DB
