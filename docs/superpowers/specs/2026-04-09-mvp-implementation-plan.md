@@ -22,28 +22,28 @@
 
 | 任务编号 | 任务名称 | 状态 | 完成日期 | 备注 | 产出 |
 |---------|---------|------|---------|------|------|
-| 1.1.1 | 初始化 React + TypeScript + Vite 项目 | | | 用 `npm create vite@latest frontend -- --template react-ts` | `frontend/` 目录 |
-| 1.1.2 | 配置 Tailwind CSS v4 + shadcn/ui | | | 创建 `tailwind.config.ts`，验证样式生效 | 全局样式体系 |
-| 1.1.3 | 配置 React Router 路由骨架 | | | `/session`、`/upload`、`/processing`、`/notes/:session_id`，创建 4 个空页面组件 | 路由骨架 |
-| 1.1.4 | 封装 API 请求工具 | | | 创建 `frontend/src/lib/api.ts`，支持 `VITE_API_BASE_URL` 环境变量 | API 调用层 |
-| 1.1.5 | 封装 IndexedDB 操作 | | | 创建 `frontend/src/lib/idb.ts`，使用 idb 库，定义 session/audio/notes 三个 store | 本地持久化层 |
+| 1.1.1 | 初始化 React + TypeScript + Vite 项目 | ✅ | 2026-04-09 | 用 `npm create vite@latest frontend -- --template react-ts` | `frontend/` 目录 |
+| 1.1.2 | 配置 Tailwind CSS v4 + shadcn/ui | ✅ | 2026-04-09 | 创建 `tailwind.config.ts`，验证样式生效 | 全局样式体系 |
+| 1.1.3 | 配置 React Router 路由骨架 | ✅ | 2026-04-09 | `/session`、`/upload`、`/processing`、`/notes/:session_id`，创建 4 个空页面组件 | 路由骨架 |
+| 1.1.4 | 封装 API 请求工具 | ✅ | 2026-04-09 | 创建 `frontend/src/lib/api.ts`，支持 `VITE_API_BASE_URL` 环境变量 | API 调用层 |
+| 1.1.5 | 封装 IndexedDB 操作 | ✅ | 2026-04-09 | 创建 `frontend/src/lib/idb.ts`，使用 idb 库，定义 session/audio/notes 三个 store | 本地持久化层 |
 
 ### Task 1.2: 后端项目初始化
 
 | 任务编号 | 任务名称 | 状态 | 完成日期 | 备注 | 产出 |
 |---------|---------|------|---------|------|------|
-| 1.2.1 | 初始化 FastAPI 后端骨架 | | | 创建 `backend/` 目录，`main.py` FastAPI 入口，`requirements.txt`（fastapi, uvicorn, python-multipart） | 后端骨架 |
-| 1.2.2 | 配置 CORS 中间件 | | | 允许 localhost:5173 和未来 Vercel 域名 | 跨域可用 |
-| 1.2.3 | 注册路由结构 | | | 创建 `backend/routers/` 目录，注册 process 和 sessions 两个 router，各有一个 health check 端点 | 路由结构 |
-| 1.2.4 | 创建环境变量模板 | | | 创建 `backend/.env.example`，列出所有需要的 API Key 占位（ANTHROPIC_API_KEY 等） | 环境变量模板 |
+| 1.2.1 | 初始化 FastAPI 后端骨架 | ✅ | 2026-04-09 | 创建 `backend/` 目录，`main.py` FastAPI 入口，`requirements.txt`（fastapi, uvicorn, python-multipart） | 后端骨架 |
+| 1.2.2 | 配置 CORS 中间件 | ✅ | 2026-04-09 | 允许 localhost:5173 和未来 Vercel 域名 | 跨域可用 |
+| 1.2.3 | 注册路由结构 | ✅ | 2026-04-09 | 创建 `backend/routers/` 目录，注册 process 和 sessions 两个 router，各有一个 health check 端点 | 路由结构 |
+| 1.2.4 | 创建环境变量模板 | ✅ | 2026-04-09 | 创建 `backend/.env.example`，列出所有需要的 API Key 占位（ANTHROPIC_API_KEY 等） | 环境变量模板 |
 
 ### Task 1.3: 根目录启动配置
 
 | 任务编号 | 任务名称 | 状态 | 完成日期 | 备注 | 产出 |
 |---------|---------|------|---------|------|------|
-| 1.3.1 | 配置一键启动 | | | 根目录 `package.json` 配置 concurrently，`npm run dev` 同时启动前端和后端 | 一键启动 |
-| 1.3.2 | 创建 .gitignore | | | node_modules, .venv, .env, __pycache__, dist | 代码卫生 |
-| 1.3.3 | 联通验证 | | | `npm run dev` 后前端 localhost:5173 + 后端 localhost:8000/docs 均可访问 | 联通验证 |
+| 1.3.1 | 配置一键启动 | ✅ | 2026-04-09 | 根目录 `package.json` 配置 concurrently，`npm run dev` 同时启动前端和后端 | 一键启动 |
+| 1.3.2 | 创建 .gitignore | ✅ | 2026-04-09 | node_modules, .venv, .env, __pycache__, dist | 代码卫生 |
+| 1.3.3 | 联通验证 | ✅ | 2026-04-09 | `npm run dev` 后前端 localhost:5173 + 后端 localhost:8000/docs 均可访问 | 联通验证 |
 
 ---
 
