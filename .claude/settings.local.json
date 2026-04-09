@@ -6,7 +6,9 @@
       "Bash(npm create:*)",
       "Bash(rm -f src/App.css src/assets/react.svg src/assets/vite.svg src/assets/hero.png)",
       "Bash(ls src/assets/)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(node prepare-digest.js)",
+      "Bash(python3 -c \" import sys, json data = json.load\\(sys.stdin\\) builders = data.get\\('x', []\\) for b in builders[5:]: print\\(f'--- {b[\\\\\"name\\\\\"]} \\(@{b[\\\\\"handle\\\\\"]}\\) ---'\\) print\\(f'Bio: {b.get\\(\\\\\"bio\\\\\",\\\\\"\\\\\"\\)}'\\) tweets = b.get\\('tweets', []\\) for t in tweets[:3]: print\\(f' Tweet: {t.get\\(\\\\\"text\\\\\",\\\\\"\\\\\"\\)[:300]}'\\) print\\(f' URL: {t.get\\(\\\\\"url\\\\\",\\\\\"\\\\\"\\)}'\\) \")"
     ]
   }
 }

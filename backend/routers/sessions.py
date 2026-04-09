@@ -127,12 +127,11 @@ def sessions_health():
 def get_session(session_id: str):
     if session_id == "mock-session-001":
         return MOCK_SESSION
-    raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
 
+    # Look up real sessions from the process router's in-memory store
+    from routers.process import _SESSIONS
+    session = _SESSIONS.get(session_id)
+    if session:
+        return session
 
-@router.post("/sessions/{session_id}/page/{page_num}/retry")
-def retry_page(session_id: str, page_num: int):
-    """Stub for Phase B real API. Returns success for mock session."""
-    if session_id == "mock-session-001":
-        return {"status": "ok", "message": f"Page {page_num} retry queued (mock)"}
     raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")

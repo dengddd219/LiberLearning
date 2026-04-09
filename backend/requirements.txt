@@ -2,3 +2,24 @@ fastapi==0.115.5
 uvicorn[standard]==0.32.1
 python-multipart==0.0.12
 python-dotenv==1.0.1
+
+# PPT parsing
+pymupdf==1.24.14
+
+# Numeric (used by alignment service)
+numpy>=1.26,<3.0
+
+# Audio processing
+# FFmpeg is a system dependency (install via install_deps.bat)
+
+# ASR & Embeddings
+openai==1.57.0
+
+# LLM note generation
+anthropic==0.40.0
+
+# Async HTTP
+httpx==0.28.1
+
+# Rate limiting
+slowapi==0.1.9
