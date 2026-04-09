@@ -29,3 +29,6 @@ npm-debug.log*
 
 # Drizzle
 drizzle/
+
+# Git worktrees
+.worktrees/
