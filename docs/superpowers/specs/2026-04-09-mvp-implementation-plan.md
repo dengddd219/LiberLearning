@@ -55,23 +55,23 @@
 
 | 任务编号 | 任务名称 | 状态 | 完成日期 | 备注 | 产出 |
 |---------|---------|------|---------|------|------|
-| 2.1.1 | 编写 Mock 数据文件 | | | 3 页预置 Mock JSON（第1页有用户批注→验证 active_notes；第2页纯讲解→验证 passive_notes；第3页脱离课件→验证 page_supplement） | Mock 数据文件 |
-| 2.1.2 | 实现 Mock 处理接口 | | | `POST /api/process-mock`：接收文件上传（不处理），直接返回 Mock JSON | Mock API |
-| 2.1.3 | 实现 Session 查询接口 | | | `GET /api/sessions/{id}`：返回对应 session 的 Mock JSON | Session 查询 API |
-| 2.1.4 | 配置静态文件服务 | | | `/slides/{filename}` 和 `/audio/{filename}` 提供 3 张示例 PPT PNG 和 1 段示例音频 | 静态资源 |
+| 2.1.1 | 编写 Mock 数据文件 | ✅ | 2026-04-09 | 3 页预置 Mock JSON（第1页有用户批注→验证 active_notes；第2页纯讲解→验证 passive_notes；第3页脱离课件→验证 page_supplement） | Mock 数据文件 |
+| 2.1.2 | 实现 Mock 处理接口 | ✅ | 2026-04-09 | `POST /api/process-mock`：接收文件上传（不处理），直接返回 Mock JSON | Mock API |
+| 2.1.3 | 实现 Session 查询接口 | ✅ | 2026-04-09 | `GET /api/sessions/{id}`：返回对应 session 的 Mock JSON | Session 查询 API |
+| 2.1.4 | 配置静态文件服务 | ✅ | 2026-04-09 | `/slides/{filename}` 和 `/audio/{filename}` 提供 3 张示例 PPT PNG 和 1 段示例音频 | 静态资源 |
 
 ### Task 2.2: 上课采集界面（/session，P0 核心）
 
 | 任务编号 | 任务名称 | 状态 | 完成日期 | 备注 | 产出 |
 |---------|---------|------|---------|------|------|
-| 2.2.1 | 三栏布局骨架 | | | 左栏可折叠(~200px)、中栏弹性、右栏固定(~320px) | 布局组件 `ThreeColumnLayout` |
-| 2.2.2 | 左栏：大纲导航组件 | | | 页码列表，hover 浮出缩略图，点击滚动到对应页面 | `OutlineNav` 组件 |
-| 2.2.3 | 中栏：PPT 画布组件 | | | 所有 PPT 页面 PNG 垂直堆叠排列，Intersection Observer 检测「当前页」（视口占比最大的页面） | `SlideCanvas` 组件 |
-| 2.2.4 | 中栏：就地文本批注组件 | | | 点击 PPT 画面任意位置弹出文字框，确认后以标注样式留在原位，记录 page_num + timestamp + y_position | `InlineAnnotation` 组件 |
-| 2.2.5 | 右栏：录音控制条组件 | | | 开始/暂停/停止按钮 + 计时器，使用 MediaRecorder API 录音，每 10 分钟自动切片存 IndexedDB | `RecordingControl` 组件 |
-| 2.2.6 | 右栏：当前页笔记区组件 | | | 显示当前页的就地批注列表，支持直接在此输入新笔记（与中栏批注双向同步），切换页面时笔记区跟随切换 | `PageNotes` 组件 |
-| 2.2.7 | 无 PPT 模式 | | | 两栏布局（左: 录音控制，右: 自由文本笔记区），PPT 上传为可选项 | 降级布局 |
-| 2.2.8 | PPT 上传组件 | | | 拖拽 + 点击上传 .ppt/.pptx/.pdf，调用后端上传接口，上传成功后加载页面 PNG 到中栏画布 | `FileUpload` 组件 |
+| 2.2.1 | 三栏布局骨架 | ✅ | 2026-04-09 | 左栏可折叠(~200px)、中栏弹性、右栏固定(~320px) | 布局组件 `ThreeColumnLayout` |
+| 2.2.2 | 左栏：大纲导航组件 | ✅ | 2026-04-09 | 页码列表，hover 浮出缩略图，点击滚动到对应页面 | `OutlineNav` 组件 |
+| 2.2.3 | 中栏：PPT 画布组件 | ✅ | 2026-04-09 | 所有 PPT 页面 PNG 垂直堆叠排列，Intersection Observer 检测「当前页」（视口占比最大的页面） | `SlideCanvas` 组件 |
+| 2.2.4 | 中栏：就地文本批注组件 | ✅ | 2026-04-09 | 点击 PPT 画面任意位置弹出文字框，确认后以标注样式留在原位，记录 page_num + timestamp + y_position | `InlineAnnotation` 组件 |
+| 2.2.5 | 右栏：录音控制条组件 | ✅ | 2026-04-09 | 开始/暂停/停止按钮 + 计时器，使用 MediaRecorder API 录音，每 10 分钟自动切片存 IndexedDB | `RecordingControl` 组件 |
+| 2.2.6 | 右栏：当前页笔记区组件 | ✅ | 2026-04-09 | 显示当前页的就地批注列表，支持直接在此输入新笔记（与中栏批注双向同步），切换页面时笔记区跟随切换 | `PageNotes` 组件 |
+| 2.2.7 | 无 PPT 模式 | ✅ | 2026-04-09 | 两栏布局（左: 录音控制，右: 自由文本笔记区），PPT 上传为可选项 | 降级布局 |
+| 2.2.8 | PPT 上传组件 | ✅ | 2026-04-09 | 拖拽 + 点击上传 .ppt/.pptx/.pdf，调用后端上传接口，上传成功后加载页面 PNG 到中栏画布 | `FileUpload` 组件 |
 
 ### Task 2.3: 处理进度界面（/processing）
 
