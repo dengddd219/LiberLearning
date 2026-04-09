@@ -1,2 +1,0 @@
-export TINYFISH_API_KEY=sk-tinyfish-RoUZ-CTxxKHX24UFBJ0CiD-DvqnCQYJI
-
