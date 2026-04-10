@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LiberStudy API 成本仪表盘</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f4f5f7;
+      color: #1a1a2e;
+      font-size: 14px;
+    }
+    header {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 18px; font-weight: 600; }
+    header span { font-size: 12px; opacity: 0.5; margin-left: auto; }
+
+    .main { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+
+    /* ── 汇总面板 ── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    .stat-card .label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    .stat-card .value { font-size: 22px; font-weight: 700; color: #1a1a2e; }
+    .stat-card .sub   { font-size: 11px; color: #aaa; margin-top: 2px; }
+
+    .charts-row {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .chart-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    .chart-card h3 { font-size: 13px; font-weight: 600; margin-bottom: 12px; color: #555; }
+    .chart-wrap { position: relative; height: 200px; }
+
+    /* ── 输入区 ── */
+    .input-section {
+      background: #fff;
+      border-radius: 10px;
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+      margin-bottom: 24px;
+    }
+    .input-section h3 { font-size: 13px; font-weight: 600; color: #555; margin-bottom: 10px; }
+    .input-row { display: flex; gap: 8px; }
+    textarea {
+      flex: 1;
+      height: 110px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 10px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 12px;
+      resize: vertical;
+      outline: none;
+      transition: border-color .2s;
+    }
+    textarea:focus { border-color: #6c63ff; }
+    .btn-col { display: flex; flex-direction: column; gap: 6px; }
+    button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s;
+      white-space: nowrap;
+    }
+    button:hover { opacity: .85; }
+    .btn-primary   { background: #6c63ff; color: #fff; }
+    .btn-secondary { background: #e8e8f0; color: #444; }
+    .btn-danger    { background: #ff4d4f; color: #fff; }
+    .btn-export    { background: #22c55e; color: #fff; }
+    #toast {
+      display: none;
+      background: #333;
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      align-self: center;
+    }
+
+    /* ── 表格 ── */
+    .table-section {
+      background: #fff;
+      border-radius: 10px;
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    .table-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .table-header h3 { font-size: 13px; font-weight: 600; color: #555; }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      text-align: left;
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      padding: 8px 10px;
+      border-bottom: 1px solid #eee;
+    }
+    td {
+      padding: 9px 10px;
+      border-bottom: 1px solid #f0f0f0;
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr.expandable { cursor: pointer; }
+    tr.expandable:hover td { background: #fafafa; }
+    tr.detail-row td { background: #f9f9ff; padding: 0; }
+    .detail-inner {
+      display: none;
+      padding: 12px 16px;
+      font-size: 12px;
+      color: #555;
+      line-height: 1.8;
+    }
+    .detail-inner.open { display: block; }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px 16px;
+    }
+    .detail-item .k { color: #aaa; }
+    .detail-item .v { font-weight: 600; color: #333; }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .pill-whisper   { background: #e0f0ff; color: #0077cc; }
+    .pill-embedding { background: #e8fff0; color: #00884a; }
+    .pill-claude    { background: #f0eaff; color: #6c2fff; }
+    .total-cost { font-weight: 700; color: #6c63ff; }
+    .empty-state {
+      text-align: center;
+      color: #bbb;
+      padding: 40px 0;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6c63ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+  <h1>LiberStudy — API 成本仪表盘</h1>
+  <span>数据存储于本地 localStorage</span>
+</header>
+
+<div class="main">
+
+  <!-- 汇总卡片 -->
+  <div class="summary-grid">
+    <div class="stat-card">
+      <div class="label">累计总费用</div>
+      <div class="value" id="s-total">¥0.00</div>
+      <div class="sub" id="s-runs">0 次运行</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Whisper 累计</div>
+      <div class="value" id="s-whisper">¥0.00</div>
+      <div class="sub">¥0.0468/分钟</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Embedding 累计</div>
+      <div class="value" id="s-embedding">¥0.00</div>
+      <div class="sub">¥0.1366/1M tokens</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Claude 累计</div>
+      <div class="value" id="s-claude">¥0.00</div>
+      <div class="sub">输入¥15 / 输出¥75 per 1M</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">平均单次费用</div>
+      <div class="value" id="s-avg">¥0.00</div>
+      <div class="sub" id="s-audio-total">总音频 0 分钟</div>
+    </div>
+  </div>
+
+  <!-- 图表行 -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <h3>费用构成（累计）</h3>
+      <div class="chart-wrap">
+        <canvas id="pie-chart"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>每次运行费用趋势</h3>
+      <div class="chart-wrap">
+        <canvas id="bar-chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- 输入区 -->
+  <div class="input-section">
+    <h3>录入新数据</h3>
+    <div style="margin-bottom:8px; font-size:12px; color:#aaa;">
+      粘贴单条运行 JSON（追加）或粘贴包含数组的全量 JSON（批量导入/覆盖）
+    </div>
+    <div class="input-row">
+      <textarea id="json-input" placeholder='粘贴单条：{"run_at":"...","audio_seconds":1800,...}
+或全量数组：[{"run_at":"..."},{"run_at":"..."},...]'></textarea>
+      <div class="btn-col">
+        <button class="btn-primary" onclick="handleAppend()">追加记录</button>
+        <button class="btn-secondary" onclick="handleImport()">批量导入（覆盖）</button>
+        <button class="btn-export" onclick="handleExport()">导出全量 JSON</button>
+        <button class="btn-danger" onclick="handleClear()">清空历史</button>
+        <div id="toast">已复制</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 历史表格 -->
+  <div class="table-section">
+    <div class="table-header">
+      <h3>历史运行记录</h3>
+      <span id="t-count" style="font-size:12px;color:#aaa;"></span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>时间</th>
+          <th>音频时长</th>
+          <th>PPT页数</th>
+          <th><span class="pill pill-whisper">Whisper</span></th>
+          <th><span class="pill pill-embedding">Embedding</span></th>
+          <th><span class="pill pill-claude">Claude</span></th>
+          <th>总费用</th>
+        </tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
+    <div class="empty-state" id="empty-state">暂无记录，请粘贴 JSON 开始录入</div>
+  </div>
+
+</div>
+
+<script>
+// ── 存储 key ──────────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'liberstudy_cost_runs';
+
+function loadRuns() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+  catch { return []; }
+}
+function saveRuns(runs) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(runs));
+}
+
+// ── 费用格式化 ────────────────────────────────────────────────────────────────
+function fmt(n) { return '¥' + (n || 0).toFixed(4); }
+function fmtBig(n) { return '¥' + (n || 0).toFixed(3); }
+
+function fmtDuration(secs) {
+  const m = Math.floor(secs / 60), s = secs % 60;
+  return m > 0 ? `${m}分${s}秒` : `${s}秒`;
+}
+
+function fmtTime(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString('zh-CN', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+  } catch { return iso; }
+}
+
+// ── 图表实例 ──────────────────────────────────────────────────────────────────
+let pieChart = null, barChart = null;
+
+const COLORS = {
+  whisper:   '#60a5fa',
+  embedding: '#34d399',
+  claude:    '#a78bfa',
+};
+
+function initCharts() {
+  const pieCtx = document.getElementById('pie-chart').getContext('2d');
+  pieChart = new Chart(pieCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Whisper', 'Embedding', 'Claude'],
+      datasets: [{ data: [0, 0, 0], backgroundColor: [COLORS.whisper, COLORS.embedding, COLORS.claude], borderWidth: 2 }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 10 } } },
+    },
+  });
+
+  const barCtx = document.getElementById('bar-chart').getContext('2d');
+  barChart = new Chart(barCtx, {
+    type: 'bar',
+    data: {
+      labels: [],
+      datasets: [
+        { label: 'Whisper',   data: [], backgroundColor: COLORS.whisper,   stack: 'cost' },
+        { label: 'Embedding', data: [], backgroundColor: COLORS.embedding, stack: 'cost' },
+        { label: 'Claude',    data: [], backgroundColor: COLORS.claude,    stack: 'cost' },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { stacked: true, ticks: { font: { size: 10 } } },
+        y: { stacked: true, ticks: { font: { size: 10 }, callback: v => '¥' + v.toFixed(2) } },
+      },
+      plugins: { legend: { labels: { font: { size: 11 }, padding: 8 } } },
+    },
+  });
+}
+
+// ── 渲染全部 ──────────────────────────────────────────────────────────────────
+function render() {
+  const runs = loadRuns();
+
+  // 汇总计算
+  let totalCny = 0, whisperCny = 0, embCny = 0, claudeCny = 0, totalAudioSec = 0;
+  runs.forEach(r => {
+    totalCny    += r.total_cost_cny || 0;
+    whisperCny  += (r.whisper?.cost_cny || 0);
+    embCny      += (r.embedding?.cost_cny || 0);
+    claudeCny   += (r.claude?.cost_cny || 0);
+    totalAudioSec += (r.audio_seconds || 0);
+  });
+
+  // 汇总卡片
+  document.getElementById('s-total').textContent     = '¥' + totalCny.toFixed(3);
+  document.getElementById('s-runs').textContent      = `${runs.length} 次运行`;
+  document.getElementById('s-whisper').textContent   = '¥' + whisperCny.toFixed(3);
+  document.getElementById('s-embedding').textContent = '¥' + embCny.toFixed(4);
+  document.getElementById('s-claude').textContent    = '¥' + claudeCny.toFixed(3);
+  document.getElementById('s-avg').textContent       = runs.length ? '¥' + (totalCny / runs.length).toFixed(3) : '¥0.000';
+  document.getElementById('s-audio-total').textContent = `总音频 ${Math.round(totalAudioSec / 60)} 分钟`;
+
+  // 饼图
+  pieChart.data.datasets[0].data = [whisperCny, embCny, claudeCny];
+  pieChart.update();
+
+  // 条形图（最近 15 条）
+  const recent = runs.slice(-15);
+  barChart.data.labels = recent.map((r, i) => fmtTime(r.run_at) || `#${i+1}`);
+  barChart.data.datasets[0].data = recent.map(r => +(r.whisper?.cost_cny || 0).toFixed(4));
+  barChart.data.datasets[1].data = recent.map(r => +(r.embedding?.cost_cny || 0).toFixed(4));
+  barChart.data.datasets[2].data = recent.map(r => +(r.claude?.cost_cny || 0).toFixed(4));
+  barChart.update();
+
+  // 表格
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = '';
+  document.getElementById('empty-state').style.display = runs.length ? 'none' : 'block';
+  document.getElementById('t-count').textContent = runs.length ? `共 ${runs.length} 条` : '';
+
+  runs.slice().reverse().forEach((r, idx) => {
+    const no = runs.length - idx;
+    const mainTr = document.createElement('tr');
+    mainTr.className = 'expandable';
+    mainTr.innerHTML = `
+      <td style="color:#aaa;font-size:12px;">#${no}</td>
+      <td>${fmtTime(r.run_at)}</td>
+      <td>${fmtDuration(r.audio_seconds || 0)}</td>
+      <td>${r.ppt_pages ?? '-'} 页</td>
+      <td>${fmt(r.whisper?.cost_cny)}</td>
+      <td>${fmt(r.embedding?.cost_cny)}</td>
+      <td>${fmt(r.claude?.cost_cny)}</td>
+      <td class="total-cost">${fmtBig(r.total_cost_cny)}</td>
+    `;
+
+    const detailTr = document.createElement('tr');
+    detailTr.className = 'detail-row';
+    detailTr.innerHTML = `<td colspan="8"><div class="detail-inner" id="detail-${no}">
+      <div class="detail-grid">
+        <div class="detail-item"><span class="k">Whisper 音频时长</span><br><span class="v">${r.whisper?.audio_seconds ?? r.audio_seconds ?? '-'} 秒</span></div>
+        <div class="detail-item"><span class="k">Embedding tokens</span><br><span class="v">${(r.embedding?.tokens ?? 0).toLocaleString()}</span></div>
+        <div class="detail-item"><span class="k">Claude 输入 tokens</span><br><span class="v">${(r.claude?.input_tokens ?? 0).toLocaleString()}</span></div>
+        <div class="detail-item"><span class="k">Claude 输出 tokens</span><br><span class="v">${(r.claude?.output_tokens ?? 0).toLocaleString()}</span></div>
+        <div class="detail-item"><span class="k">Whisper 费用</span><br><span class="v">${fmt(r.whisper?.cost_cny)}</span></div>
+        <div class="detail-item"><span class="k">Embedding 费用</span><br><span class="v">${fmt(r.embedding?.cost_cny)}</span></div>
+        <div class="detail-item"><span class="k">Claude 费用</span><br><span class="v">${fmt(r.claude?.cost_cny)}</span></div>
+        <div class="detail-item"><span class="k">运行时间</span><br><span class="v">${r.run_at ?? '-'}</span></div>
+        <div class="detail-item"><span class="k">本次总费用</span><br><span class="v total-cost">${fmtBig(r.total_cost_cny)}</span></div>
+      </div>
+    </div></td>`;
+
+    mainTr.addEventListener('click', () => {
+      const d = document.getElementById(`detail-${no}`);
+      d.classList.toggle('open');
+    });
+
+    tbody.appendChild(mainTr);
+    tbody.appendChild(detailTr);
+  });
+}
+
+// ── 操作函数 ──────────────────────────────────────────────────────────────────
+function parseInput() {
+  const raw = document.getElementById('json-input').value.trim();
+  if (!raw) { alert('请先粘贴 JSON'); return null; }
+  try { return JSON.parse(raw); }
+  catch (e) { alert('JSON 解析失败：' + e.message); return null; }
+}
+
+function handleAppend() {
+  const parsed = parseInput();
+  if (!parsed) return;
+  const runs = loadRuns();
+  if (Array.isArray(parsed)) {
+    parsed.forEach(r => runs.push(r));
+  } else {
+    runs.push(parsed);
+  }
+  saveRuns(runs);
+  document.getElementById('json-input').value = '';
+  render();
+  showToast('已追加');
+}
+
+function handleImport() {
+  const parsed = parseInput();
+  if (!parsed) return;
+  if (!confirm('批量导入将覆盖全部现有历史，确认继续？')) return;
+  saveRuns(Array.isArray(parsed) ? parsed : [parsed]);
+  document.getElementById('json-input').value = '';
+  render();
+  showToast('已导入');
+}
+
+function handleExport() {
+  const runs = loadRuns();
+  const json = JSON.stringify(runs, null, 2);
+  navigator.clipboard.writeText(json).then(() => showToast('已复制到剪贴板'));
+}
+
+function handleClear() {
+  if (!confirm('确认清空所有历史记录？')) return;
+  saveRuns([]);
+  render();
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 1800);
+}
+
+// ── 启动 ──────────────────────────────────────────────────────────────────────
+initCharts();
+render();
+</script>
+</body>
+</html>

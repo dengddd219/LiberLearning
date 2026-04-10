@@ -13,8 +13,14 @@ from pathlib import Path
 
 def _ffmpeg_path() -> str:
     """Find FFmpeg executable."""
-    if shutil.which("ffmpeg"):
-        return "ffmpeg"
+    candidates = [
+        "ffmpeg",
+        r"C:\Users\19841\AppData\Local\Microsoft\WinGet\Links\ffmpeg.exe",
+        r"C:\Users\19841\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1-full_build\bin\ffmpeg.exe",
+    ]
+    for c in candidates:
+        if shutil.which(c) or Path(c).exists():
+            return c
     raise RuntimeError(
         "FFmpeg not found. Run install_deps.bat and restart your terminal."
     )
@@ -98,13 +104,18 @@ def get_audio_duration(wav_path: str) -> float:
     """
     Return audio duration in seconds using ffprobe.
     """
-    ffprobe = shutil.which("ffprobe")
+    ffprobe_candidates = [
+        "ffprobe",
+        r"C:\Users\19841\AppData\Local\Microsoft\WinGet\Links\ffprobe.exe",
+        r"C:\Users\19841\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1-full_build\bin\ffprobe.exe",
+    ]
+    ffprobe = next(
+        (c for c in ffprobe_candidates if shutil.which(c) or Path(c).exists()),
+        None,
+    )
     if not ffprobe:
-        # ffprobe ships with ffmpeg; try same dir
-        ffmpeg = _ffmpeg_path()
-        ffprobe = str(Path(ffmpeg).parent / "ffprobe")
-        if not Path(ffprobe).exists():
-            ffprobe = "ffprobe"
+        # fallback: derive from ffmpeg path
+        ffprobe = str(Path(_ffmpeg_path()).parent / "ffprobe.exe")
 
     result = subprocess.run(
         [

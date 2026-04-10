@@ -4,6 +4,41 @@
 
 ---
 
+## Phase 4 完成 — 2026-04-09（真实 API 接入）
+
+**背景**：Phase 1-3（Mock + UI）已完成，开始接入真实 API 进入 Phase 4。
+
+### 新增文件
+| 文件 | 说明 |
+|------|------|
+| `backend/services/ppt_parser.py` | PPT→PDF（LibreOffice）+ PyMuPDF 文本提取 + PNG 渲染 |
+| `backend/services/audio.py` | FFmpeg 格式转换（WebM/M4A→16kHz WAV）、多切片合并、时长探测 |
+| `backend/services/asr.py` | OpenAI Whisper API（英文，中转站支持）+ filler word 后处理 |
+| `backend/services/alignment.py` | text-embedding-3-small 余弦相似度对齐 + off-slide 检测（中转站支持） |
+| `backend/services/note_generator.py` | Claude claude-sonnet-4-6，被动+主动笔记，3次重试，5并发（代理+模型可配置） |
+| `backend/routers/process.py` | `POST /api/process` 真实处理链路 + 自实现限流（2次/天/IP） |
+| `install_deps.bat` | 一键安装 LibreOffice + FFmpeg（winget） |
+
+### 主要修改
+- `backend/main.py`：明确加载 `backend/.env`，移除 slowapi 依赖
+- `backend/routers/sessions.py`：支持查询真实 session（来自内存 store）
+- `backend/requirements.txt`：添加 pymupdf、numpy、openai、anthropic、httpx；移除 slowapi
+
+### API 中转站配置支持（新增）
+- `ANTHROPIC_API_KEY` / `ANTHROPIC_BASE_URL` / `ANTHROPIC_MODEL`（Claude）
+- `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `OPENAI_EMBEDDING_MODEL`（Whisper + Embedding）
+
+### 端到端验证 ✅
+- `POST /api/process` → FFmpeg 转换 → Whisper ASR → 语义对齐 → Claude 笔记生成
+- 128秒音频测试通过，生成4条带 timestamp 的结构化笔记
+
+### 待完成
+- 单元测试（Task 4.1.4、4.2.3、4.3.4、4.4.5、4.5.5、4.6.4）
+- Phase 5（PostHog 埋点）
+- Phase 6（Vercel 前端部署 + Railway 后端部署）
+
+---
+
 ## PRD 审阅记录 — 2026-04-09（大厂 PM 视角）
 
 > 本次审阅由 AI 辅助完成，逐问题记录原始问题与产品负责人回复，供后续 PRD 修改参考。

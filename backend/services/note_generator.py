@@ -59,14 +59,25 @@ Rules:
 """
 
 
-def _client() -> anthropic.Anthropic:
+DEFAULT_MODEL = "claude-sonnet-4-6"
+
+
+def _client() -> tuple[anthropic.Anthropic, str]:
+    """Return (client, model_name) using env-configured key, base URL, and model."""
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key or api_key.startswith("sk-ant-xxx"):
         raise RuntimeError(
             "ANTHROPIC_API_KEY not set or is placeholder. "
             "Add a real key to backend/.env"
         )
-    return anthropic.Anthropic(api_key=api_key)
+    base_url = os.environ.get("ANTHROPIC_BASE_URL", "").strip() or None
+    model = os.environ.get("ANTHROPIC_MODEL", "").strip() or DEFAULT_MODEL
+
+    client = anthropic.Anthropic(
+        api_key=api_key,
+        **({"base_url": base_url} if base_url else {}),
+    )
+    return client, model
 
 
 def _format_segments(segments: list[dict]) -> str:
@@ -89,6 +100,7 @@ def _extract_json(text: str) -> dict:
 
 async def _generate_passive(
     client: anthropic.Anthropic,
+    model: str,
     page: dict,
     semaphore: asyncio.Semaphore,
 ) -> dict:
@@ -109,7 +121,7 @@ async def _generate_passive(
                 response = await loop.run_in_executor(
                     None,
                     lambda: client.messages.create(
-                        model="claude-sonnet-4-6",
+                        model=model,
                         max_tokens=1024,
                         system=PASSIVE_SYSTEM,
                         messages=[{"role": "user", "content": user_msg}],
@@ -129,6 +141,7 @@ async def _generate_passive(
 
 async def _generate_active(
     client: anthropic.Anthropic,
+    model: str,
     page: dict,
     user_note: str,
     semaphore: asyncio.Semaphore,
@@ -149,7 +162,7 @@ async def _generate_active(
                 response = await loop.run_in_executor(
                     None,
                     lambda: client.messages.create(
-                        model="claude-sonnet-4-6",
+                        model=model,
                         max_tokens=1024,
                         system=ACTIVE_SYSTEM,
                         messages=[{"role": "user", "content": user_msg}],
@@ -180,7 +193,7 @@ async def generate_notes_for_all_pages(
 
     Returns an augmented list matching the session API response format.
     """
-    client = _client()
+    client, model = _client()
     semaphore = asyncio.Semaphore(MAX_CONCURRENT)
 
     async def process_page(page: dict) -> dict:
@@ -199,7 +212,7 @@ async def generate_notes_for_all_pages(
 
         # Passive notes (always)
         try:
-            passive = await _generate_passive(client, page, semaphore)
+            passive = await _generate_passive(client, model, page, semaphore)
             result["passive_notes"] = passive
         except Exception as e:
             result["status"] = "partial_ready"
@@ -211,7 +224,7 @@ async def generate_notes_for_all_pages(
         )
         if user_note:
             try:
-                active = await _generate_active(client, page, user_note, semaphore)
+                active = await _generate_active(client, model, page, user_note, semaphore)
                 result["active_notes"] = {
                     "user_note": user_note,
                     "ai_expansion": active.get("ai_expansion", ""),

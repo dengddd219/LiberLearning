@@ -9,9 +9,17 @@ Output format (list of segments):
 
 import os
 import re
+import shutil
+import subprocess
+import tempfile
 from typing import Optional
 
 from openai import OpenAI
+
+# Whisper API max file size is 25 MB.
+# 16kHz mono 16-bit WAV ≈ 1.92 MB/min → 10 min chunks ≈ 19 MB (safe margin).
+CHUNK_DURATION_SEC = 600  # 10 minutes per chunk
+MAX_FILE_SIZE_MB = 25
 
 # ── Filler words to strip (English + Chinese) ─────────────────────────────────
 _EN_FILLERS = re.compile(
@@ -35,6 +43,45 @@ def _postprocess(text: str, lang: str) -> str:
     return text.strip()
 
 
+def _split_audio(wav_path: str) -> list[tuple[str, float]]:
+    """
+    Split a WAV file into chunks of CHUNK_DURATION_SEC seconds.
+    Returns list of (chunk_path, offset_seconds) tuples.
+    If the file is small enough, returns the original path with offset 0.
+    """
+    file_size_mb = os.path.getsize(wav_path) / (1024 * 1024)
+    if file_size_mb <= MAX_FILE_SIZE_MB:
+        return [(wav_path, 0.0)]
+
+    from services.audio import _ffmpeg_path, get_audio_duration
+    ffmpeg = _ffmpeg_path()
+    total_duration = get_audio_duration(wav_path)
+
+    tmp_dir = tempfile.mkdtemp(prefix="asr_chunks_")
+    chunks = []
+    offset = 0.0
+
+    while offset < total_duration:
+        chunk_path = os.path.join(tmp_dir, f"chunk_{int(offset)}.wav")
+        result = subprocess.run(
+            [
+                ffmpeg, "-y",
+                "-i", wav_path,
+                "-ss", str(offset),
+                "-t", str(CHUNK_DURATION_SEC),
+                "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le",
+                chunk_path,
+            ],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"FFmpeg chunk split failed:\n{result.stderr}")
+        chunks.append((chunk_path, offset))
+        offset += CHUNK_DURATION_SEC
+
+    return chunks
+
+
 def transcribe_openai(
     wav_path: str,
     language: str = "en",
@@ -42,6 +89,7 @@ def transcribe_openai(
 ) -> list[dict]:
     """
     Transcribe a WAV file using OpenAI Whisper API with word-level timestamps.
+    Auto-splits files exceeding 25 MB into 10-minute chunks.
 
     Returns a list of segments:
       [{"text": str, "start": float, "end": float}, ...]
@@ -52,31 +100,43 @@ def transcribe_openai(
             "OPENAI_API_KEY not set or is placeholder. "
             "Add a real key to backend/.env"
         )
+    base_url = os.environ.get("OPENAI_BASE_URL", "").strip() or None
+    client = OpenAI(
+        api_key=api_key,
+        **({"base_url": base_url} if base_url else {}),
+    )
 
-    client = OpenAI(api_key=api_key)
+    chunks = _split_audio(wav_path)
+    all_segments = []
 
-    with open(wav_path, "rb") as audio_file:
-        response = client.audio.transcriptions.create(
-            model="whisper-1",
-            file=audio_file,
-            language=language,
-            response_format="verbose_json",
-            timestamp_granularities=["segment"],
-            prompt=prompt,
-        )
-
-    segments = []
-    for seg in response.segments or []:
-        cleaned = _postprocess(seg.text, language)
-        if cleaned:
-            segments.append(
-                {
-                    "text": cleaned,
-                    "start": seg.start,
-                    "end": seg.end,
-                }
+    for chunk_path, time_offset in chunks:
+        with open(chunk_path, "rb") as audio_file:
+            response = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
+                language=language,
+                response_format="verbose_json",
+                timestamp_granularities=["segment"],
+                prompt=prompt,
             )
-    return segments
+
+        for seg in response.segments or []:
+            cleaned = _postprocess(seg.text, language)
+            if cleaned:
+                all_segments.append(
+                    {
+                        "text": cleaned,
+                        "start": seg.start + time_offset,
+                        "end": seg.end + time_offset,
+                    }
+                )
+
+    # Clean up temp chunk files
+    if len(chunks) > 1:
+        chunk_dir = os.path.dirname(chunks[0][0])
+        shutil.rmtree(chunk_dir, ignore_errors=True)
+
+    return all_segments
 
 
 def transcribe_aliyun(

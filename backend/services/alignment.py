@@ -21,22 +21,29 @@ OFF_SLIDE_THRESHOLD = 0.30
 LOW_CONFIDENCE_THRESHOLD = 0.60
 
 
-def _get_client() -> OpenAI:
+def _get_client() -> tuple[OpenAI, str]:
+    """Return (client, embedding_model) using env-configured key, base URL, and model."""
     api_key = os.environ.get("OPENAI_API_KEY", "")
     if not api_key or api_key.startswith("sk-xxx"):
         raise RuntimeError(
             "OPENAI_API_KEY not set. Add a real key to backend/.env"
         )
-    return OpenAI(api_key=api_key)
+    base_url = os.environ.get("OPENAI_BASE_URL", "").strip() or None
+    model = os.environ.get("OPENAI_EMBEDDING_MODEL", "").strip() or "text-embedding-3-small"
+    client = OpenAI(
+        api_key=api_key,
+        **({"base_url": base_url} if base_url else {}),
+    )
+    return client, model
 
 
-def _embed_texts(texts: list[str], client: OpenAI) -> np.ndarray:
+def _embed_texts(texts: list[str], client: OpenAI, model: str) -> np.ndarray:
     """
     Batch-embed a list of texts.
     Returns an (N, D) float32 numpy array.
     """
     response = client.embeddings.create(
-        model="text-embedding-3-small",
+        model=model,
         input=texts,
     )
     vectors = [item.embedding for item in response.data]
@@ -80,14 +87,14 @@ def build_page_timeline(
     if not ppt_pages or not segments:
         return _empty_timeline(ppt_pages, total_audio_duration)
 
-    client = _get_client()
+    client, embed_model = _get_client()
 
     # Embed PPT page texts and segment texts
     page_texts = [p.get("ppt_text", "") or f"Page {p['page_num']}" for p in ppt_pages]
     seg_texts = [s["text"] for s in segments]
 
-    page_embeddings = _embed_texts(page_texts, client)   # (P, D)
-    seg_embeddings = _embed_texts(seg_texts, client)     # (S, D)
+    page_embeddings = _embed_texts(page_texts, client, embed_model)   # (P, D)
+    seg_embeddings = _embed_texts(seg_texts, client, embed_model)     # (S, D)
 
     # Similarity matrix: (S, P)
     sim_matrix = _cosine_similarity(seg_embeddings, page_embeddings)

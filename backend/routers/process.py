@@ -8,13 +8,13 @@ Process router.
 import asyncio
 import os
 import tempfile
+import time
 import uuid
+from collections import defaultdict
 from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, UploadFile, File
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 from services.audio import convert_to_wav, merge_chunks, get_audio_duration
 from services.ppt_parser import parse_ppt
@@ -24,9 +24,26 @@ from services.note_generator import generate_notes_for_all_pages
 
 router = APIRouter(tags=["process"])
 
-# ── Rate limiting ──────────────────────────────────────────────────────────────
-# 2 real process calls per user per day; mock endpoint is unlimited.
-limiter = Limiter(key_func=get_remote_address)
+# ── Simple in-process rate limiter (2 calls/day per IP) ───────────────────────
+_rate_store: dict[str, list[float]] = defaultdict(list)
+MAX_CALLS_PER_DAY = 2
+DAY_SECONDS = 86400
+
+
+def _check_rate_limit(ip: str) -> None:
+    now = time.time()
+    calls = [t for t in _rate_store[ip] if now - t < DAY_SECONDS]
+    if len(calls) >= MAX_CALLS_PER_DAY:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit: max {MAX_CALLS_PER_DAY} processing calls per day.",
+        )
+    calls.append(now)
+    _rate_store[ip] = calls
+
+
+# Expose a dummy limiter so main.py import doesn't break
+limiter = None
 
 # In-memory session store (replace with DB in production)
 _SESSIONS: dict[str, dict] = {}
@@ -46,8 +63,8 @@ def process_health():
 
 @router.post("/process-mock")
 async def process_mock(
-    ppt: Optional[UploadFile] = File(None),
-    audio: Optional[UploadFile] = File(None),
+    ppt: Optional[UploadFile] = File(default=None),
+    audio: Optional[UploadFile] = File(default=None),
 ):
     """
     Phase A mock endpoint: ignores uploaded files, returns a fixed session_id.
@@ -59,27 +76,17 @@ async def process_mock(
 # ── Phase B: Real processing pipeline ─────────────────────────────────────────
 
 @router.post("/process")
-@limiter.limit("2/day")
 async def process_real(
     request: Request,
     background_tasks: BackgroundTasks,
     ppt: Optional[UploadFile] = File(None),
     audio: UploadFile = File(...),
     language: str = "en",
-    user_anchors: str = "[]",  # JSON string: [{"page_num": int, "timestamp": float}]
+    user_anchors: str = "[]",
 ):
-    """
-    Real processing pipeline:
-      1. Save uploaded files to a temp session dir
-      2. Convert audio to WAV
-      3. Parse PPT (if provided)
-      4. ASR transcription
-      5. Semantic alignment
-      6. LLM note generation (async background)
-
-    Returns session_id immediately; poll GET /api/sessions/{id} for status.
-    """
     import json as _json
+
+    _check_rate_limit(request.client.host)
 
     session_id = str(uuid.uuid4())
     session_dir = Path(tempfile.gettempdir()) / "liberstudy" / session_id
