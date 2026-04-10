@@ -166,13 +166,18 @@ def transcribe_aliyun(
 def transcribe(
     wav_path: str,
     language: str = "en",
+    prompt: Optional[str] = None,
 ) -> list[dict]:
     """
     Unified transcription entry point.
     Routes to Alibaba Cloud for Chinese if keys are available,
     otherwise falls back to OpenAI Whisper.
+
+    Args:
+        prompt: Domain vocabulary hint for Whisper (e.g. "CNN, LSTM, backpropagation").
+                Improves recognition of technical terms. Ignored by Aliyun ASR.
     """
     aliyun_key = os.environ.get("ALIYUN_ACCESS_KEY_ID", "")
     if language.startswith("zh") and aliyun_key:
         return transcribe_aliyun(wav_path, language)
-    return transcribe_openai(wav_path, language)
+    return transcribe_openai(wav_path, language, prompt=prompt)

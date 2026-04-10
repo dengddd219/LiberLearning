@@ -17,7 +17,7 @@ from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, UploadFile, File
 
 from services.audio import convert_to_wav, merge_chunks, get_audio_duration
-from services.ppt_parser import parse_ppt
+from services.ppt_parser import parse_ppt, extract_domain_terms
 from services.asr import transcribe
 from services.alignment import build_page_timeline
 from services.note_generator import generate_notes_for_all_pages
@@ -169,7 +169,9 @@ async def _run_pipeline(
             # Prefix session_id into URLs so multiple sessions don't collide
 
         # Step 3: ASR transcription
-        segments = transcribe(wav_path, language=language)
+        # If PPT was parsed, inject domain terms as Whisper prompt for better term recognition
+        asr_prompt = extract_domain_terms(ppt_pages) if ppt_pages else None
+        segments = transcribe(wav_path, language=language, prompt=asr_prompt)
 
         # Step 4: Semantic alignment
         if ppt_pages:
