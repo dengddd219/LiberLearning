@@ -74,18 +74,15 @@ def render_pipeline(language: str, template: str, granularity: str,
     with st.expander("Step 1 — PPT parsing", expanded=has_ppt):
         ppt_cache  = _ppt_path()
         slides_dir = _slides_dir()
-        if not has_ppt:
-            st.info("No PPT uploaded — no-PPT mode. Step 1 skipped.")
-        elif ppt_cache.exists():
+        if ppt_cache.exists():
             pages_meta = _load_json(ppt_cache)
             st.success(f"✅ Cached — {len(pages_meta)} slides")
             cols = st.columns(min(len(pages_meta), 5))
-            # Render previews directly from PDF via PyMuPDF (no PNG files)
             import fitz
             pdf_path = slides_dir / "slides.pdf"
             if pdf_path.exists():
                 doc = fitz.open(str(pdf_path))
-                mat = fitz.Matrix(1.5, 1.5)  # ~108 dpi — enough for thumbnails
+                mat = fitz.Matrix(1.5, 1.5)
                 for i, pg in enumerate(pages_meta[:5]):
                     page_idx = pg["pdf_page_num"] - 1
                     if page_idx < len(doc):
@@ -95,7 +92,7 @@ def render_pipeline(language: str, template: str, granularity: str,
                             st.image(img_bytes, caption=f"Slide {pg['page_num']}",
                                      use_container_width=True)
                 doc.close()
-        else:
+        elif ppt_file is not None:
             if st.button("▶ Parse PPT", key="btn_step1"):
                 t0 = time.time()
                 prog = st.progress(0, text="Saving PPT file…")
@@ -113,6 +110,8 @@ def render_pipeline(language: str, template: str, granularity: str,
                 _log_run("ppt_parse", elapsed, extra={"n_pages": len(pages_meta)})
                 st.success(f"✅ {_badge(elapsed)} — {len(pages_meta)} slides")
                 st.rerun()
+        else:
+            st.info("No PPT uploaded — no-PPT mode. Step 1 skipped.")
 
     # ── Step 2 ────────────────────────────────────────────────────────────────
     with st.expander("Step 2 — ASR transcription", expanded=False):
