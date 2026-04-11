@@ -57,7 +57,7 @@ def compare_aligned_pages(data_a: list[dict], data_b: list[dict]) -> list[dict]:
         off_slide_changed: list[dict] = []
         # A aligned → B off_slide
         for t in texts_a:
-            if t in off_texts_b and t not in texts_b:
+            if t in off_texts_b and t not in texts_b and t not in text_to_page_b:
                 off_slide_changed.append({"text": t, "direction": "to_off"})
         # A off_slide → B aligned at this page
         for s in off_a:
@@ -253,6 +253,8 @@ def _render_segment_row(col_a: Any, col_b: Any, text: str,
     status: unchanged | sim_changed | gone | new | to_off_slide | from_off_slide
     """
     def _seg_label(seg: dict, extra: str = "") -> str:
+        if seg is None:
+            return "(missing)"
         ts = _fmt_time(seg["start"])
         te = _fmt_time(seg["end"])
         sim = seg["similarity"]
@@ -357,36 +359,37 @@ def render_align_compare() -> None:
             for p in data_b for s in p.get("aligned_segments", [])
         }
 
-        for pd in page_diffs:
-            if only_diff and not pd["has_diff"]:
+        import pandas as pd_lib
+
+        for page_diff in page_diffs:
+            if only_diff and not page_diff["has_diff"]:
                 continue
 
-            conf_a = pd["conf_a"]
-            conf_b = pd["conf_b"]
-            rules  = analyze_page_diff_rules(pd)
-            icon   = "🟡" if pd["has_diff"] else "⚪"
-            label  = (f"Slide {pd['page_num']} — conf {conf_a:.2f}→{conf_b:.2f}  "
+            conf_a = page_diff["conf_a"]
+            conf_b = page_diff["conf_b"]
+            rules  = analyze_page_diff_rules(page_diff)
+            icon   = "🟡" if page_diff["has_diff"] else "⚪"
+            label  = (f"Slide {page_diff['page_num']} — conf {conf_a:.2f}→{conf_b:.2f}  "
                       f"{icon}  {rules['summary']}")
 
-            with st.expander(label, expanded=pd["has_diff"]):
+            with st.expander(label, expanded=page_diff["has_diff"]):
 
-                import pandas as pd_lib
                 tbl = pd_lib.DataFrame([{
                     "": "Run A", "conf": conf_a, "segs": rules["seg_count_a"],
                     "sim_mean": rules["sim_mean_a"], "sim_min": rules["sim_min_a"],
-                    "off_slide": len(pd["off_slide_a"]),
+                    "off_slide": len(page_diff["off_slide_a"]),
                 }, {
                     "": "Run B", "conf": conf_b, "segs": rules["seg_count_b"],
                     "sim_mean": rules["sim_mean_b"], "sim_min": rules["sim_min_b"],
-                    "off_slide": len(pd["off_slide_b"]),
+                    "off_slide": len(page_diff["off_slide_b"]),
                 }])
                 st.dataframe(tbl.set_index(""), use_container_width=True)
 
-                llm_key = f"llm_result_{pd['page_num']}_{run_id_a}_{run_id_b}"
-                if st.button(f"🤖 Claude 分析 (Slide {pd['page_num']})",
-                             key=f"btn_llm_{pd['page_num']}_{run_id_a}_{run_id_b}"):
+                llm_key = f"llm_result_{page_diff['page_num']}_{run_id_a}_{run_id_b}"
+                if st.button(f"🤖 Claude 分析 (Slide {page_diff['page_num']})",
+                             key=f"btn_llm_{page_diff['page_num']}_{run_id_a}_{run_id_b}"):
                     with st.spinner("Claude 分析中…"):
-                        result = analyze_page_diff_llm(pd, run_id_a, run_id_b)
+                        result = analyze_page_diff_llm(page_diff, run_id_a, run_id_b)
                         st.session_state[llm_key] = result
                 if llm_key in st.session_state:
                     st.info(st.session_state[llm_key])
@@ -397,12 +400,12 @@ def render_align_compare() -> None:
                 col_a_hdr.markdown(f"**Run A** `{run_id_a}`")
                 col_b_hdr.markdown(f"**Run B** `{run_id_b}`")
 
-                sim_map_a = {s["text"]: s for s in pd["segments_a"]}
-                sim_map_b = {s["text"]: s for s in pd["segments_b"]}
+                sim_map_a = {s["text"]: s for s in page_diff["segments_a"]}
+                sim_map_b = {s["text"]: s for s in page_diff["segments_b"]}
 
                 all_texts = list(dict.fromkeys(
-                    [s["text"] for s in pd["segments_a"]]
-                    + [s["text"] for s in pd["segments_b"]]
+                    [s["text"] for s in page_diff["segments_a"]]
+                    + [s["text"] for s in page_diff["segments_b"]]
                 ))
 
                 col_a, col_b = st.columns(2)
@@ -411,11 +414,11 @@ def render_align_compare() -> None:
                     in_b = text in sim_map_b
                     is_to_off = any(
                         d["text"] == text and d["direction"] == "to_off"
-                        for d in pd["off_slide_changed"]
+                        for d in page_diff["off_slide_changed"]
                     )
                     is_from_off = any(
                         d["text"] == text and d["direction"] == "from_off"
-                        for d in pd["off_slide_changed"]
+                        for d in page_diff["off_slide_changed"]
                     )
 
                     if is_to_off:
@@ -438,17 +441,17 @@ def render_align_compare() -> None:
                         _render_segment_row(col_a, col_b, text,
                                             None, sim_map_b[text], "new", source_page=src)
 
-                if pd["off_slide_a"] or pd["off_slide_b"]:
+                if page_diff["off_slide_a"] or page_diff["off_slide_b"]:
                     st.divider()
                     st.caption("──── off_slide ────")
                     col_off_a, col_off_b = st.columns(2)
 
                     all_off_texts = list(dict.fromkeys(
-                        [s["text"] for s in pd["off_slide_a"]]
-                        + [s["text"] for s in pd["off_slide_b"]]
+                        [s["text"] for s in page_diff["off_slide_a"]]
+                        + [s["text"] for s in page_diff["off_slide_b"]]
                     ))
-                    off_map_a = {s["text"]: s for s in pd["off_slide_a"]}
-                    off_map_b = {s["text"]: s for s in pd["off_slide_b"]}
+                    off_map_a = {s["text"]: s for s in page_diff["off_slide_a"]}
+                    off_map_b = {s["text"]: s for s in page_diff["off_slide_b"]}
 
                     for text in all_off_texts:
                         in_oa = text in off_map_a
