@@ -595,7 +595,7 @@ def render_pipeline(language: str, threshold: float, realign_btn: bool):
                 format_func=lambda x: {
                     "active_expand": "① 基于我的笔记扩写",
                     "active_comprehensive": "③ 完整综合笔记",
-                }[x],
+                }.get(x, x),
                 key="s5_tmpl",
             )
             granularity_s5 = st.radio(
