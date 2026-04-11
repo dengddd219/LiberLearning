@@ -117,9 +117,7 @@ def render_pipeline(language: str, template: str, granularity: str,
     with st.expander("Step 2 — ASR transcription", expanded=False):
         wav = _wav_path()
         asr = _asr_path()
-        if not wav.exists():
-            st.info("Complete Step 0 first.")
-        elif asr.exists():
+        if asr.exists():
             segments = _load_json(asr)
             total_chars = sum(len(s["text"]) for s in segments)
             st.success(f"✅ Cached — {len(segments)} segments, {total_chars:,} chars")
@@ -128,7 +126,7 @@ def render_pipeline(language: str, template: str, granularity: str,
                 st.text(f"[{ms//60:02d}:{ms%60:02d}–{me//60:02d}:{me%60:02d}] {seg['text']}")
             if len(segments) > 10:
                 st.caption(f"… and {len(segments)-10} more")
-        else:
+        elif wav.exists():
             if st.button("▶ Run ASR", key="btn_step2"):
                 t0 = time.time()
                 from services.audio import get_audio_duration
@@ -144,6 +142,8 @@ def render_pipeline(language: str, template: str, granularity: str,
                          extra={"n_segments": len(segments), "duration_s": dur})
                 st.success(f"✅ {_badge(elapsed, cost=cost)} — {len(segments)} segments")
                 st.rerun()
+        else:
+            st.info("Complete Step 0 first.")
 
     # ── Step 3 ────────────────────────────────────────────────────────────────
     with st.expander("Step 3 — Semantic alignment", expanded=False):
