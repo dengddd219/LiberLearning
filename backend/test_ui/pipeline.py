@@ -31,7 +31,7 @@ def render_pipeline(language: str, template: str, granularity: str,
     with col_ppt:
         ppt_file = st.file_uploader("Slides (pdf / pptx / ppt) — optional", type=["pdf", "pptx", "ppt"])
 
-    has_ppt = ppt_file is not None
+    has_ppt = ppt_file is not None or _ppt_path().exists()
 
     # ── Step 0 ────────────────────────────────────────────────────────────────
     with st.expander("Step 0 — Audio upload & conversion", expanded=True):
