@@ -298,3 +298,69 @@ async def generate_notes_for_all_pages(
 
     # Restore original page order: virtual pages follow their source page
     return list(results)
+
+
+async def generate_annotations(
+    page: dict,
+    annotations: list[dict],
+    template: str = "active_expand",
+    granularity: str = "simple",
+) -> dict:
+    """
+    For each annotation on a page, call Claude to generate ai_expansion.
+
+    Args:
+        page: page dict with page_num, ppt_text, aligned_segments
+        annotations: list of {"text": str, "x": float, "y": float}
+        template: active template name
+        granularity: "simple" | "detailed"
+
+    Returns:
+        {
+            "page_num": <int>,
+            "annotations": [{"text", "x", "y", "ai_expansion"}, ...],
+            "_cost": {"input_tokens": int, "output_tokens": int}
+        }
+    """
+    system_prompt = _load_prompt(template, granularity)
+    client, model = _client()
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+
+    page_num = page["page_num"]
+    ppt_text = page.get("ppt_text", "") or "(no slide text)"
+    ppt_bullets = _format_ppt_bullets(ppt_text)
+    transcript = _format_segments(page.get("aligned_segments", []))
+
+    total_input = 0
+    total_output = 0
+    results = []
+
+    for ann in annotations:
+        user_note = ann.get("text", "").strip()
+        if not user_note:
+            results.append({**ann, "ai_expansion": ""})
+            continue
+
+        user_msg = (
+            f"## PPT Bullet Points\n{ppt_bullets}\n\n"
+            f"## Student's Note\n{user_note}\n\n"
+            f"## Transcript\n{transcript}"
+        )
+        try:
+            data = await _generate_page(
+                client, model, system_prompt, user_msg,
+                semaphore, page_num, template,
+            )
+            usage = data.pop("_usage", {})
+            total_input += usage.get("input_tokens", 0)
+            total_output += usage.get("output_tokens", 0)
+            ai_expansion = data.get("ai_expansion", "") or data.get("content", "") or str(data)
+            results.append({**ann, "ai_expansion": ai_expansion})
+        except Exception as e:
+            results.append({**ann, "ai_expansion": f"[Error: {e}]"})
+
+    return {
+        "page_num": page_num,
+        "annotations": results,
+        "_cost": {"input_tokens": total_input, "output_tokens": total_output},
+    }
