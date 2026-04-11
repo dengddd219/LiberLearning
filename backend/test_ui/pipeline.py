@@ -24,22 +24,31 @@ from test_ui.helpers import (
 
 
 def _render_ppt_page_image(page_num: int) -> bytes | None:
-    """Render PPT page as PNG bytes using PyMuPDF. page_num is 1-indexed."""
+    """Render PPT page as PNG bytes using PyMuPDF. page_num is 1-indexed.
+    Tries slides.pdf first; falls back to slide_NNN.png for legacy runs."""
     import fitz
     slides_dir = _get_slides_dir()
+
+    # Primary: read from slides.pdf (current ppt_parser output)
     pdf_path = slides_dir / "slides.pdf"
-    if not pdf_path.exists():
-        return None
-    doc = fitz.open(str(pdf_path))
-    page_idx = page_num - 1
-    if page_idx < 0 or page_idx >= len(doc):
+    if pdf_path.exists():
+        doc = fitz.open(str(pdf_path))
+        page_idx = page_num - 1
+        if page_idx < 0 or page_idx >= len(doc):
+            doc.close()
+            return None
+        mat = fitz.Matrix(1.5, 1.5)
+        pix = doc[page_idx].get_pixmap(matrix=mat)
+        img_bytes = pix.tobytes("png")
         doc.close()
-        return None
-    mat = fitz.Matrix(1.5, 1.5)
-    pix = doc[page_idx].get_pixmap(matrix=mat)
-    img_bytes = pix.tobytes("png")
-    doc.close()
-    return img_bytes
+        return img_bytes
+
+    # Fallback: pre-rendered slide_NNN.png (legacy runs)
+    png_path = slides_dir / f"slide_{page_num:03d}.png"
+    if png_path.exists():
+        return png_path.read_bytes()
+
+    return None
 
 
 def render_pipeline(language: str, threshold: float, realign_btn: bool):
