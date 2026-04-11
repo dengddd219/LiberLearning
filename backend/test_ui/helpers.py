@@ -176,7 +176,8 @@ def _build_noppt_pages(segments: list[dict], chunk_size: int = 10) -> list[dict]
         pages.append({
             "page_num": i // chunk_size + 1,
             "ppt_text": "",
-            "slide_image_url": "",
+            "pdf_url": "",
+            "pdf_page_num": i // chunk_size + 1,
             "aligned_segments": chunk,
             "page_start_time": chunk[0]["start"],
             "page_end_time": chunk[-1]["end"],

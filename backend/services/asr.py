@@ -21,12 +21,53 @@ from openai import OpenAI
 CHUNK_DURATION_SEC = 600  # 10 minutes per chunk
 MAX_FILE_SIZE_MB = 25
 
+# ── Sentence-ending punctuation ───────────────────────────────────────────────
+_SENTENCE_END = re.compile(r"[.?!。？！]$")
+_MAX_MERGE_CHARS = 200  # force-cut if no sentence-end punctuation found
+
 # ── Filler words to strip (English + Chinese) ─────────────────────────────────
 _EN_FILLERS = re.compile(
     r"\b(um+|uh+|er+|ah+|like|you know|i mean|sort of|kind of|basically|literally|right\?|okay so|so yeah)\b",
     re.IGNORECASE,
 )
 _ZH_FILLERS = re.compile(r"[嗯呃啊哦额那个就是其实吧呢]")
+
+
+def _merge_into_sentences(segments: list[dict]) -> list[dict]:
+    """
+    Merge raw Whisper segments into complete sentences.
+
+    Rules:
+    - Cut on sentence-ending punctuation (. ? ! 。 ？ ！)
+    - Force-cut when accumulated text exceeds _MAX_MERGE_CHARS
+    - Merged segment: start = first sub-segment's start, end = last sub-segment's end
+    """
+    if not segments:
+        return []
+
+    merged = []
+    buf_texts: list[str] = []
+    buf_start: float = segments[0]["start"]
+    buf_end: float = segments[0]["end"]
+    buf_len = 0
+
+    for seg in segments:
+        buf_texts.append(seg["text"])
+        buf_end = seg["end"]
+        buf_len += len(seg["text"])
+
+        should_cut = _SENTENCE_END.search(seg["text"].rstrip()) or buf_len > _MAX_MERGE_CHARS
+        if should_cut:
+            merged.append({"text": " ".join(buf_texts).strip(), "start": buf_start, "end": buf_end})
+            buf_texts = []
+            buf_start = seg["end"]
+            buf_len = 0
+
+    # Flush any remaining buffer
+    if buf_texts:
+        merged.append({"text": " ".join(buf_texts).strip(), "start": buf_start, "end": buf_end})
+
+    return merged
 
 
 def _postprocess(text: str, lang: str) -> str:
@@ -136,7 +177,7 @@ def transcribe_openai(
         chunk_dir = os.path.dirname(chunks[0][0])
         shutil.rmtree(chunk_dir, ignore_errors=True)
 
-    return all_segments
+    return _merge_into_sentences(all_segments)
 
 
 def transcribe_aliyun(

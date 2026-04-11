@@ -188,16 +188,52 @@ async def generate_notes_for_all_pages(
     semaphore = asyncio.Semaphore(MAX_CONCURRENT)
     is_passive = template in PASSIVE_TEMPLATES
 
+    OFF_SLIDE_PPT_TEXT = "（本段内容无对应 PPT）"
+    OFF_SLIDE_PROMPT_HEADER = "（本段内容无对应 PPT，以下为老师脱离 PPT 讲解的内容）"
+
+    # Expand page list: insert a virtual page after each page that has off_slide_segments
+    expanded_pages: list[dict] = []
+    for page in pages:
+        expanded_pages.append(page)
+        off_segs = page.get("off_slide_segments")
+        if off_segs:
+            start = min(s.get("start", 0) for s in off_segs)
+            end = max(s.get("end", 0) for s in off_segs)
+            virtual = {
+                "page_num": f"{page['page_num']}_off",
+                "is_off_slide": True,
+                "ppt_text": OFF_SLIDE_PPT_TEXT,
+                "aligned_segments": off_segs,
+                "page_start_time": start,
+                "page_end_time": end,
+                "alignment_confidence": 0.0,
+                "page_supplement": None,
+                "pdf_url": page.get("pdf_url", ""),
+                "pdf_page_num": page.get("pdf_page_num", page["page_num"]),
+                "active_notes": None,
+            }
+            expanded_pages.append(virtual)
+
     async def process_page(page: dict) -> dict:
         page_num = page["page_num"]
-        ppt_text = page.get("ppt_text", "") or "(no slide text)"
+        is_off_slide = page.get("is_off_slide", False)
+
+        if is_off_slide:
+            ppt_text = OFF_SLIDE_PPT_TEXT
+            ppt_bullets = OFF_SLIDE_PROMPT_HEADER
+        else:
+            ppt_text = page.get("ppt_text", "") or "(no slide text)"
+            ppt_bullets = _format_ppt_bullets(ppt_text)
+
         transcript = _format_segments(page.get("aligned_segments", []))
-        ppt_bullets = _format_ppt_bullets(ppt_text)
 
         result = {
             "page_num": page_num,
-            "slide_image_url": page.get("slide_image_url", ""),
+            "is_off_slide": is_off_slide,
+            "pdf_url": page.get("pdf_url", ""),
+            "pdf_page_num": page.get("pdf_page_num", page_num),
             "ppt_text": ppt_text,
+            "aligned_segments": page.get("aligned_segments", []),
             "page_start_time": page.get("page_start_time", 0),
             "page_end_time": page.get("page_end_time", 0),
             "alignment_confidence": page.get("alignment_confidence", 0.0),
@@ -257,5 +293,8 @@ async def generate_notes_for_all_pages(
 
         return result
 
-    tasks = [process_page(p) for p in pages]
-    return await asyncio.gather(*tasks)
+    tasks = [process_page(p) for p in expanded_pages]
+    results = await asyncio.gather(*tasks)
+
+    # Restore original page order: virtual pages follow their source page
+    return list(results)

@@ -169,6 +169,12 @@ FastAPI 后端（Python）
 
 **置信度**：每页输出对齐置信度 `alignment_confidence`（0-1），综合最高相似度分数和锚点数量计算。
 
+**current_page 状态机（归属决策）**：纯 argmax 语义匹配会导致时间轴不连续（片段偶然匹配远处旧页），破坏溯回功能。实现时须维护 `current_page` 状态：
+- 连续 K=3 个片段最高匹配页 > current_page → 切换（向前翻页）
+- 连续 K=3 个片段最高匹配页 = current_page - 1 → 允许切换（老师补充上一页）
+- 跨 2 页以上回跳 → 禁止，片段仍归 current_page（老师引用旧页内容时，内容服务于当前页）
+- 详见 PRD §"current_page 状态机与对齐策略决策"
+
 ### 6.3 笔记生成策略
 
 - **被动学习**（所有页面均生成）：PPT 每页 bullet + 对应精校转录片段 → Claude API 行级对齐，输出每个 bullet 的注释 + 引用时间戳

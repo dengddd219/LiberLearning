@@ -17,7 +17,8 @@ MOCK_SESSION = {
     "pages": [
         {
             "page_num": 1,
-            "slide_image_url": "/slides/slide_001.png",
+            "pdf_url": "/slides/slides.pdf",
+            "pdf_page_num": 1,
             "ppt_text": "第三章 数据链路层\n• 功能与服务\n• 成帧（Framing）\n• 差错控制\n• 流量控制",
             "page_start_time": 0,
             "page_end_time": 1200,
@@ -54,7 +55,8 @@ MOCK_SESSION = {
         },
         {
             "page_num": 2,
-            "slide_image_url": "/slides/slide_002.png",
+            "pdf_url": "/slides/slides.pdf",
+            "pdf_page_num": 2,
             "ppt_text": "停止等待协议（Stop-and-Wait ARQ）\n• 发送一帧，等待ACK\n• 超时重传\n• 信道利用率 = T1 / (T1 + RTT + T2)",
             "page_start_time": 1200,
             "page_end_time": 2800,
@@ -88,7 +90,8 @@ MOCK_SESSION = {
         },
         {
             "page_num": 3,
-            "slide_image_url": "/slides/slide_003.png",
+            "pdf_url": "/slides/slides.pdf",
+            "pdf_page_num": 3,
             "ppt_text": "Go-Back-N 协议\n• 发送窗口 ≤ 2^n - 1\n• 累积确认\n• 接收方丢弃失序帧",
             "page_start_time": 2800,
             "page_end_time": 3600,

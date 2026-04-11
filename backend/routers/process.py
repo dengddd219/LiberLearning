@@ -165,7 +165,7 @@ async def _run_pipeline(
         slides_dir = str(Path("static") / "slides" / session_id)
         ppt_pages: list[dict] = []
         if ppt_path:
-            ppt_pages = parse_ppt(ppt_path, slides_dir, png_prefix=f"slide_{session_id}")
+            ppt_pages = parse_ppt(ppt_path, slides_dir, pdf_name=f"slides_{session_id}.pdf")
             # Prefix session_id into URLs so multiple sessions don't collide
 
         # Step 3: ASR transcription
@@ -187,7 +187,8 @@ async def _run_pipeline(
                 {
                     "page_num": 1,
                     "ppt_text": "",
-                    "slide_image_url": None,
+                    "pdf_url": None,
+                    "pdf_page_num": 1,
                     "page_start_time": 0,
                     "page_end_time": int(duration),
                     "alignment_confidence": 1.0,

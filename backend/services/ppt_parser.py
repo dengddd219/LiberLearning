@@ -170,20 +170,24 @@ def extract_domain_terms(pages: list[dict], max_terms: int = 50) -> str:
 def parse_ppt(
     ppt_path: str,
     slides_output_dir: str,
-    dpi: int = 150,
-    png_prefix: str = "slide",
+    pdf_name: str = "slides.pdf",
 ) -> list[dict]:
     """
     Full PPT parsing pipeline:
       1. Convert PPT/PPTX to PDF via LibreOffice
-      2. For each PDF page: extract text + render PNG
+      2. Copy PDF to slides_output_dir
+      3. For each PDF page: extract text only (no PNG rendering)
 
     Returns a list of dicts:
       {
-        "page_num": int,          # 1-based
-        "ppt_text": str,          # extracted text
-        "slide_image_url": str,   # relative URL, e.g. /slides/slide_001.png
+        "page_num": int,       # 1-based
+        "ppt_text": str,       # extracted text (for semantic alignment)
+        "pdf_url": str,        # relative URL to the PDF, e.g. /slides/slides.pdf
+        "pdf_page_num": int,   # 1-based page index within the PDF (same as page_num)
       }
+
+    Frontend renders slides via PDF.js using pdf_url + pdf_page_num.
+    No PNG files are produced.
     """
     os.makedirs(slides_output_dir, exist_ok=True)
 
@@ -191,32 +195,28 @@ def parse_ppt(
         # Step 1: PPT → PDF
         suffix = Path(ppt_path).suffix.lower()
         if suffix == ".pdf":
-            pdf_path = ppt_path
+            src_pdf = ppt_path
         else:
-            pdf_path = pptx_to_pdf(ppt_path, tmp_dir)
+            src_pdf = pptx_to_pdf(ppt_path, tmp_dir)
 
-        # Step 2: per-page extraction
-        doc = fitz.open(pdf_path)
+        # Step 2: copy PDF into slides_output_dir for serving
+        dest_pdf = Path(slides_output_dir) / pdf_name
+        shutil.copy2(src_pdf, dest_pdf)
+        pdf_url = f"/slides/{pdf_name}"
+
+        # Step 3: per-page text extraction
+        doc = fitz.open(src_pdf)
         pages = []
-        mat = fitz.Matrix(dpi / 72, dpi / 72)
 
         for i, page in enumerate(doc):
             page_num = i + 1
-
-            # Text extraction
             ppt_text = _clean_ppt_text(page.get_text("text"))
-
-            # PNG rendering
-            filename = f"{png_prefix}_{page_num:03d}.png"
-            png_path = Path(slides_output_dir) / filename
-            pix = page.get_pixmap(matrix=mat)
-            pix.save(str(png_path))
-
             pages.append(
                 {
                     "page_num": page_num,
                     "ppt_text": ppt_text,
-                    "slide_image_url": f"/slides/{filename}",
+                    "pdf_url": pdf_url,
+                    "pdf_page_num": page_num,
                 }
             )
 

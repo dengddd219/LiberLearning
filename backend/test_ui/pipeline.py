@@ -80,12 +80,21 @@ def render_pipeline(language: str, template: str, granularity: str,
             pages_meta = _load_json(ppt_cache)
             st.success(f"✅ Cached — {len(pages_meta)} slides")
             cols = st.columns(min(len(pages_meta), 5))
-            for i, pg in enumerate(pages_meta[:5]):
-                img_path = _get_run_dir() / pg["slide_image_url"].lstrip("/")
-                if img_path.exists():
-                    with cols[i % 5]:
-                        st.image(str(img_path), caption=f"Slide {pg['page_num']}",
-                                 use_container_width=True)
+            # Render previews directly from PDF via PyMuPDF (no PNG files)
+            import fitz
+            pdf_path = slides_dir / "slides.pdf"
+            if pdf_path.exists():
+                doc = fitz.open(str(pdf_path))
+                mat = fitz.Matrix(1.5, 1.5)  # ~108 dpi — enough for thumbnails
+                for i, pg in enumerate(pages_meta[:5]):
+                    page_idx = pg["pdf_page_num"] - 1
+                    if page_idx < len(doc):
+                        pix = doc[page_idx].get_pixmap(matrix=mat)
+                        img_bytes = pix.tobytes("png")
+                        with cols[i % 5]:
+                            st.image(img_bytes, caption=f"Slide {pg['page_num']}",
+                                     use_container_width=True)
+                doc.close()
         else:
             if st.button("▶ Parse PPT", key="btn_step1"):
                 t0 = time.time()

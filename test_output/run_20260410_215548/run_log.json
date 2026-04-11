@@ -40,5 +40,13 @@
     "tokens": 0,
     "cost_usd": 0.0,
     "page_num": 1
+  },
+  {
+    "ts": "2026-04-10T23:50:43",
+    "step": "bullet_align",
+    "elapsed_s": 148.0,
+    "tokens": 0,
+    "cost_usd": 0.0,
+    "page_num": 4
   }
 ]
