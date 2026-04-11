@@ -36,13 +36,11 @@ def render_pipeline(language: str, template: str, granularity: str,
     # ── Step 0 ────────────────────────────────────────────────────────────────
     with st.expander("Step 0 — Audio upload & conversion", expanded=True):
         wav = _wav_path()
-        if audio_file is None:
-            st.info("Upload an audio file above to begin.")
-        elif wav.exists():
+        if wav.exists():
             from services.audio import get_audio_duration
             dur = get_audio_duration(str(wav))
             st.success(f"✅ Cached WAV — {dur:.1f}s ({wav.stat().st_size/1e6:.1f} MB)")
-        else:
+        elif audio_file is not None:
             if st.button("▶ Convert to WAV", key="btn_step0"):
                 t0 = time.time()
                 prog = st.progress(0, text="Saving uploaded file…")
@@ -69,6 +67,8 @@ def render_pipeline(language: str, template: str, granularity: str,
                 dur = get_audio_duration(str(wav))
                 _log_run("audio", elapsed, extra={"duration_s": dur})
                 st.success(f"✅ {_badge(elapsed)} — {dur:.1f}s (trimmed to 10 min)")
+        else:
+            st.info("Upload an audio file above to begin.")
 
     # ── Step 1 ────────────────────────────────────────────────────────────────
     with st.expander("Step 1 — PPT parsing", expanded=has_ppt):
