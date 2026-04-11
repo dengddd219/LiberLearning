@@ -335,12 +335,10 @@ async def generate_annotations(
     total_output = 0
     results = []
 
-    for ann in annotations:
+    async def _process_ann(ann: dict) -> dict:
         user_note = ann.get("text", "").strip()
         if not user_note:
-            results.append({**ann, "ai_expansion": ""})
-            continue
-
+            return {**ann, "ai_expansion": "", "_tokens": (0, 0)}
         user_msg = (
             f"## PPT Bullet Points\n{ppt_bullets}\n\n"
             f"## Student's Note\n{user_note}\n\n"
@@ -352,12 +350,18 @@ async def generate_annotations(
                 semaphore, page_num, template,
             )
             usage = data.pop("_usage", {})
-            total_input += usage.get("input_tokens", 0)
-            total_output += usage.get("output_tokens", 0)
             ai_expansion = data.get("ai_expansion", "") or data.get("content", "") or str(data)
-            results.append({**ann, "ai_expansion": ai_expansion})
+            return {**ann, "ai_expansion": ai_expansion,
+                    "_tokens": (usage.get("input_tokens", 0), usage.get("output_tokens", 0))}
         except Exception as e:
-            results.append({**ann, "ai_expansion": f"[Error: {e}]"})
+            return {**ann, "ai_expansion": f"[Error: {e}]", "_tokens": (0, 0)}
+
+    ann_results = await asyncio.gather(*[_process_ann(ann) for ann in annotations])
+    for r in ann_results:
+        tokens = r.pop("_tokens", (0, 0))
+        total_input += tokens[0]
+        total_output += tokens[1]
+        results.append(r)
 
     return {
         "page_num": page_num,
