@@ -1,0 +1,1041 @@
+[
+  {
+    "page_num": 1,
+    "is_off_slide": false,
+    "pdf_url": "",
+    "pdf_page_num": 1,
+    "ppt_text": "Practical aspects of training / validation",
+    "aligned_segments": [
+      {
+        "text": "Okay, so let's get started.",
+        "start": 90.0,
+        "end": 112.87999725341797,
+        "similarity": 0.09676401317119598
+      },
+      {
+        "text": "So before the break, we have mentioned that you should try to train a model with two",
+        "start": 112.87999725341797,
+        "end": 120.19999694824219,
+        "similarity": 0.4368879497051239
+      },
+      {
+        "text": "layers and a model with six layers.",
+        "start": 120.19999694824219,
+        "end": 124.31999969482422,
+        "similarity": 0.25617218017578125
+      },
+      {
+        "text": "And one thing that you may have observed is that a six-layer model may not be as good",
+        "start": 124.31999969482422,
+        "end": 131.16000366210938,
+        "similarity": 0.41387760639190674
+      },
+      {
+        "text": "as a simple model.",
+        "start": 131.16000366210938,
+        "end": 133.63999938964844,
+        "similarity": 0.24895928800106049
+      },
+      {
+        "text": "And this is weird because we have mentioned that deep neural network becomes powerful",
+        "start": 133.63999938964844,
+        "end": 141.8000030517578,
+        "similarity": 0.3742910325527191
+      },
+      {
+        "text": "because we have more layers.",
+        "start": 141.8000030517578,
+        "end": 143.60000610351562,
+        "similarity": 0.1804402768611908
+      },
+      {
+        "text": "But now this is not the case.",
+        "start": 143.60000610351562,
+        "end": 145.9600067138672,
+        "similarity": 0.04813943803310394
+      },
+      {
+        "text": "So in the rest of this lecture, we are going to discuss several practical aspects in training",
+        "start": 145.9600067138672,
+        "end": 154.0399932861328,
+        "similarity": 0.6105251908302307
+      },
+      {
+        "text": "neural network models.",
+        "start": 154.0399932861328,
+        "end": 155.97999572753906,
+        "similarity": 0.3810373842716217
+      },
+      {
+        "text": "So let's start with the easy thing.",
+        "start": 155.97999572753906,
+        "end": 159.16000366210938,
+        "similarity": 0.1396552473306656
+      },
+      {
+        "text": "Let's consider a practical scenario in our real life.",
+        "start": 159.16000366210938,
+        "end": 163.63999938964844,
+        "similarity": 0.27155667543411255
+      },
+      {
+        "text": "That is, I may want to predict who will repay their loan and who will default.",
+        "start": 163.63999938964844,
+        "end": 169.52000427246094,
+        "similarity": 0.6160886883735657
+      },
+      {
+        "text": "So your goal is to build a model and predict who else is going to default.",
+        "start": 186.0,
+        "end": 193.8000030517578,
+        "similarity": 0.4422959089279175
+      },
+      {
+        "text": "So whether this is a valid feature or whether there are some problem when we make this conclusion.",
+        "start": 214.17999267578125,
+        "end": 223.16000366210938,
+        "similarity": 0.2235148549079895
+      },
+      {
+        "text": "This is a very classic problem of overfitting or there's no codal evidence that blue shirts",
+        "start": 223.16000366210938,
+        "end": 236.63999938964844,
+        "similarity": 0.5752637386322021
+      },
+      {
+        "text": "actually predict applicant's default behavior, right?",
+        "start": 236.63999938964844,
+        "end": 241.52000427246094,
+        "similarity": 0.44854724407196045
+      },
+      {
+        "text": "And this introduced our classic discussion of training error and generalization error.",
+        "start": 270.7799987792969,
+        "end": 277.5,
+        "similarity": 0.5705172419548035
+      },
+      {
+        "text": "training error means the error on the training data set.",
+        "start": 277.5,
+        "end": 282.70001220703125,
+        "similarity": 0.562629759311676
+      }
+    ],
+    "page_start_time": 90.0,
+    "page_end_time": 282.70001220703125,
+    "alignment_confidence": 0.36300861678625407,
+    "page_supplement": {
+      "content": "So in such a scenario, a lender helps you to investigate this problem and you are given the files of 100 applicants. Among these 100 applicants, there are five of them defaulted within three years. For such a job, what you may find is they give you some photos and they find that all the five people who defaulted worn blue shirts during their interviews. And your model also find that blue shirts is a strong signal for default. The reason is because all of them are wearing blue shirts. So you cannot say only those who default wear such a blue shirts. This is one thing. And the other thing is using human logic, we know that the color of the shirts should have no codal inference with whether he's going to default or not. So because of that, we know that this feature may not be a valid feature.",
+      "timestamp_start": 169.52000427246094,
+      "timestamp_end": 270.7799987792969
+    },
+    "passive_notes": {
+      "error": "Note generation failed after 3 retries for page 1 (template=passive_outline_summary): Error code: 429 - {'code': 'USAGE_LIMIT_EXCEEDED', 'message': 'error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]'}",
+      "bullets": []
+    },
+    "active_notes": null,
+    "status": "partial_ready",
+    "_cost": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  },
+  {
+    "page_num": "1_off",
+    "is_off_slide": true,
+    "pdf_url": "",
+    "pdf_page_num": 1,
+    "ppt_text": "（本段内容无对应 PPT）",
+    "aligned_segments": [
+      {
+        "text": "So in such a scenario, a lender helps you to investigate this problem and you are given",
+        "start": 169.52000427246094,
+        "end": 175.72000122070312,
+        "similarity": 0.22089049220085144
+      },
+      {
+        "text": "the files of 100 applicants.",
+        "start": 175.72000122070312,
+        "end": 179.47999572753906,
+        "similarity": 0.1569739431142807
+      },
+      {
+        "text": "Among these 100 applicants, there are five of them defaulted within three years.",
+        "start": 179.47999572753906,
+        "end": 186.0,
+        "similarity": 0.22602641582489014
+      },
+      {
+        "text": "For such a job, what you may find is they give you some photos and they find that all",
+        "start": 193.8000030517578,
+        "end": 201.44000244140625,
+        "similarity": 0.1727357804775238
+      },
+      {
+        "text": "the five people who defaulted worn blue shirts during their interviews.",
+        "start": 201.44000244140625,
+        "end": 207.27999877929688,
+        "similarity": 0.18873417377471924
+      },
+      {
+        "text": "And your model also find that blue shirts is a strong signal for default.",
+        "start": 207.27999877929688,
+        "end": 214.17999267578125,
+        "similarity": 0.28421545028686523
+      },
+      {
+        "text": "The reason is because all of them are wearing blue shirts.",
+        "start": 241.52000427246094,
+        "end": 245.32000732421875,
+        "similarity": 0.0874796137213707
+      },
+      {
+        "text": "So you cannot say only those who default wear such a blue shirts.",
+        "start": 245.32000732421875,
+        "end": 250.44000244140625,
+        "similarity": 0.1493140459060669
+      },
+      {
+        "text": "This is one thing.",
+        "start": 250.44000244140625,
+        "end": 251.44000244140625,
+        "similarity": 0.18099650740623474
+      },
+      {
+        "text": "And the other thing is using human logic, we know that the color of the shirts should",
+        "start": 251.72000122070312,
+        "end": 257.3999938964844,
+        "similarity": 0.22024156153202057
+      },
+      {
+        "text": "have no codal inference with whether he's going to default or not.",
+        "start": 257.3999938964844,
+        "end": 264.1199951171875,
+        "similarity": 0.18504948914051056
+      },
+      {
+        "text": "So because of that, we know that this feature may not be a valid feature.",
+        "start": 264.1199951171875,
+        "end": 270.7799987792969,
+        "similarity": 0.11924172937870026
+      }
+    ],
+    "page_start_time": 169.52000427246094,
+    "page_end_time": 270.7799987792969,
+    "alignment_confidence": 0.0,
+    "page_supplement": null,
+    "passive_notes": {
+      "error": "Note generation failed after 3 retries for page 1_off (template=passive_outline_summary): Error code: 429 - {'code': 'USAGE_LIMIT_EXCEEDED', 'message': 'error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]'}",
+      "bullets": []
+    },
+    "active_notes": null,
+    "status": "partial_ready",
+    "_cost": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  },
+  {
+    "page_num": 2,
+    "is_off_slide": false,
+    "pdf_url": "",
+    "pdf_page_num": 2,
+    "ppt_text": "Predict Who Will Repay TheirLoans •A lender hires you to investigate who will repay their  loans •You are given complete files on 100 •5 defaulted within 3 years Image creditdebt.org",
+    "aligned_segments": [],
+    "page_start_time": 282.70001220703125,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null,
+    "passive_notes": {
+      "error": "Note generation failed after 3 retries for page 2 (template=passive_outline_summary): Error code: 429 - {'code': 'USAGE_LIMIT_EXCEEDED', 'message': 'error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]'}",
+      "bullets": []
+    },
+    "active_notes": null,
+    "status": "partial_ready",
+    "_cost": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  },
+  {
+    "page_num": 3,
+    "is_off_slide": false,
+    "pdf_url": "",
+    "pdf_page_num": 3,
+    "ppt_text": "A Surprising Finding\n• All 5 people who defaulted wore blue shirts during interviews\n• Your model may find this strong signal as well",
+    "aligned_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 282.70001220703125,
+    "alignment_confidence": 0.0,
+    "page_supplement": null,
+    "passive_notes": {
+      "error": "Note generation failed after 3 retries for page 3 (template=passive_outline_summary): Error code: 429 - {'code': 'USAGE_LIMIT_EXCEEDED', 'message': 'error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]'}",
+      "bullets": []
+    },
+    "active_notes": null,
+    "status": "partial_ready",
+    "_cost": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  },
+  {
+    "page_num": 4,
+    "is_off_slide": false,
+    "pdf_url": "",
+    "pdf_page_num": 4,
+    "ppt_text": "Training Error and Generalization Error\n• Training error (bias): model error on the training data\n• Generalization error (variance): model error on new data\n• Example: practice a future exam with past exams\n• Doing well on past exams (training error) doesn’t guarantee a  good score on the future exam (generalization error)\n• Student A gets 0 error on past exams by rote learning\n• Student B  understands the reasons for givenanswers",
+    "aligned_segments": [
+      {
+        "text": "And generalization error refers to your error on a new data.",
+        "start": 282.70001220703125,
+        "end": 287.5799865722656,
+        "similarity": 0.580304741859436
+      },
+      {
+        "text": "And we always say that the performance on the training data does not represent the performance",
+        "start": 287.5799865722656,
+        "end": 294.3800048828125,
+        "similarity": 0.43823665380477905
+      },
+      {
+        "text": "on a new data set.",
+        "start": 294.3800048828125,
+        "end": 296.4599914550781,
+        "similarity": 0.26801180839538574
+      },
+      {
+        "text": "This is very similar to we make practices for a future exam with past exams.",
+        "start": 296.4599914550781,
+        "end": 303.260009765625,
+        "similarity": 0.23897933959960938
+      },
+      {
+        "text": "For those who do well on past exam, that means you get a very small training error that does",
+        "start": 303.3800048828125,
+        "end": 310.6600036621094,
+        "similarity": 0.5076401233673096
+      },
+      {
+        "text": "not guarantee a good score on the future exam, where the future exam actually represent the",
+        "start": 310.6600036621094,
+        "end": 316.5799865722656,
+        "similarity": 0.21352124214172363
+      },
+      {
+        "text": "generalization error, right?",
+        "start": 316.5799865722656,
+        "end": 319.2200012207031,
+        "similarity": 0.4829043447971344
+      },
+      {
+        "text": "And one student may get zero error on past exam by root learning.",
+        "start": 319.2200012207031,
+        "end": 324.5400085449219,
+        "similarity": 0.4919935166835785
+      },
+      {
+        "text": "So even if student B may not have good score on past exam, may not that good at past exam,",
+        "start": 337.760009765625,
+        "end": 345.7799987792969,
+        "similarity": 0.2665373682975769
+      },
+      {
+        "text": "as long as he can understand the reasonings, he should be able to have a higher score.",
+        "start": 345.7799987792969,
+        "end": 350.6199951171875,
+        "similarity": 0.1977613866329193
+      },
+      {
+        "text": "So this is the trade-off we have mentioned in your Model 3 class about training and generalization",
+        "start": 350.6199951171875,
+        "end": 358.6600036621094,
+        "similarity": 0.4794524312019348
+      },
+      {
+        "text": "or they call it bias and virus in some cases, right?",
+        "start": 358.79998779296875,
+        "end": 363.1000061035156,
+        "similarity": 0.2213841676712036
+      },
+      {
+        "text": "So because of that, we need to evaluate our model to understand whether it has a good",
+        "start": 363.1000061035156,
+        "end": 370.260009765625,
+        "similarity": 0.43547844886779785
+      },
+      {
+        "text": "generalization performance.",
+        "start": 370.260009765625,
+        "end": 372.3399963378906,
+        "similarity": 0.38739413022994995
+      },
+      {
+        "text": "So in this process, we say that we can have two data sets.",
+        "start": 372.3399963378906,
+        "end": 377.260009765625,
+        "similarity": 0.23660627007484436
+      },
+      {
+        "text": "One data set is called validation data set.",
+        "start": 377.260009765625,
+        "end": 380.260009765625,
+        "similarity": 0.6586639285087585
+      },
+      {
+        "text": "This is the data used to evaluate the model.",
+        "start": 380.260009765625,
+        "end": 383.9800109863281,
+        "similarity": 0.4584547281265259
+      },
+      {
+        "text": "And this data should not be mixed with your training data.",
+        "start": 383.9800109863281,
+        "end": 387.1400146484375,
+        "similarity": 0.39451953768730164
+      },
+      {
+        "text": "And the validation data set will be used to do model selection, which model should",
+        "start": 387.1400146484375,
+        "end": 392.94000244140625,
+        "similarity": 0.6306931972503662
+      },
+      {
+        "text": "I train.",
+        "start": 392.94000244140625,
+        "end": 395.29998779296875,
+        "similarity": 0.23461176455020905
+      },
+      {
+        "text": "The test data set will be the data set that to evaluate your final performance.",
+        "start": 395.29998779296875,
+        "end": 401.1400146484375,
+        "similarity": 0.4701062738895416
+      },
+      {
+        "text": "So I'm sure you have learned how to use training validation and test the procedure in the machine",
+        "start": 421.29998779296875,
+        "end": 431.6199951171875,
+        "similarity": 0.5735483169555664
+      },
+      {
+        "text": "And you have also learned about k-fold cross-validation.",
+        "start": 439.6600036621094,
+        "end": 443.17999267578125,
+        "similarity": 0.39085397124290466
+      },
+      {
+        "text": "However, all of them are not applicable for deep learning models.",
+        "start": 443.29998779296875,
+        "end": 451.1000061035156,
+        "similarity": 0.4158017933368683
+      },
+      {
+        "text": "So k-fold cross-validation is too expensive because you have known that training a deep",
+        "start": 451.1000061035156,
+        "end": 456.260009765625,
+        "similarity": 0.5348258018493652
+      },
+      {
+        "text": "learning model should take hours or even millions of hours.",
+        "start": 456.260009765625,
+        "end": 460.260009765625,
+        "similarity": 0.4019100069999695
+      },
+      {
+        "text": "because now I have a very large data.",
+        "start": 476.1600036621094,
+        "end": 480.20001220703125,
+        "similarity": 0.18923218548297882
+      },
+      {
+        "text": "I may have 1 million or even 1 billion data points.",
+        "start": 480.20001220703125,
+        "end": 483.8800048828125,
+        "similarity": 0.24213650822639465
+      },
+      {
+        "text": "In that case, using 30% of the data to be validation or testing data may be a waste",
+        "start": 483.8800048828125,
+        "end": 490.44000244140625,
+        "similarity": 0.48142009973526
+      },
+      {
+        "text": "of your data.",
+        "start": 490.44000244140625,
+        "end": 491.6000061035156,
+        "similarity": 0.19890809059143066
+      },
+      {
+        "text": "So because of that, for deep learning, people usually leave 10,000 or 1,000 data points",
+        "start": 491.6400146484375,
+        "end": 498.6400146484375,
+        "similarity": 0.5067792534828186
+      },
+      {
+        "text": "as testing data and use all the other data as training data.",
+        "start": 498.6400146484375,
+        "end": 503.1199951171875,
+        "similarity": 0.4788612425327301
+      },
+      {
+        "text": "So the percentage of training validation and testing could be very extreme.",
+        "start": 503.1199951171875,
+        "end": 507.9200134277344,
+        "similarity": 0.622573733329773
+      },
+      {
+        "text": "It could be 98% for training and 1% for validation and test.",
+        "start": 507.9200134277344,
+        "end": 512.52001953125,
+        "similarity": 0.5930739641189575
+      },
+      {
+        "text": "Or even if you have really 1 million data, then I will only leave 5,000 for validation",
+        "start": 512.52001953125,
+        "end": 518.280029296875,
+        "similarity": 0.416093647480011
+      },
+      {
+        "text": "and testing and use all the 99.5% of the data to train the model.",
+        "start": 518.280029296875,
+        "end": 523.8800048828125,
+        "similarity": 0.4768349528312683
+      },
+      {
+        "text": "So this is a difference between traditional machine learning model training as well as",
+        "start": 523.8800048828125,
+        "end": 529.5999755859375,
+        "similarity": 0.44933250546455383
+      },
+      {
+        "text": "deep learning model training.",
+        "start": 529.5999755859375,
+        "end": 532.280029296875,
+        "similarity": 0.4590165913105011
+      },
+      {
+        "text": "And here we have mentioned two concepts.",
+        "start": 532.280029296875,
+        "end": 535.3200073242188,
+        "similarity": 0.19914530217647552
+      },
+      {
+        "text": "One is called parameter.",
+        "start": 535.3200073242188,
+        "end": 536.8800048828125,
+        "similarity": 0.22200730443000793
+      },
+      {
+        "text": "The other is called hyperparameters.",
+        "start": 536.8800048828125,
+        "end": 540.280029296875,
+        "similarity": 0.542673647403717
+      }
+    ],
+    "page_start_time": 282.70001220703125,
+    "page_end_time": 540.280029296875,
+    "alignment_confidence": 0.4070313249419375,
+    "page_supplement": {
+      "content": "That means he remember all the answers mechanically. But that student may have a worse score compared to another student who understand the reasons for a given number of answers. So that could be a future exam or the health cell price I bid it or the data set we use to determine the final winner on a Kaggle computation that is called private leaderboard. So in your homework 2, you will actually have such a test data set. learning course. , you may have learned I should split the data 70-30. This is the most classic way. So because of that, it is impossible to just determine which model structure is better using k-fold. On the other hand, splitting the data in a 70-30 proportion may also not a good idea",
+      "timestamp_start": 324.5400085449219,
+      "timestamp_end": 476.1600036621094
+    },
+    "passive_notes": {
+      "error": "Note generation failed after 3 retries for page 4 (template=passive_outline_summary): Error code: 429 - {'code': 'USAGE_LIMIT_EXCEEDED', 'message': 'error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]'}",
+      "bullets": []
+    },
+    "active_notes": null,
+    "status": "partial_ready",
+    "_cost": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  },
+  {
+    "page_num": "4_off",
+    "is_off_slide": true,
+    "pdf_url": "",
+    "pdf_page_num": 4,
+    "ppt_text": "（本段内容无对应 PPT）",
+    "aligned_segments": [
+      {
+        "text": "That means he remember all the answers mechanically.",
+        "start": 324.5400085449219,
+        "end": 329.0199890136719,
+        "similarity": 0.18784010410308838
+      },
+      {
+        "text": "But that student may have a worse score compared to another student who understand the reasons",
+        "start": 329.05999755859375,
+        "end": 336.05999755859375,
+        "similarity": 0.2997453510761261
+      },
+      {
+        "text": "for a given number of answers.",
+        "start": 336.05999755859375,
+        "end": 337.760009765625,
+        "similarity": 0.17828601598739624
+      },
+      {
+        "text": "So that could be a future exam or the health cell price I bid it or the data set we use",
+        "start": 401.1400146484375,
+        "end": 409.8599853515625,
+        "similarity": 0.2258492410182953
+      },
+      {
+        "text": "to determine the final winner on a Kaggle computation that is called private leaderboard.",
+        "start": 409.8599853515625,
+        "end": 415.05999755859375,
+        "similarity": 0.28860366344451904
+      },
+      {
+        "text": "So in your homework 2, you will actually have such a test data set.",
+        "start": 415.05999755859375,
+        "end": 421.29998779296875,
+        "similarity": 0.2873918116092682
+      },
+      {
+        "text": "learning course.",
+        "start": 431.6199951171875,
+        "end": 432.6199951171875,
+        "similarity": 0.2336820363998413
+      },
+      {
+        "text": ", you may have learned I should split the data 70-30.",
+        "start": 432.6199951171875,
+        "end": 438.17999267578125,
+        "similarity": 0.21877747774124146
+      },
+      {
+        "text": "This is the most classic way.",
+        "start": 438.17999267578125,
+        "end": 439.6600036621094,
+        "similarity": 0.11054326593875885
+      },
+      {
+        "text": "So because of that, it is impossible to just determine which model structure is better",
+        "start": 460.260009765625,
+        "end": 466.5199890136719,
+        "similarity": 0.27649739384651184
+      },
+      {
+        "text": "using k-fold.",
+        "start": 466.5199890136719,
+        "end": 467.5199890136719,
+        "similarity": 0.28098011016845703
+      },
+      {
+        "text": "On the other hand, splitting the data in a 70-30 proportion may also not a good idea",
+        "start": 468.4800109863281,
+        "end": 476.1600036621094,
+        "similarity": 0.24581068754196167
+      }
+    ],
+    "page_start_time": 324.5400085449219,
+    "page_end_time": 476.1600036621094,
+    "alignment_confidence": 0.0,
+    "page_supplement": null,
+    "passive_notes": {
+      "error": "Note generation failed after 3 retries for page 4_off (template=passive_outline_summary): Error code: 429 - {'code': 'USAGE_LIMIT_EXCEEDED', 'message': 'error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]'}",
+      "bullets": []
+    },
+    "active_notes": null,
+    "status": "partial_ready",
+    "_cost": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  },
+  {
+    "page_num": 5,
+    "is_off_slide": false,
+    "pdf_url": "",
+    "pdf_page_num": 5,
+    "ppt_text": "Validation Dataset and TestDataset\n• Validation dataset: a dataset used to evaluate themodel\n• Should not be mixed with the training data (#1 mistake)\n• Model selection purpose •Test dataset: a dataset can be used once, e.g.\n• A future exam\n• The house sale price I bided\n• Dataset used in private leaderboard in Kaggle",
+    "aligned_segments": [],
+    "page_start_time": 540.280029296875,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null,
+    "passive_notes": {
+      "error": "Note generation failed after 3 retries for page 5 (template=passive_outline_summary): Error code: 429 - {'code': 'USAGE_LIMIT_EXCEEDED', 'message': 'error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]'}",
+      "bullets": []
+    },
+    "active_notes": null,
+    "status": "partial_ready",
+    "_cost": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  },
+  {
+    "page_num": 6,
+    "is_off_slide": false,
+    "pdf_url": "",
+    "pdf_page_num": 6,
+    "ppt_text": "• Previous ML: 70/30\n• Big data: 1,000,000 10,000 10,000\n• Percentages: 98/1/1\n• Percentages: 99.5/0.4/0.1\n• K-fold CV is expensive for deep learning",
+    "aligned_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 540.280029296875,
+    "alignment_confidence": 0.0,
+    "page_supplement": null,
+    "passive_notes": {
+      "error": "Note generation failed after 3 retries for page 6 (template=passive_outline_summary): Error code: 429 - {'code': 'USAGE_LIMIT_EXCEEDED', 'message': 'error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]'}",
+      "bullets": []
+    },
+    "active_notes": null,
+    "status": "partial_ready",
+    "_cost": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  },
+  {
+    "page_num": 7,
+    "is_off_slide": false,
+    "pdf_url": "",
+    "pdf_page_num": 7,
+    "ppt_text": "Hyperparameter:\n•  Learning rate\n•  Batch size\n•  #hidden layers\n•  #hidden units\n•  Choice of activation function\n• ...\n•  Model selection",
+    "aligned_segments": [
+      {
+        "text": "Parameters in neural networks refers to the weight and bias.",
+        "start": 540.280029296875,
+        "end": 547.0,
+        "similarity": 0.479694664478302
+      },
+      {
+        "text": "Hyperparameters are the parameters that you are going to choose using model selection.",
+        "start": 547.0,
+        "end": 552.760009765625,
+        "similarity": 0.6921333074569702
+      },
+      {
+        "text": "And your model selection criteria is the performance on the validation data set.",
+        "start": 552.760009765625,
+        "end": 558.5599975585938,
+        "similarity": 0.4928196668624878
+      },
+      {
+        "text": "So far, we have mentioned so many hyperparameters learning rate, epochs, batch size, hidden",
+        "start": 558.5599975585938,
+        "end": 564.2000122070312,
+        "similarity": 0.5934472680091858
+      },
+      {
+        "text": "layers, hidden units, so on and so forth.",
+        "start": 564.2000122070312,
+        "end": 567.280029296875,
+        "similarity": 0.2635827958583832
+      },
+      {
+        "text": "All of them should be determined using the validation data set.",
+        "start": 567.280029296875,
+        "end": 573.6400146484375,
+        "similarity": 0.48765209317207336
+      },
+      {
+        "text": "So how to decide what is the best combination of hyperparameters?",
+        "start": 573.6400146484375,
+        "end": 579.52001953125,
+        "similarity": 0.5437705516815186
+      },
+      {
+        "text": ", when we train deep learning models, this process is a very empirical process.",
+        "start": 579.52001953125,
+        "end": 586.760009765625,
+        "similarity": 0.6004000306129456
+      },
+      {
+        "text": "So some people actually compare training a deep learning model with alchemy because people",
+        "start": 586.760009765625,
+        "end": 594.0399780273438,
+        "similarity": 0.37729611992836
+      },
+      {
+        "text": "believe that there are so many hidden secrets that human cannot explain why on earth.",
+        "start": 594.0399780273438,
+        "end": 600.0,
+        "similarity": 0.1039644181728363
+      }
+    ],
+    "page_start_time": 540.280029296875,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.4634760916233063,
+    "page_supplement": null,
+    "passive_notes": {
+      "error": "Note generation failed after 3 retries for page 7 (template=passive_outline_summary): Error code: 429 - {'code': 'USAGE_LIMIT_EXCEEDED', 'message': 'error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]'}",
+      "bullets": []
+    },
+    "active_notes": null,
+    "status": "partial_ready",
+    "_cost": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  },
+  {
+    "page_num": 8,
+    "is_off_slide": false,
+    "pdf_url": "",
+    "pdf_page_num": 8,
+    "ppt_text": "•Training dataset: train parameters with givenhyper-parameters •Validation dataset: choose hyper-parameters •Test dataset: leave it alone",
+    "aligned_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null,
+    "passive_notes": {
+      "error": "Note generation failed after 3 retries for page 8 (template=passive_outline_summary): Error code: 429 - {'code': 'USAGE_LIMIT_EXCEEDED', 'message': 'error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]'}",
+      "bullets": []
+    },
+    "active_notes": null,
+    "status": "partial_ready",
+    "_cost": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  },
+  {
+    "page_num": 9,
+    "is_off_slide": false,
+    "pdf_url": "",
+    "pdf_page_num": 9,
+    "ppt_text": "Applied DL is a very empiricalprocess This game is called while True: learn()",
+    "aligned_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null,
+    "passive_notes": {
+      "error": "Note generation failed after 3 retries for page 9 (template=passive_outline_summary): Error code: 429 - {'code': 'USAGE_LIMIT_EXCEEDED', 'message': 'error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]'}",
+      "bullets": []
+    },
+    "active_notes": null,
+    "status": "partial_ready",
+    "_cost": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  },
+  {
+    "page_num": 10,
+    "is_off_slide": false,
+    "pdf_url": "",
+    "pdf_page_num": 10,
+    "ppt_text": "Applied DL is a very empiricalprocess # of iterations",
+    "aligned_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null,
+    "passive_notes": {
+      "error": "Note generation failed after 3 retries for page 10 (template=passive_outline_summary): Error code: 429 - {'code': 'USAGE_LIMIT_EXCEEDED', 'message': 'error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]'}",
+      "bullets": []
+    },
+    "active_notes": null,
+    "status": "partial_ready",
+    "_cost": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  },
+  {
+    "page_num": 11,
+    "is_off_slide": false,
+    "pdf_url": "",
+    "pdf_page_num": 11,
+    "ppt_text": "(no slide text)",
+    "aligned_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null,
+    "passive_notes": {
+      "error": "Note generation failed after 3 retries for page 11 (template=passive_outline_summary): Error code: 429 - {'code': 'USAGE_LIMIT_EXCEEDED', 'message': 'error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]'}",
+      "bullets": []
+    },
+    "active_notes": null,
+    "status": "partial_ready",
+    "_cost": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  },
+  {
+    "page_num": 12,
+    "is_off_slide": false,
+    "pdf_url": "",
+    "pdf_page_num": 12,
+    "ppt_text": "(no slide text)",
+    "aligned_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null,
+    "passive_notes": {
+      "error": "Note generation failed after 3 retries for page 12 (template=passive_outline_summary): Error code: 429 - {'code': 'USAGE_LIMIT_EXCEEDED', 'message': 'error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]'}",
+      "bullets": []
+    },
+    "active_notes": null,
+    "status": "partial_ready",
+    "_cost": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  },
+  {
+    "page_num": 13,
+    "is_off_slide": false,
+    "pdf_url": "",
+    "pdf_page_num": 13,
+    "ppt_text": "• The ability to fit variety offunctions\n• Low-capacity models struggles to fit trainingset\n• High-capacity models can memorize the training set",
+    "aligned_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null,
+    "passive_notes": {
+      "error": "Note generation failed after 3 retries for page 13 (template=passive_outline_summary): Error code: 429 - {'code': 'USAGE_LIMIT_EXCEEDED', 'message': 'error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]'}",
+      "bullets": []
+    },
+    "active_notes": null,
+    "status": "partial_ready",
+    "_cost": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  },
+  {
+    "page_num": 14,
+    "is_off_slide": false,
+    "pdf_url": "",
+    "pdf_page_num": 14,
+    "ppt_text": "Influence of ModelComplexity",
+    "aligned_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null,
+    "passive_notes": {
+      "error": "Note generation failed after 3 retries for page 14 (template=passive_outline_summary): Error code: 429 - {'code': 'USAGE_LIMIT_EXCEEDED', 'message': 'error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]'}",
+      "bullets": []
+    },
+    "active_notes": null,
+    "status": "partial_ready",
+    "_cost": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  },
+  {
+    "page_num": 15,
+    "is_off_slide": false,
+    "pdf_url": "",
+    "pdf_page_num": 15,
+    "ppt_text": "(no slide text)",
+    "aligned_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null,
+    "passive_notes": {
+      "error": "Note generation failed after 3 retries for page 15 (template=passive_outline_summary): Error code: 429 - {'code': 'USAGE_LIMIT_EXCEEDED', 'message': 'error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]'}",
+      "bullets": []
+    },
+    "active_notes": null,
+    "status": "partial_ready",
+    "_cost": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  },
+  {
+    "page_num": 16,
+    "is_off_slide": false,
+    "pdf_url": "",
+    "pdf_page_num": 16,
+    "ppt_text": "• It’s hard to compare complexity between different algorithms\n• e.g. tree vs neural network\n• Given an algorithm family, two main factors matter:\n• The number of parameters\n• The values taken by each parameter",
+    "aligned_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null,
+    "passive_notes": {
+      "error": "Note generation failed after 3 retries for page 16 (template=passive_outline_summary): Error code: 429 - {'code': 'USAGE_LIMIT_EXCEEDED', 'message': 'error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]'}",
+      "bullets": []
+    },
+    "active_notes": null,
+    "status": "partial_ready",
+    "_cost": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  },
+  {
+    "page_num": 17,
+    "is_off_slide": false,
+    "pdf_url": "",
+    "pdf_page_num": 17,
+    "ppt_text": "•Multiple factors matters •# of examples •# of elements in eachexample",
+    "aligned_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null,
+    "passive_notes": {
+      "error": "Note generation failed after 3 retries for page 17 (template=passive_outline_summary): Error code: 429 - {'code': 'USAGE_LIMIT_EXCEEDED', 'message': 'error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]'}",
+      "bullets": []
+    },
+    "active_notes": null,
+    "status": "partial_ready",
+    "_cost": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  },
+  {
+    "page_num": 18,
+    "is_off_slide": false,
+    "pdf_url": "",
+    "pdf_page_num": 18,
+    "ppt_text": "Basic recipe for machinelearning •High bias (training data performance) → Underfitting → •High variance (validation set performance) → Overfitting →",
+    "aligned_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null,
+    "passive_notes": {
+      "error": "Note generation failed after 3 retries for page 18 (template=passive_outline_summary): Error code: 429 - {'code': 'USAGE_LIMIT_EXCEEDED', 'message': 'error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]'}",
+      "bullets": []
+    },
+    "active_notes": null,
+    "status": "partial_ready",
+    "_cost": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  },
+  {
+    "page_num": 19,
+    "is_off_slide": false,
+    "pdf_url": "",
+    "pdf_page_num": 19,
+    "ppt_text": "•Model capacity and data capacity should be matched to prevent overfitting and underfitting.\n•Understand fitting and bias/variance relationship •Empirically, use training/validation error to evaluate •Know what to do under whichcircumstance",
+    "aligned_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null,
+    "passive_notes": {
+      "error": "Note generation failed after 3 retries for page 19 (template=passive_outline_summary): Error code: 429 - {'code': 'USAGE_LIMIT_EXCEEDED', 'message': 'error: code=429 reason=\"DAILY_LIMIT_EXCEEDED\" message=\"daily usage limit exceeded\" metadata=map[]'}",
+      "bullets": []
+    },
+    "active_notes": null,
+    "status": "partial_ready",
+    "_cost": {
+      "input_tokens": 0,
+      "output_tokens": 0
+    }
+  }
+]

@@ -30,12 +30,36 @@ ALIGNMENT_STRATEGIES = {
         "module": "services.alignment_v2",
         "label":  "V2 (D-004) — K=3去抖+升级",
     },
+    "v3a": {
+        "module": "services.alignment_v3a",
+        "label":  "V3a — 三分类（逻辑词规则）",
+    },
+    "v3b": {
+        "module": "services.alignment_v3b",
+        "label":  "V3b — 三分类（滑窗embedding）",
+    },
 }
 
 
 def _load_strategy_module(strategy_key: str):
     import importlib
     return importlib.import_module(ALIGNMENT_STRATEGIES[strategy_key]["module"])
+
+
+def _load_prompt_section(template_key: str, granularity: str) -> str:
+    """Load a prompt section from prompts/<template_key>.md."""
+    md_file = Path(__file__).parent.parent / "prompts" / f"{template_key}.md"
+    if not md_file.exists():
+        return ""
+    text = md_file.read_text(encoding="utf-8")
+    tag = "## SIMPLE" if granularity == "simple" else "## DETAILED"
+    idx = text.find(tag)
+    if idx == -1:
+        return ""
+    content_start = idx + len(tag)
+    next_heading = text.find("\n## ", content_start)
+    section = text[content_start:next_heading] if next_heading != -1 else text[content_start:]
+    return section.strip()
 
 
 def _build_prompt_registry() -> dict:
@@ -58,9 +82,11 @@ def _build_prompt_registry() -> dict:
             try:
                 spec.loader.exec_module(mod)
                 registry[tmpl_key].append({
-                    "version_label": getattr(mod, "VERSION_LABEL", py_file.stem),
-                    "description":   getattr(mod, "PROMPT_DESCRIPTION", ""),
-                    "file":          str(py_file),
+                    "version_label":  getattr(mod, "VERSION_LABEL", py_file.stem),
+                    "description":    getattr(mod, "PROMPT_DESCRIPTION", ""),
+                    "prompt_simple":  _load_prompt_section(tmpl_key, "simple"),
+                    "prompt_detailed": _load_prompt_section(tmpl_key, "detailed"),
+                    "file":           str(py_file),
                 })
             except Exception:
                 pass
@@ -190,7 +216,9 @@ def _aligned_path(): return _get_run_dir() / "aligned_pages.json"
 def _gt_path():      return TEST_OUTPUT_BASE / "ground_truth.json"
 def _judge_path():   return TEST_OUTPUT_BASE / "judge_scores.json"
 def _log_path():     return _get_run_dir() / "run_log.json"
-def _notes_cache(tmpl, gran):
+def _notes_cache(tmpl, gran, strategy_key: str = ""):
+    if strategy_key:
+        return _get_run_dir() / f"notes_{tmpl}_{gran}_{strategy_key}.json"
     return _get_run_dir() / f"notes_{tmpl}_{gran}.json"
 
 
