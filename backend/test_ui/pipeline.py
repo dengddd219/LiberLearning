@@ -290,6 +290,10 @@ def render_pipeline(language: str, template: str, granularity: str,
                                                    else "(off-slide)")
                                     st.caption(f"{icon} seg{r['segment_idx']} → {bullet_text} ({conf:.2f})")
 
+                st.divider()
+                from test_ui.align_compare import render_align_compare
+                render_align_compare()
+
     # ── Step 4 ────────────────────────────────────────────────────────────────
     with st.expander("Step 4 — Note generation", expanded=False):
         note_cache = _notes_cache(template, granularity)
