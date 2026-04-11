@@ -18,11 +18,31 @@ from test_ui.helpers import (
     _wav_path, _asr_path, _aligned_path, _ppt_path,
     _notes_cache, _slides_dir, _log_path,
     _save_json, _load_json,
+    _aligned_path_for_strategy, _load_strategy_module,
+    ALIGNMENT_STRATEGIES, PROMPT_REGISTRY,
 )
 
 
-def render_pipeline(language: str, template: str, granularity: str,
-                    threshold: float, realign_btn: bool):
+def _render_ppt_page_image(page_num: int) -> bytes | None:
+    """Render PPT page as PNG bytes using PyMuPDF. page_num is 1-indexed."""
+    import fitz
+    slides_dir = _get_slides_dir()
+    pdf_path = slides_dir / "slides.pdf"
+    if not pdf_path.exists():
+        return None
+    doc = fitz.open(str(pdf_path))
+    page_idx = page_num - 1
+    if page_idx < 0 or page_idx >= len(doc):
+        doc.close()
+        return None
+    mat = fitz.Matrix(1.5, 1.5)
+    pix = doc[page_idx].get_pixmap(matrix=mat)
+    img_bytes = pix.tobytes("png")
+    doc.close()
+    return img_bytes
+
+
+def render_pipeline(language: str, threshold: float, realign_btn: bool):
     st.title("LiberStudy — Backend Pipeline Tester")
 
     col_audio, col_ppt = st.columns(2)
@@ -150,247 +170,399 @@ def render_pipeline(language: str, template: str, granularity: str,
         if not has_ppt:
             st.info("No PPT — alignment skipped.")
         else:
-            aligned_path = _aligned_path()
-            ppt_cache   = _ppt_path()
-            asr         = _asr_path()
+            ppt_cache = _ppt_path()
+            asr       = _asr_path()
             if not asr.exists() or not ppt_cache.exists():
                 st.info("Complete Steps 1 & 2 first.")
             else:
-                aligned_exists = aligned_path.exists()
-                # Never auto-run alignment: only run when explicitly triggered
-                run_align = realign_btn
-                if not aligned_exists:
-                    run_align = st.button("▶ Run Alignment", key="btn_step3")
+                segments_data  = _load_json(asr)
+                ppt_pages_data = _load_json(ppt_cache)
 
-                if run_align:
-                    t0 = time.time()
-                    prog = st.progress(0, text="Embedding PPT pages…")
-                    import services.alignment as _align_mod
-                    _align_mod.OFF_SLIDE_THRESHOLD = threshold
-                    from services.alignment import build_page_timeline
-                    from services.audio import get_audio_duration
-                    pages_meta = _load_json(ppt_cache)
-                    segments   = _load_json(asr)
-                    dur        = get_audio_duration(str(_wav_path()))
-                    prog.progress(50, text="Computing similarity…")
-                    aligned = build_page_timeline(pages_meta, segments, total_audio_duration=dur)
-                    _save_json(aligned_path, aligned)
-                    st.session_state["last_threshold"] = threshold
-                    elapsed = time.time() - t0
-                    total_chars = (sum(len(p.get("ppt_text","")) for p in pages_meta)
-                                   + sum(len(s["text"]) for s in segments))
-                    est_tokens = total_chars // 4
-                    cost = est_tokens / 1e6 * EMBED_COST_PER_1M_TOK
-                    _log_run("alignment", elapsed, est_tokens, cost,
-                             extra={"threshold": threshold,
-                                    "avg_confidence": sum(p.get("alignment_confidence",0)
-                                                          for p in aligned) / max(len(aligned),1)})
-                    prog.progress(100, text="Done")
-                    st.success(f"✅ {_badge(elapsed, est_tokens, cost)}")
+                # ── Strategy selection row ────────────────────────────────────
+                strat_keys   = list(ALIGNMENT_STRATEGIES.keys())
+                strat_labels = [ALIGNMENT_STRATEGIES[k]["label"] for k in strat_keys]
 
-                if aligned_path.exists():
-                    aligned = _load_json(aligned_path)
-                    covered  = sum(1 for p in aligned if p.get("aligned_segments"))
-                    avg_conf = sum(p.get("alignment_confidence",0) for p in aligned) / max(len(aligned),1)
-                    c1, c2, c3 = st.columns(3)
-                    c1.metric("Slides covered", f"{covered}/{len(aligned)}")
-                    c2.metric("Avg confidence", f"{avg_conf:.2f}")
-                    c3.metric("Threshold", threshold)
+                col_left_sel, col_right_sel = st.columns(2)
+                with col_left_sel:
+                    left_strat_idx = st.selectbox(
+                        "Strategy (Left Pane)", range(len(strat_keys)),
+                        format_func=lambda i: strat_labels[i],
+                        key="left_strategy"
+                    )
+                    left_key = strat_keys[left_strat_idx]
+                    left_mod = _load_strategy_module(left_key)
+                    st.text_area("Strategy description",
+                                 value=getattr(left_mod, "STRATEGY_DESCRIPTION", ""),
+                                 disabled=True, height=80, key="left_strat_desc")
 
-                    # -- Per-slide summary (no raw transcript preview) --------
-                    for pg in aligned:
+                with col_right_sel:
+                    right_strat_idx = st.selectbox(
+                        "Strategy (Right Pane)", range(len(strat_keys)),
+                        format_func=lambda i: strat_labels[i],
+                        index=min(1, len(strat_keys) - 1),
+                        key="right_strategy"
+                    )
+                    right_key = strat_keys[right_strat_idx]
+                    right_mod = _load_strategy_module(right_key)
+                    st.text_area("Strategy description",
+                                 value=getattr(right_mod, "STRATEGY_DESCRIPTION", ""),
+                                 disabled=True, height=80, key="right_strat_desc")
+
+                # ── Per-strategy run buttons ──────────────────────────────────
+                def _ensure_alignment(strategy_key, label):
+                    path = _aligned_path_for_strategy(strategy_key)
+                    if path.exists() and not realign_btn:
+                        return _load_json(path)
+                    if st.button(f"▶ Run {label}", key=f"btn_align_{strategy_key}"):
+                        t0 = time.time()
+                        from services.audio import get_audio_duration
+                        dur = get_audio_duration(str(_wav_path()))
+                        mod = _load_strategy_module(strategy_key)
+                        mod.OFF_SLIDE_THRESHOLD = threshold
+                        aligned = mod.build_page_timeline(
+                            ppt_pages_data, segments_data, total_audio_duration=dur
+                        )
+                        _save_json(path, aligned)
+                        elapsed = time.time() - t0
+                        total_chars = (sum(len(p.get("ppt_text", "")) for p in ppt_pages_data)
+                                       + sum(len(s["text"]) for s in segments_data))
+                        est_tokens = total_chars // 4
+                        cost = est_tokens / 1e6 * EMBED_COST_PER_1M_TOK
+                        _log_run(f"alignment_{strategy_key}", elapsed, est_tokens, cost,
+                                 extra={"strategy": strategy_key, "threshold": threshold})
+                        st.rerun()
+                    return None
+
+                col_run_l, col_run_r = st.columns(2)
+                with col_run_l:
+                    left_aligned = _ensure_alignment(left_key, strat_labels[left_strat_idx])
+                with col_run_r:
+                    right_aligned = _ensure_alignment(right_key, strat_labels[right_strat_idx])
+
+                # ── Section A — Overall View ──────────────────────────────────
+                st.subheader("Section A — Overall Confidence View")
+                col_a_l, col_a_r = st.columns(2)
+
+                def _render_confidence_badges(aligned_data, label):
+                    if aligned_data is None:
+                        st.caption(f"({label} not run yet)")
+                        return None, None
+                    covered = sum(1 for p in aligned_data if p.get("aligned_segments"))
+                    avg_conf = sum(p.get("alignment_confidence", 0) for p in aligned_data) / max(len(aligned_data), 1)
+                    high_conf_count = sum(1 for p in aligned_data if p.get("alignment_confidence", 0) >= 0.6)
+                    off_slide_count = sum(len(p.get("off_slide_segments", [])) for p in aligned_data)
+                    for pg in aligned_data:
                         conf = pg.get("alignment_confidence", 0)
                         icon = _confidence_color(conf)
                         segs = pg.get("aligned_segments", [])
                         ts   = int(pg.get("page_start_time", 0))
                         te   = int(pg.get("page_end_time", 0))
                         st.markdown(
-                            f"{icon} **Slide {pg['page_num']}** — "
+                            f"{icon} Slide {pg['page_num']} — "
                             f"conf={conf:.2f}, {len(segs)} segs "
                             f"[{ts//60:02d}:{ts%60:02d}–{te//60:02d}:{te%60:02d}]"
                         )
+                    st.caption(f"Covered: {covered}/{len(aligned_data)} | Avg conf: {avg_conf:.2f}")
+                    return avg_conf, high_conf_count, off_slide_count
 
-                    # -- Transcript Timeline ----------------------------------
-                    st.divider()
-                    st.subheader("Transcript Timeline")
+                with col_a_l:
+                    st.markdown(f"**{strat_labels[left_strat_idx]}**")
+                    left_stats = _render_confidence_badges(left_aligned, strat_labels[left_strat_idx])
 
-                    # Build start-time -> page info lookup
-                    seg_to_page: dict = {}
+                with col_a_r:
+                    st.markdown(f"**{strat_labels[right_strat_idx]}**")
+                    right_stats = _render_confidence_badges(right_aligned, strat_labels[right_strat_idx])
+
+                # Delta row
+                if (left_aligned is not None and right_aligned is not None
+                        and left_stats is not None and right_stats is not None
+                        and len(left_stats) == 3 and len(right_stats) == 3):
+                    l_avg, l_high, l_off = left_stats
+                    r_avg, r_high, r_off = right_stats
+                    avg_delta = r_avg - l_avg
+                    high_delta = r_high - l_high
+                    n_pages = max(len(left_aligned), len(right_aligned), 1)
+                    high_pct = f"{high_delta/n_pages*100:+.0f}%"
+                    off_delta = r_off - l_off
+                    l_off_safe = max(l_off, 1)
+                    off_pct = f"{off_delta/l_off_safe*100:+.0f}%"
+                    st.info(
+                        f"📊 Delta (V2 vs V1): Avg conf {avg_delta:+.2f} | "
+                        f"高置信度页面 (≥0.6) {high_delta:+d} ({high_pct}) | "
+                        f"Off-slide 段 {off_delta:+d} ({off_pct})"
+                    )
+
+                # ── Section B — Transcript Timeline ───────────────────────────
+                st.subheader("Section B — Transcript Timeline")
+
+                page_size = st.number_input(
+                    "Segments per page", min_value=5, max_value=100, value=15, step=5,
+                    key="tl_page_size"
+                )
+
+                # Pagination state
+                if "tl_current_page" not in st.session_state:
+                    st.session_state["tl_current_page"] = 0
+
+                asr_segs = segments_data
+                total_segs  = len(asr_segs)
+                total_pages = max(1, (total_segs + page_size - 1) // page_size)
+                cur_tl = min(st.session_state["tl_current_page"], total_pages - 1)
+
+                nav1, nav2, nav3 = st.columns([1, 3, 1])
+                with nav1:
+                    if st.button("← Prev", key="tl_prev", disabled=cur_tl == 0):
+                        st.session_state["tl_current_page"] = cur_tl - 1
+                        st.rerun()
+                with nav2:
+                    st.caption(f"Page {cur_tl + 1} / {total_pages}  ({total_segs} segments total)")
+                with nav3:
+                    if st.button("Next →", key="tl_next", disabled=cur_tl >= total_pages - 1):
+                        st.session_state["tl_current_page"] = cur_tl + 1
+                        st.rerun()
+
+                def _build_seg_lookup(aligned):
+                    lookup = {}
+                    if aligned is None:
+                        return lookup
                     for pg in aligned:
                         for s in pg.get("aligned_segments", []):
-                            seg_to_page[s["start"]] = {
+                            lookup[s["start"]] = {
                                 "page_num": pg["page_num"],
-                                "conf": pg.get("alignment_confidence", 0),
                                 "is_off_slide": False,
+                                "similarity": s.get("similarity", 0),
+                                "conf": pg.get("alignment_confidence", 0),
                             }
-                        supp = pg.get("page_supplement")
-                        if supp and isinstance(supp, dict):
-                            for s in supp.get("segments", []):
-                                seg_to_page[s["start"]] = {
-                                    "page_num": pg["page_num"],
-                                    "conf": pg.get("alignment_confidence", 0),
-                                    "is_off_slide": True,
-                                }
+                        for s in pg.get("off_slide_segments", []):
+                            lookup[s["start"]] = {
+                                "page_num": pg["page_num"],
+                                "is_off_slide": True,
+                                "similarity": s.get("similarity", 0),
+                                "conf": pg.get("alignment_confidence", 0),
+                            }
+                    return lookup
 
-                    asr_segs = _load_json(_asr_path())
-                    PAGE_SIZE = 20
-                    total_segs = len(asr_segs)
-                    total_pages = max(1, (total_segs + PAGE_SIZE - 1) // PAGE_SIZE)
+                left_lookup  = _build_seg_lookup(left_aligned)
+                right_lookup = _build_seg_lookup(right_aligned)
 
-                    tl_page_key = "tl_page"
-                    if tl_page_key not in st.session_state:
-                        st.session_state[tl_page_key] = 0
-                    cur_tl = st.session_state[tl_page_key]
+                s_start = cur_tl * page_size
+                for seg in asr_segs[s_start: s_start + page_size]:
+                    ms = int(seg["start"])
+                    me = int(seg["end"])
+                    st.markdown(f"`[{ms//60:02d}:{ms%60:02d}–{me//60:02d}:{me%60:02d}]` {seg['text']}")
+                    sub_l, sub_r = st.columns(2)
 
-                    nav1, nav2, nav3 = st.columns([1, 3, 1])
-                    with nav1:
-                        if st.button("← Prev", key="tl_prev", disabled=cur_tl == 0):
-                            st.session_state[tl_page_key] = cur_tl - 1
-                            st.rerun()
-                    with nav2:
-                        st.caption(f"Page {cur_tl + 1} / {total_pages}  ({total_segs} segments total)")
-                    with nav3:
-                        if st.button("Next →", key="tl_next", disabled=cur_tl >= total_pages - 1):
-                            st.session_state[tl_page_key] = cur_tl + 1
-                            st.rerun()
-
-                    s_start = cur_tl * PAGE_SIZE
-                    for seg in asr_segs[s_start: s_start + PAGE_SIZE]:
-                        ms = int(seg["start"])
-                        me = int(seg["end"])
-                        st.markdown(f"`[{ms//60:02d}:{ms%60:02d}–{me//60:02d}:{me%60:02d}]` {seg['text']}")
-                        info = seg_to_page.get(seg["start"])
+                    def _fmt_info(info, label):
                         if info is None:
-                            st.caption("  分类情况: off slide")
-                        elif info["is_off_slide"]:
-                            st.caption(
-                                f"  分类情况: off slide (near Slide {info['page_num']}), "
-                                f"conf={info['conf']:.2f}"
-                            )
-                        else:
-                            st.caption(
-                                f"  分类情况: Slide {info['page_num']}, "
-                                f"conf={info['conf']:.2f}"
-                            )
+                            return f"({label} — not run)"
+                        if info["is_off_slide"]:
+                            return f"off-slide (near Slide {info['page_num']}), sim={info['similarity']:.3f}"
+                        return f"Slide {info['page_num']}, sim={info['similarity']:.3f}, conf={info['conf']:.2f}"
 
-                # ── Bullet-level alignment (3 methods) ─────────────────────
-                st.divider()
-                st.subheader("Bullet-Level Alignment (A / B / C)")
+                    with sub_l:
+                        li = left_lookup.get(seg["start"])
+                        st.caption(f"  L: {_fmt_info(li, strat_labels[left_strat_idx])}")
+                    with sub_r:
+                        ri = right_lookup.get(seg["start"])
+                        st.caption(f"  R: {_fmt_info(ri, strat_labels[right_strat_idx])}")
 
-                if not aligned_path.exists():
-                    st.info("Run alignment first to enable bullet-level analysis.")
-                else:
-                    aligned_data = _load_json(aligned_path)
-                    page_opts_ba = [f"Slide {p['page_num']} ({len(p.get('aligned_segments',[]))} segs)"
-                                    for p in aligned_data if p.get("aligned_segments")]
-                    pages_with_segs = [p for p in aligned_data if p.get("aligned_segments")]
-
-                    if not pages_with_segs:
-                        st.warning("No slides have aligned segments — cannot run bullet alignment.")
+                # ── Legacy: bullet-level alignment (collapsed) ────────────────
+                aligned_path = _aligned_path()
+                with st.expander("Bullet-Level Alignment (A / B / C) — Legacy", expanded=False):
+                    if not aligned_path.exists():
+                        st.info("Run alignment first to enable bullet-level analysis.")
                     else:
-                        ba_page_idx = st.selectbox("Select slide for bullet alignment",
-                                                   range(len(page_opts_ba)),
-                                                   format_func=lambda i: page_opts_ba[i],
-                                                   key="ba_page_sel")
-                        ba_page     = pages_with_segs[ba_page_idx]
-                        ba_segments = ba_page.get("aligned_segments", [])
-                        ba_ppt_text = ba_page.get("ppt_text", "")
-                        bullet_lines = [l.strip() for l in ba_ppt_text.splitlines() if l.strip()]
-                        st.caption(f"{len(bullet_lines)} bullets, {len(ba_segments)} segments on this slide")
+                        aligned_data = _load_json(aligned_path)
+                        page_opts_ba = [f"Slide {p['page_num']} ({len(p.get('aligned_segments',[]))} segs)"
+                                        for p in aligned_data if p.get("aligned_segments")]
+                        pages_with_segs = [p for p in aligned_data if p.get("aligned_segments")]
 
-                        if st.button("▶ Run Bullet Alignment (all 3 methods)", key="btn_bullet_align"):
-                            from services.bullet_alignment import (
-                                align_bullets_embedding,
-                                align_bullets_llm,
-                                align_bullets_hybrid,
-                            )
-                            results = {}
-                            prog = st.progress(0, text="Method A (Embedding)…")
-                            t0 = time.time()
-                            results["A"] = align_bullets_embedding(ba_ppt_text, ba_segments)
-                            elapsed_a = time.time() - t0
+                        if not pages_with_segs:
+                            st.warning("No slides have aligned segments — cannot run bullet alignment.")
+                        else:
+                            ba_page_idx = st.selectbox("Select slide for bullet alignment",
+                                                       range(len(page_opts_ba)),
+                                                       format_func=lambda i: page_opts_ba[i],
+                                                       key="ba_page_sel")
+                            ba_page     = pages_with_segs[ba_page_idx]
+                            ba_segments = ba_page.get("aligned_segments", [])
+                            ba_ppt_text = ba_page.get("ppt_text", "")
+                            bullet_lines = [l.strip() for l in ba_ppt_text.splitlines() if l.strip()]
+                            st.caption(f"{len(bullet_lines)} bullets, {len(ba_segments)} segments on this slide")
 
-                            prog.progress(33, text="Method B (LLM)…")
-                            t1 = time.time()
-                            results["B"] = align_bullets_llm(ba_ppt_text, ba_segments)
-                            elapsed_b = time.time() - t1
+                            if st.button("▶ Run Bullet Alignment (all 3 methods)", key="btn_bullet_align"):
+                                from services.bullet_alignment import (
+                                    align_bullets_embedding,
+                                    align_bullets_llm,
+                                    align_bullets_hybrid,
+                                )
+                                results = {}
+                                prog = st.progress(0, text="Method A (Embedding)…")
+                                t0 = time.time()
+                                results["A"] = align_bullets_embedding(ba_ppt_text, ba_segments)
+                                elapsed_a = time.time() - t0
 
-                            prog.progress(66, text="Method C (Hybrid)…")
-                            t2 = time.time()
-                            results["C"] = align_bullets_hybrid(ba_ppt_text, ba_segments)
-                            elapsed_c = time.time() - t2
+                                prog.progress(33, text="Method B (LLM)…")
+                                t1 = time.time()
+                                results["B"] = align_bullets_llm(ba_ppt_text, ba_segments)
+                                elapsed_b = time.time() - t1
 
-                            prog.progress(100, text="Done")
-                            ba_out = {
-                                "page_num": ba_page["page_num"],
-                                "bullets": bullet_lines,
-                                "n_segments": len(ba_segments),
-                                "A": {"results": results["A"], "elapsed_s": round(elapsed_a, 2)},
-                                "B": {"results": results["B"], "elapsed_s": round(elapsed_b, 2)},
-                                "C": {"results": results["C"], "elapsed_s": round(elapsed_c, 2)},
-                            }
-                            _save_json(_get_run_dir() / "bullet_alignment.json", ba_out)
-                            _log_run("bullet_align", elapsed_a + elapsed_b + elapsed_c,
-                                     extra={"page_num": ba_page["page_num"]})
-                            st.rerun()
+                                prog.progress(66, text="Method C (Hybrid)…")
+                                t2 = time.time()
+                                results["C"] = align_bullets_hybrid(ba_ppt_text, ba_segments)
+                                elapsed_c = time.time() - t2
 
-                        ba_cache = _get_run_dir() / "bullet_alignment.json"
-                        if ba_cache.exists():
-                            ba_out = _load_json(ba_cache)
-                            col_a, col_b, col_c = st.columns(3)
-                            for col, method, label in [
-                                (col_a, "A", "A — Embedding"),
-                                (col_b, "B", "B — LLM"),
-                                (col_c, "C", "C — Hybrid"),
-                            ]:
-                                with col:
-                                    st.markdown(f"**{label}** ({ba_out[method]['elapsed_s']:.1f}s)")
-                                    for r in ba_out[method]["results"][:10]:
-                                        bidx = r["bullet_idx"]
-                                        conf = r["confidence"]
-                                        icon = "🟢" if conf >= 0.6 else ("🟡" if conf >= 0.3 else "🔴")
-                                        bullet_text = (ba_out["bullets"][bidx][:30] + "…"
-                                                       if 0 <= bidx < len(ba_out["bullets"])
-                                                       else "(off-slide)")
-                                        st.caption(f"{icon} seg{r['segment_idx']} → {bullet_text} ({conf:.2f})")
+                                prog.progress(100, text="Done")
+                                ba_out = {
+                                    "page_num": ba_page["page_num"],
+                                    "bullets": bullet_lines,
+                                    "n_segments": len(ba_segments),
+                                    "A": {"results": results["A"], "elapsed_s": round(elapsed_a, 2)},
+                                    "B": {"results": results["B"], "elapsed_s": round(elapsed_b, 2)},
+                                    "C": {"results": results["C"], "elapsed_s": round(elapsed_c, 2)},
+                                }
+                                _save_json(_get_run_dir() / "bullet_alignment.json", ba_out)
+                                _log_run("bullet_align", elapsed_a + elapsed_b + elapsed_c,
+                                         extra={"page_num": ba_page["page_num"]})
+                                st.rerun()
 
-                st.divider()
-                from test_ui.align_compare import render_align_compare
-                render_align_compare()
+                            ba_cache = _get_run_dir() / "bullet_alignment.json"
+                            if ba_cache.exists():
+                                ba_out = _load_json(ba_cache)
+                                col_a, col_b, col_c = st.columns(3)
+                                for col, method, label in [
+                                    (col_a, "A", "A — Embedding"),
+                                    (col_b, "B", "B — LLM"),
+                                    (col_c, "C", "C — Hybrid"),
+                                ]:
+                                    with col:
+                                        st.markdown(f"**{label}** ({ba_out[method]['elapsed_s']:.1f}s)")
+                                        for r in ba_out[method]["results"][:10]:
+                                            bidx = r["bullet_idx"]
+                                            conf = r["confidence"]
+                                            icon = "🟢" if conf >= 0.6 else ("🟡" if conf >= 0.3 else "🔴")
+                                            bullet_text = (ba_out["bullets"][bidx][:30] + "…"
+                                                           if 0 <= bidx < len(ba_out["bullets"])
+                                                           else "(off-slide)")
+                                            st.caption(f"{icon} seg{r['segment_idx']} → {bullet_text} ({conf:.2f})")
+
+                with st.expander("Legacy Run Diff", expanded=False):
+                    from test_ui.align_compare import render_align_compare
+                    render_align_compare()
 
     # ── Step 4 ────────────────────────────────────────────────────────────────
     with st.expander("Step 4 — Note generation", expanded=False):
-        note_cache = _notes_cache(template, granularity)
-        asr        = _asr_path()
-        aligned    = _aligned_path()
+        asr     = _asr_path()
+        aligned = _aligned_path()
+
+        # ── Template + granularity selector (moved from sidebar) ──────────────
+        template = st.selectbox("Note template", [
+            "passive_ppt_notes", "passive_outline_summary",
+            "active_expand", "active_comprehensive",
+        ], format_func=lambda x: {
+            "passive_ppt_notes":       "② 全PPT讲解笔记",
+            "passive_outline_summary": "④ 大纲摘要",
+            "active_expand":           "① 基于我的笔记扩写",
+            "active_comprehensive":    "③ 完整综合笔记",
+        }[x], key="s4_template")
+        granularity = st.radio("Granularity", ["simple", "detailed"], horizontal=True,
+                               key="s4_granularity")
+
+        # ── Prompt version selector ───────────────────────────────────────────
+        template_prompts = PROMPT_REGISTRY.get(template, [])
+        if template_prompts:
+            st.markdown("**Prompt version**")
+            for pv in template_prompts:
+                col_pv, col_desc = st.columns([1, 3])
+                with col_pv:
+                    is_selected = st.session_state.get("s4_prompt_version") == pv["version_label"]
+                    btn_label = f"{'✅ ' if is_selected else ''}{pv['version_label']}"
+                    if st.button(btn_label, key=f"pvbtn_{template}_{pv['version_label']}"):
+                        st.session_state["s4_prompt_version"] = pv["version_label"]
+                        st.rerun()
+                with col_desc:
+                    st.text_area("Description", value=pv["description"], disabled=True, height=60,
+                                 key=f"pvdesc_{template}_{pv['version_label']}")
+        else:
+            st.caption("No prompt versions found for this template.")
+
+        # ── Strategy commitment section ───────────────────────────────────────
+        st.markdown("**Strategy commitment**")
+        run_dir = _get_run_dir()
+        avail_strat_keys = [k for k in ALIGNMENT_STRATEGIES.keys()
+                            if (run_dir / f"aligned_pages_{k}.json").exists()]
+
+        committed_meta = {}
+        meta_path = run_dir / "meta.json"
+        if meta_path.exists():
+            try:
+                committed_meta = _load_json(meta_path)
+            except Exception:
+                pass
+        committed_strategy = committed_meta.get("committed_strategy", "")
+
+        if committed_strategy:
+            committed_label = ALIGNMENT_STRATEGIES.get(committed_strategy, {}).get("label", committed_strategy)
+            st.info(f"当前使用策略：{committed_label}")
+
+        if avail_strat_keys:
+            avail_labels = [ALIGNMENT_STRATEGIES[k]["label"] for k in avail_strat_keys]
+            commit_sel_idx = st.radio(
+                "Commit alignment strategy", range(len(avail_strat_keys)),
+                format_func=lambda i: avail_labels[i],
+                key="s4_committed_strategy"
+            )
+            commit_key = avail_strat_keys[commit_sel_idx]
+            if st.button("Commit to this strategy", key="btn_commit_strategy"):
+                src = run_dir / f"aligned_pages_{commit_key}.json"
+                dst = run_dir / "aligned_pages.json"
+                import shutil as _shutil
+                _shutil.copy2(str(src), str(dst))
+                committed_meta["committed_strategy"] = commit_key
+                _save_json(meta_path, committed_meta)
+                st.success(f"✅ Committed: {ALIGNMENT_STRATEGIES[commit_key]['label']}")
+                st.rerun()
+        else:
+            st.warning("请先在 Step 3 中运行至少一个对齐策略，再提交。")
+
+        st.divider()
+
+        # ── Note generation ───────────────────────────────────────────────────
         ready = (has_ppt and aligned.exists()) or (not has_ppt and asr.exists())
+        note_cache = _notes_cache(template, granularity)
 
         if not ready:
-            st.info("Complete Step 3 (or Step 2 for no-PPT mode) first.")
+            if has_ppt and not aligned.exists():
+                st.warning("请先在上方的「Commit to this strategy」完成策略锁定，再生成笔记。")
+            else:
+                st.info("Complete Step 3 (or Step 2 for no-PPT mode) first.")
         elif note_cache.exists():
             notes = _load_json(note_cache)
             st.success(f"✅ Cached — {len(notes)} pages ({template} / {granularity})")
             _render_notes(notes, template)
         else:
-            if st.button(f"▶ Generate notes [{template} / {granularity}]", key="btn_step4"):
-                t0 = time.time()
-                pages_in = (_load_json(aligned) if has_ppt
-                            else _build_noppt_pages(_load_json(asr)))
-                prog = st.progress(0, text=f"Generating notes for {len(pages_in)} pages…")
-                from services.note_generator import generate_notes_for_all_pages
-                notes = _run_sync(generate_notes_for_all_pages(
-                    pages_in, template=template, granularity=granularity))
-                _save_json(note_cache, notes)
-                prog.progress(100, text="Done")
-                total_in  = sum(p.get("_cost",{}).get("input_tokens",0) for p in notes)
-                total_out = sum(p.get("_cost",{}).get("output_tokens",0) for p in notes)
-                cost = total_in/1e6*CLAUDE_INPUT_PER_1M + total_out/1e6*CLAUDE_OUTPUT_PER_1M
-                elapsed = time.time() - t0
-                _log_run("note_gen", elapsed, total_in+total_out, cost,
-                         extra={"template": template, "granularity": granularity,
-                                "n_pages": len(notes)})
-                st.success(f"✅ {_badge(elapsed, total_in+total_out, cost)}")
-                st.rerun()
+            if has_ppt and not aligned.exists():
+                st.warning("请先在上方的「Commit to this strategy」完成策略锁定，再生成笔记。")
+            else:
+                if st.button(f"▶ Generate notes [{template} / {granularity}]", key="btn_step4"):
+                    t0 = time.time()
+                    pages_in = (_load_json(aligned) if has_ppt
+                                else _build_noppt_pages(_load_json(asr)))
+                    prog = st.progress(0, text=f"Generating notes for {len(pages_in)} pages…")
+                    from services.note_generator import generate_notes_for_all_pages
+                    notes = _run_sync(generate_notes_for_all_pages(
+                        pages_in, template=template, granularity=granularity))
+                    _save_json(note_cache, notes)
+                    prog.progress(100, text="Done")
+                    total_in  = sum(p.get("_cost", {}).get("input_tokens", 0) for p in notes)
+                    total_out = sum(p.get("_cost", {}).get("output_tokens", 0) for p in notes)
+                    cost = total_in/1e6*CLAUDE_INPUT_PER_1M + total_out/1e6*CLAUDE_OUTPUT_PER_1M
+                    elapsed = time.time() - t0
+                    _log_run("note_gen", elapsed, total_in+total_out, cost,
+                             extra={"template": template, "granularity": granularity,
+                                    "n_pages": len(notes)})
+                    st.success(f"✅ {_badge(elapsed, total_in+total_out, cost)}")
+                    st.rerun()
 
     # ── Step 5 ────────────────────────────────────────────────────────────────
     with st.expander("Step 5 — Active learning test", expanded=False):
@@ -417,6 +589,8 @@ def render_pipeline(language: str, template: str, granularity: str,
                                        format_func=lambda x: {
                                            "active_expand": "① 基于我的笔记扩写",
                                            "active_comprehensive": "③ 完整综合笔记"}[x])
+            granularity_s5 = st.radio("Granularity (Step 5)", ["simple", "detailed"],
+                                      horizontal=True, key="s5_gran")
             user_note = st.text_area("Your annotation", height=100,
                                      placeholder="Type what you wrote during the lecture…")
 
@@ -426,14 +600,14 @@ def render_pipeline(language: str, template: str, granularity: str,
                 prog = st.progress(0, text="Calling Claude…")
                 from services.note_generator import generate_notes_for_all_pages
                 result = _run_sync(generate_notes_for_all_pages(
-                    [page_with_note], template=active_tmpl, granularity=granularity))
+                    [page_with_note], template=active_tmpl, granularity=granularity_s5))
                 prog.progress(100, text="Done")
                 r = result[0]
                 elapsed = time.time() - t0
                 ci   = r.get("_cost", {})
-                tok  = ci.get("input_tokens",0) + ci.get("output_tokens",0)
-                cost = (ci.get("input_tokens",0)/1e6*CLAUDE_INPUT_PER_1M
-                        + ci.get("output_tokens",0)/1e6*CLAUDE_OUTPUT_PER_1M)
+                tok  = ci.get("input_tokens", 0) + ci.get("output_tokens", 0)
+                cost = (ci.get("input_tokens", 0)/1e6*CLAUDE_INPUT_PER_1M
+                        + ci.get("output_tokens", 0)/1e6*CLAUDE_OUTPUT_PER_1M)
                 _log_run("active_learn", elapsed, tok, cost,
                          extra={"template": active_tmpl})
                 st.caption(_badge(elapsed, tok, cost))
@@ -451,22 +625,25 @@ def render_pipeline(language: str, template: str, granularity: str,
 
     # ── Step 6 ────────────────────────────────────────────────────────────────
     with st.expander("Step 6 — Export", expanded=False):
-        note_cache = _notes_cache(template, granularity)
+        # Use s4_template / s4_granularity if available, else defaults
+        template_exp  = st.session_state.get("s4_template", "passive_ppt_notes")
+        gran_exp      = st.session_state.get("s4_granularity", "simple")
+        note_cache = _notes_cache(template_exp, gran_exp)
         if not note_cache.exists():
             st.info("Generate notes (Step 4) first.")
         else:
             notes = _load_json(note_cache)
             col_md, col_pdf = st.columns(2)
             with col_md:
-                md_content = _build_markdown(notes, template, has_ppt)
+                md_content = _build_markdown(notes, template_exp, has_ppt)
                 st.download_button("⬇ Download Markdown", data=md_content,
-                                   file_name=f"liberstudy_{template}_{granularity}.md",
+                                   file_name=f"liberstudy_{template_exp}_{gran_exp}.md",
                                    mime="text/markdown", use_container_width=True)
             with col_pdf:
                 if st.button("⬇ Generate PDF", use_container_width=True, key="btn_pdf"):
-                    pdf_bytes = _build_pdf(notes, template, has_ppt)
+                    pdf_bytes = _build_pdf(notes, template_exp, has_ppt)
                     st.download_button("Click to save PDF", data=pdf_bytes,
-                                       file_name=f"liberstudy_{template}_{granularity}.pdf",
+                                       file_name=f"liberstudy_{template_exp}_{gran_exp}.pdf",
                                        mime="application/pdf", use_container_width=True)
             st.markdown("**Preview (first 3000 chars):**")
             st.markdown(md_content[:3000] + ("\n\n…" if len(md_content) > 3000 else ""))
@@ -477,7 +654,9 @@ def render_pipeline(language: str, template: str, granularity: str,
 
     issues = []
     aligned_path = _aligned_path()
-    notes_path   = _notes_cache(template, granularity)
+    template_iss  = st.session_state.get("s4_template", "passive_ppt_notes")
+    gran_iss      = st.session_state.get("s4_granularity", "simple")
+    notes_path   = _notes_cache(template_iss, gran_iss)
 
     if aligned_path.exists():
         aligned = _load_json(aligned_path)
