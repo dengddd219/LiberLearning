@@ -1,0 +1,61 @@
+[
+  {
+    "ts": "2026-04-10T22:41:15",
+    "step": "audio",
+    "elapsed_s": 4.42,
+    "tokens": 0,
+    "cost_usd": 0.0,
+    "duration_s": 600.0
+  },
+  {
+    "ts": "2026-04-10T22:41:25",
+    "step": "ppt_parse",
+    "elapsed_s": 6.67,
+    "tokens": 0,
+    "cost_usd": 0.0,
+    "n_pages": 19
+  },
+  {
+    "ts": "2026-04-10T22:42:41",
+    "step": "asr",
+    "elapsed_s": 71.25,
+    "tokens": 0,
+    "cost_usd": 0.06,
+    "n_segments": 94,
+    "duration_s": 600.0
+  },
+  {
+    "ts": "2026-04-10T22:42:46",
+    "step": "alignment",
+    "elapsed_s": 4.34,
+    "tokens": 2098,
+    "cost_usd": 4.2e-05,
+    "threshold": 0.3,
+    "avg_confidence": 0.3516274456280216
+  },
+  {
+    "ts": "2026-04-10T22:45:29",
+    "step": "bullet_align",
+    "elapsed_s": 58.14,
+    "tokens": 0,
+    "cost_usd": 0.0,
+    "page_num": 1
+  },
+  {
+    "ts": "2026-04-10T23:50:43",
+    "step": "bullet_align",
+    "elapsed_s": 148.0,
+    "tokens": 0,
+    "cost_usd": 0.0,
+    "page_num": 4
+  },
+  {
+    "ts": "2026-04-11T14:17:07",
+    "step": "alignment",
+    "elapsed_s": 11.59,
+    "tokens": 2098,
+    "cost_usd": 4.2e-05,
+    "threshold": 0.3,
+    "avg_confidence": 0.06492189649218409
+  }
+]

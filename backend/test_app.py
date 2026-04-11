@@ -3,7 +3,6 @@ LiberStudy — Visual Testing Platform
 Run: cd backend && ..\.venv\Scripts\streamlit run test_app.py
 """
 import sys
-import time
 from pathlib import Path
 
 import streamlit as st
@@ -21,48 +20,69 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-from test_ui.helpers import _list_runs, _get_run_dir, _slides_dir
+from test_ui.helpers import _list_runs, _get_run_dir, _save_json
 from test_ui.helpers import _wav_path, _asr_path, _aligned_path, _ppt_path
 from test_ui.helpers import _get_slides_dir
+
+
+@st.dialog("Create New Test")
+def _create_test_dialog():
+    name = st.text_input("Test name", placeholder="e.g. lecture_01")
+    note = st.text_area("Note (optional)", placeholder="e.g. CS101 week3, threshold=0.3 experiment", height=80)
+    col_ok, col_cancel = st.columns(2)
+    with col_ok:
+        if st.button("Create", use_container_width=True, type="primary"):
+            clean = name.strip().replace(" ", "_")
+            if not clean:
+                st.error("Please enter a test name.")
+            else:
+                _get_run_dir(clean)
+                _save_json(_get_run_dir(clean) / "meta.json", {"note": note.strip()})
+                st.session_state["run_id"] = clean
+                st.rerun()
+    with col_cancel:
+        if st.button("Cancel", use_container_width=True):
+            st.rerun()
+
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.title("⚙️ Config")
 
+    st.subheader("📁 Test Runs")
+
     runs = _list_runs()
-    run_options = [r["run_id"] for r in runs]
+    run_ids = [r["run_id"] for r in runs]
 
-    if "run_id" not in st.session_state:
-        # First launch: use "default" run, create it if needed
-        st.session_state["run_id"] = "default"
-        from test_ui.helpers import _get_run_dir as _init_run
-        _init_run("default")  # ensure the directory exists so _list_runs picks it up
-        runs = _list_runs()
-        run_options = [r["run_id"] for r in runs]
+    if "run_id" not in st.session_state or st.session_state["run_id"] not in run_ids:
+        if runs:
+            st.session_state["run_id"] = runs[0]["run_id"]
+        else:
+            _get_run_dir("default")
+            st.session_state["run_id"] = "default"
+            runs = _list_runs()
+            run_ids = [r["run_id"] for r in runs]
 
-    all_options = run_options + ["+ New run"]
-    current_id = st.session_state["run_id"]
-    current_idx = run_options.index(current_id) if current_id in run_options else len(run_options)
+    def _run_label(r):
+        note_part = f" — {r['note']}" if r.get("note") else ""
+        return f"{r['run_id']}  ({r['ts'][:10]}  |  ${r['cost']:.4f}){note_part}"
 
-    selected_run = st.selectbox(
-        "Run folder", all_options,
-        index=current_idx,
-        format_func=lambda i: f"➕ New run ({time.strftime('%Y%m%d_%H%M%S')})"
-                              if i == "+ New run"
-                              else next((f"{r['run_id']}  ({r['ts']}  |  ${r['cost']:.4f})"
-                                         for r in runs if r["run_id"] == i), i)
-    )
+    if runs:
+        run_labels = [_run_label(r) for r in runs]
+        current_id = st.session_state["run_id"]
+        current_idx = run_ids.index(current_id) if current_id in run_ids else 0
+        selected_label = st.selectbox("Switch test", run_labels, index=current_idx)
+        selected_run = run_ids[run_labels.index(selected_label)]
+        if selected_run != st.session_state.get("run_id"):
+            st.session_state["run_id"] = selected_run
+            st.rerun()
 
-    if selected_run == "+ New run":
-        new_id = time.strftime("%Y%m%d_%H%M%S")
-        st.session_state["run_id"] = new_id
-        from test_ui.helpers import _get_run_dir as _init_new
-        _init_new(new_id)  # create dir before rerun so _list_runs finds it
-        st.rerun()
-    elif selected_run != st.session_state.get("run_id"):
-        st.session_state["run_id"] = selected_run
-        st.rerun()
+    if st.button("➕ Create New Test", use_container_width=True):
+        _create_test_dialog()
 
+    current_run_meta = next((r for r in runs if r["run_id"] == st.session_state.get("run_id")), None)
+    if current_run_meta and current_run_meta.get("note"):
+        st.caption(f"📝 {current_run_meta['note']}")
     st.caption(f"📁 {_get_run_dir()}")
     st.divider()
 

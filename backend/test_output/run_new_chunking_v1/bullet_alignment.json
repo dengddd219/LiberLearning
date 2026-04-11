@@ -1,0 +1,277 @@
+{
+  "page_num": 1,
+  "bullets": [
+    "Practical aspects of training / validation"
+  ],
+  "n_segments": 17,
+  "A": {
+    "results": [
+      {
+        "segment_idx": 0,
+        "bullet_idx": -1,
+        "confidence": 0.1475
+      },
+      {
+        "segment_idx": 1,
+        "bullet_idx": 0,
+        "confidence": 0.3258
+      },
+      {
+        "segment_idx": 2,
+        "bullet_idx": -1,
+        "confidence": 0.2327
+      },
+      {
+        "segment_idx": 3,
+        "bullet_idx": -1,
+        "confidence": 0.1598
+      },
+      {
+        "segment_idx": 4,
+        "bullet_idx": -1,
+        "confidence": 0.0608
+      },
+      {
+        "segment_idx": 5,
+        "bullet_idx": 0,
+        "confidence": 0.5314
+      },
+      {
+        "segment_idx": 6,
+        "bullet_idx": -1,
+        "confidence": 0.1555
+      },
+      {
+        "segment_idx": 7,
+        "bullet_idx": 0,
+        "confidence": 0.3754
+      },
+      {
+        "segment_idx": 8,
+        "bullet_idx": -1,
+        "confidence": 0.1974
+      },
+      {
+        "segment_idx": 9,
+        "bullet_idx": -1,
+        "confidence": 0.1841
+      },
+      {
+        "segment_idx": 10,
+        "bullet_idx": -1,
+        "confidence": 0.1422
+      },
+      {
+        "segment_idx": 11,
+        "bullet_idx": 0,
+        "confidence": 0.2504
+      },
+      {
+        "segment_idx": 12,
+        "bullet_idx": 0,
+        "confidence": 0.347
+      },
+      {
+        "segment_idx": 13,
+        "bullet_idx": -1,
+        "confidence": 0.2379
+      },
+      {
+        "segment_idx": 14,
+        "bullet_idx": -1,
+        "confidence": 0.1514
+      },
+      {
+        "segment_idx": 15,
+        "bullet_idx": 0,
+        "confidence": 0.406
+      },
+      {
+        "segment_idx": 16,
+        "bullet_idx": 0,
+        "confidence": 0.3847
+      }
+    ],
+    "elapsed_s": 5.27
+  },
+  "B": {
+    "results": [
+      {
+        "segment_idx": 0,
+        "bullet_idx": -1,
+        "confidence": 0.9
+      },
+      {
+        "segment_idx": 1,
+        "bullet_idx": -1,
+        "confidence": 0.6
+      },
+      {
+        "segment_idx": 2,
+        "bullet_idx": -1,
+        "confidence": 0.6
+      },
+      {
+        "segment_idx": 3,
+        "bullet_idx": -1,
+        "confidence": 0.6
+      },
+      {
+        "segment_idx": 4,
+        "bullet_idx": -1,
+        "confidence": 0.6
+      },
+      {
+        "segment_idx": 5,
+        "bullet_idx": 0,
+        "confidence": 0.95
+      },
+      {
+        "segment_idx": 6,
+        "bullet_idx": 0,
+        "confidence": 0.7
+      },
+      {
+        "segment_idx": 7,
+        "bullet_idx": 0,
+        "confidence": 0.7
+      },
+      {
+        "segment_idx": 8,
+        "bullet_idx": 0,
+        "confidence": 0.7
+      },
+      {
+        "segment_idx": 9,
+        "bullet_idx": 0,
+        "confidence": 0.7
+      },
+      {
+        "segment_idx": 10,
+        "bullet_idx": 0,
+        "confidence": 0.7
+      },
+      {
+        "segment_idx": 11,
+        "bullet_idx": 0,
+        "confidence": 0.7
+      },
+      {
+        "segment_idx": 12,
+        "bullet_idx": 0,
+        "confidence": 0.8
+      },
+      {
+        "segment_idx": 13,
+        "bullet_idx": 0,
+        "confidence": 0.8
+      },
+      {
+        "segment_idx": 14,
+        "bullet_idx": 0,
+        "confidence": 0.8
+      },
+      {
+        "segment_idx": 15,
+        "bullet_idx": 0,
+        "confidence": 0.85
+      },
+      {
+        "segment_idx": 16,
+        "bullet_idx": 0,
+        "confidence": 0.85
+      }
+    ],
+    "elapsed_s": 46.09
+  },
+  "C": {
+    "results": [
+      {
+        "segment_idx": 0,
+        "bullet_idx": -1,
+        "confidence": 0.1475
+      },
+      {
+        "segment_idx": 1,
+        "bullet_idx": 0,
+        "confidence": 0.45
+      },
+      {
+        "segment_idx": 2,
+        "bullet_idx": 0,
+        "confidence": 0.35
+      },
+      {
+        "segment_idx": 3,
+        "bullet_idx": -1,
+        "confidence": 0.1598
+      },
+      {
+        "segment_idx": 4,
+        "bullet_idx": -1,
+        "confidence": 0.0608
+      },
+      {
+        "segment_idx": 5,
+        "bullet_idx": 0,
+        "confidence": 0.98
+      },
+      {
+        "segment_idx": 6,
+        "bullet_idx": -1,
+        "confidence": 0.1555
+      },
+      {
+        "segment_idx": 7,
+        "bullet_idx": 0,
+        "confidence": 0.42
+      },
+      {
+        "segment_idx": 8,
+        "bullet_idx": -1,
+        "confidence": 0.1974
+      },
+      {
+        "segment_idx": 9,
+        "bullet_idx": -1,
+        "confidence": 0.1841
+      },
+      {
+        "segment_idx": 10,
+        "bullet_idx": -1,
+        "confidence": 0.1422
+      },
+      {
+        "segment_idx": 11,
+        "bullet_idx": -1,
+        "confidence": 0.85
+      },
+      {
+        "segment_idx": 12,
+        "bullet_idx": 0,
+        "confidence": 0.55
+      },
+      {
+        "segment_idx": 13,
+        "bullet_idx": -1,
+        "confidence": 0.9
+      },
+      {
+        "segment_idx": 14,
+        "bullet_idx": -1,
+        "confidence": 0.1514
+      },
+      {
+        "segment_idx": 15,
+        "bullet_idx": 0,
+        "confidence": 0.62
+      },
+      {
+        "segment_idx": 16,
+        "bullet_idx": 0,
+        "confidence": 0.55
+      }
+    ],
+    "elapsed_s": 73.9
+  }
+}

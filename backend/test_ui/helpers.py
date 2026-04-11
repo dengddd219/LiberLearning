@@ -15,7 +15,7 @@ CLAUDE_INPUT_PER_1M   = 3.0
 CLAUDE_OUTPUT_PER_1M  = 15.0
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
-TEST_OUTPUT_BASE = Path(__file__).parent.parent.parent / "test_output"
+TEST_OUTPUT_BASE = Path(__file__).parent.parent / "test_output"
 TEST_OUTPUT_BASE.mkdir(exist_ok=True)
 
 
@@ -54,7 +54,14 @@ def _list_runs() -> list[dict]:
                         n_steps = len(log)
                 except Exception:
                     pass
-            runs.append({"run_id": run_id, "ts": ts, "cost": cost, "n_steps": n_steps})
+            note = ""
+            meta_file = d / "meta.json"
+            if meta_file.exists():
+                try:
+                    note = _load_json(meta_file).get("note", "")
+                except Exception:
+                    pass
+            runs.append({"run_id": run_id, "ts": ts, "cost": cost, "n_steps": n_steps, "note": note})
     return sorted(runs, key=lambda r: r["ts"], reverse=True)
 
 

@@ -1,0 +1,45 @@
+[
+  {
+    "ts": "2026-04-11T14:26:14",
+    "step": "audio",
+    "elapsed_s": 3.91,
+    "tokens": 0,
+    "cost_usd": 0.0,
+    "duration_s": 600.0
+  },
+  {
+    "ts": "2026-04-11T14:26:16",
+    "step": "ppt_parse",
+    "elapsed_s": 0.11,
+    "tokens": 0,
+    "cost_usd": 0.0,
+    "n_pages": 19
+  },
+  {
+    "ts": "2026-04-11T14:36:06",
+    "step": "alignment",
+    "elapsed_s": 6.39,
+    "tokens": 2105,
+    "cost_usd": 4.2e-05,
+    "threshold": 0.3,
+    "avg_confidence": 0.06917782110392336
+  },
+  {
+    "ts": "2026-04-11T14:39:01",
+    "step": "bullet_align",
+    "elapsed_s": 125.26,
+    "tokens": 0,
+    "cost_usd": 0.0,
+    "page_num": 1
+  },
+  {
+    "ts": "2026-04-11T14:40:38",
+    "step": "note_gen",
+    "elapsed_s": 79.32,
+    "tokens": 21893,
+    "cost_usd": 0.130431,
+    "template": "passive_ppt_notes",
+    "granularity": "simple",
+    "n_pages": 21
+  }
+]
