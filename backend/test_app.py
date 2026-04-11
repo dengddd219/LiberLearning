@@ -59,8 +59,9 @@ with st.sidebar:
         from test_ui.helpers import _get_run_dir as _init_new
         _init_new(new_id)  # create dir before rerun so _list_runs finds it
         st.rerun()
-    else:
+    elif selected_run != st.session_state.get("run_id"):
         st.session_state["run_id"] = selected_run
+        st.rerun()
 
     st.caption(f"📁 {_get_run_dir()}")
     st.divider()
