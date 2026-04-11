@@ -1,0 +1,86 @@
+[
+  {
+    "ts": "2026-04-11T17:13:26",
+    "step": "alignment_v2_d004",
+    "elapsed_s": 6.78,
+    "tokens": 2098,
+    "cost_usd": 4.2e-05,
+    "strategy": "v2_d004",
+    "threshold": 0.3
+  },
+  {
+    "ts": "2026-04-11T17:13:37",
+    "step": "alignment_v1_0410",
+    "elapsed_s": 8.18,
+    "tokens": 2098,
+    "cost_usd": 4.2e-05,
+    "strategy": "v1_0410",
+    "threshold": 0.3
+  },
+  {
+    "ts": "2026-04-11T17:15:47",
+    "step": "note_gen",
+    "elapsed_s": 88.93,
+    "tokens": 28850,
+    "cost_usd": 0.17031,
+    "template": "passive_ppt_notes",
+    "granularity": "simple",
+    "n_pages": 27
+  },
+  {
+    "ts": "2026-04-11T17:44:31",
+    "step": "active_learn_canvas",
+    "elapsed_s": 11.59,
+    "tokens": 0,
+    "cost_usd": 0.0,
+    "template": "active_expand",
+    "page_num": 3,
+    "n_annotations": 1
+  },
+  {
+    "ts": "2026-04-11T17:45:41",
+    "step": "active_learn_canvas",
+    "elapsed_s": 11.76,
+    "tokens": 0,
+    "cost_usd": 0.0,
+    "template": "active_expand",
+    "page_num": 3,
+    "n_annotations": 1
+  },
+  {
+    "ts": "2026-04-11T17:50:54",
+    "step": "audio",
+    "elapsed_s": 3.22,
+    "tokens": 0,
+    "cost_usd": 0.0,
+    "duration_s": 600.0
+  },
+  {
+    "ts": "2026-04-11T17:50:55",
+    "step": "ppt_parse",
+    "elapsed_s": 0.12,
+    "tokens": 0,
+    "cost_usd": 0.0,
+    "n_pages": 19
+  },
+  {
+    "ts": "2026-04-11T17:54:34",
+    "step": "asr",
+    "elapsed_s": 55.24,
+    "tokens": 0,
+    "cost_usd": 0.06,
+    "n_sentences": 67,
+    "n_raw": 94,
+    "duration_s": 600.0
+  },
+  {
+    "ts": "2026-04-11T17:59:08",
+    "step": "active_learn_canvas",
+    "elapsed_s": 11.89,
+    "tokens": 0,
+    "cost_usd": 0.0,
+    "template": "active_expand",
+    "page_num": 3,
+    "n_annotations": 1
+  }
+]

@@ -18,6 +18,89 @@ CLAUDE_OUTPUT_PER_1M  = 15.0
 TEST_OUTPUT_BASE = Path(__file__).parent.parent / "test_output"
 TEST_OUTPUT_BASE.mkdir(exist_ok=True)
 
+TEST_DOCS_BASE = Path(__file__).parent.parent / "test_documents"
+TEST_DOCS_BASE.mkdir(exist_ok=True)
+
+ALIGNMENT_STRATEGIES = {
+    "v1_0410": {
+        "module": "services.alignment_v1",
+        "label":  "V1 (0410) — 单遍扫描",
+    },
+    "v2_d004": {
+        "module": "services.alignment_v2",
+        "label":  "V2 (D-004) — K=3去抖+升级",
+    },
+}
+
+
+def _load_strategy_module(strategy_key: str):
+    import importlib
+    return importlib.import_module(ALIGNMENT_STRATEGIES[strategy_key]["module"])
+
+
+def _build_prompt_registry() -> dict:
+    """Discover all prompt version files under backend/prompts/<template>/*.py."""
+    import importlib.util
+    prompts_base = Path(__file__).parent.parent / "prompts"
+    registry: dict[str, list[dict]] = {}
+    if not prompts_base.exists():
+        return registry
+    for tmpl_dir in sorted(prompts_base.iterdir()):
+        if not tmpl_dir.is_dir():
+            continue
+        tmpl_key = tmpl_dir.name
+        registry[tmpl_key] = []
+        for py_file in sorted(tmpl_dir.glob("*.py")):
+            spec = importlib.util.spec_from_file_location(
+                f"prompts.{tmpl_key}.{py_file.stem}", py_file
+            )
+            mod = importlib.util.module_from_spec(spec)
+            try:
+                spec.loader.exec_module(mod)
+                registry[tmpl_key].append({
+                    "version_label": getattr(mod, "VERSION_LABEL", py_file.stem),
+                    "description":   getattr(mod, "PROMPT_DESCRIPTION", ""),
+                    "file":          str(py_file),
+                })
+            except Exception:
+                pass
+    return registry
+
+
+PROMPT_REGISTRY: dict = _build_prompt_registry()
+
+
+def _list_docs() -> list[dict]:
+    docs = []
+    for d in sorted(TEST_DOCS_BASE.iterdir()):
+        if d.is_dir():
+            meta = d / "doc_meta.json"
+            if meta.exists():
+                try:
+                    docs.append(_load_json(meta))
+                except Exception:
+                    pass
+    return sorted(docs, key=lambda m: m.get("created_at", ""), reverse=True)
+
+
+def _get_doc_dir(doc_id: str) -> Path:
+    d = TEST_DOCS_BASE / doc_id
+    d.mkdir(exist_ok=True)
+    return d
+
+
+def _get_doc_meta(doc_id: str) -> dict:
+    p = _get_doc_dir(doc_id) / "doc_meta.json"
+    return _load_json(p) if p.exists() else {}
+
+
+def _save_doc_meta(doc_id: str, meta: dict) -> None:
+    _save_json(_get_doc_dir(doc_id) / "doc_meta.json", meta)
+
+
+def _list_runs_for_doc(doc_id: str) -> list[dict]:
+    return [r for r in _list_runs() if r.get("doc_id") == doc_id]
+
 
 def _get_current_run_id() -> str:
     return st.session_state.get("run_id") or "default"
@@ -55,13 +138,19 @@ def _list_runs() -> list[dict]:
                 except Exception:
                     pass
             note = ""
+            doc_id = ""
+            strategy = ""
             meta_file = d / "meta.json"
             if meta_file.exists():
                 try:
-                    note = _load_json(meta_file).get("note", "")
+                    meta_data = _load_json(meta_file)
+                    note = meta_data.get("note", "")
+                    doc_id = meta_data.get("doc_id", "")
+                    strategy = meta_data.get("strategy", "")
                 except Exception:
                     pass
-            runs.append({"run_id": run_id, "ts": ts, "cost": cost, "n_steps": n_steps, "note": note})
+            runs.append({"run_id": run_id, "ts": ts, "cost": cost, "n_steps": n_steps,
+                         "note": note, "doc_id": doc_id, "strategy": strategy})
     return sorted(runs, key=lambda r: r["ts"], reverse=True)
 
 
@@ -73,17 +162,40 @@ def _load_json(path: Path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-# ── Per-run path helpers ───────────────────────────────────────────────────────
-def _wav_path():     return _get_run_dir() / "test_audio_10min.wav"
-def _asr_path():     return _get_run_dir() / "asr_segments.json"
+# ── Per-doc path helpers (Step 0/1/2 — shared across runs) ────────────────────
+# These files are fixed per-document; once processed they never need re-running.
+def _wav_path():
+    return _get_doc_dir(st.session_state.get("doc_id") or "default") / "test_audio_10min.wav"
+
+def _asr_raw_path():
+    return _get_doc_dir(st.session_state.get("doc_id") or "default") / "asr_raw.json"
+
+def _asr_path():
+    return _get_doc_dir(st.session_state.get("doc_id") or "default") / "asr_segments.json"
+
+def _ppt_path():
+    return _get_doc_dir(st.session_state.get("doc_id") or "default") / "ppt_pages.json"
+
+def _slides_dir():
+    d = _get_doc_dir(st.session_state.get("doc_id") or "default") / "slides"
+    d.mkdir(exist_ok=True)
+    return d
+
+def _get_slides_dir(run_id: str = None) -> Path:
+    """Compat alias — returns doc-level slides dir (run_id ignored)."""
+    return _slides_dir()
+
+# ── Per-run path helpers (Step 3+ — independent per strategy run) ──────────────
 def _aligned_path(): return _get_run_dir() / "aligned_pages.json"
-def _ppt_path():     return _get_run_dir() / "ppt_pages.json"
 def _gt_path():      return TEST_OUTPUT_BASE / "ground_truth.json"
 def _judge_path():   return TEST_OUTPUT_BASE / "judge_scores.json"
 def _log_path():     return _get_run_dir() / "run_log.json"
-def _slides_dir():   return _get_slides_dir()
 def _notes_cache(tmpl, gran):
     return _get_run_dir() / f"notes_{tmpl}_{gran}.json"
+
+
+def _aligned_path_for_strategy(strategy_key: str) -> Path:
+    return _get_run_dir() / f"aligned_pages_{strategy_key}.json"
 
 
 # ── UI helpers ─────────────────────────────────────────────────────────────────

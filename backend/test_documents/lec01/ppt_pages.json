@@ -1,0 +1,97 @@
+[
+  {
+    "page_num": 1,
+    "ppt_text": "Practical aspects of training / validation",
+    "slide_image_url": "/slides/slide_001.png"
+  },
+  {
+    "page_num": 2,
+    "ppt_text": "Predict Who Will Repay TheirLoans •A lender hires you to investigate who will repay their  loans •You are given complete files on 100 •5 defaulted within 3 years Image creditdebt.org",
+    "slide_image_url": "/slides/slide_002.png"
+  },
+  {
+    "page_num": 3,
+    "ppt_text": "A Surprising Finding\n• All 5 people who defaulted wore blue shirts during interviews\n• Your model may find this strong signal as well",
+    "slide_image_url": "/slides/slide_003.png"
+  },
+  {
+    "page_num": 4,
+    "ppt_text": "Training Error and Generalization Error\n• Training error (bias): model error on the training data\n• Generalization error (variance): model error on new data\n• Example: practice a future exam with past exams\n• Doing well on past exams (training error) doesn’t guarantee a  good score on the future exam (generalization error)\n• Student A gets 0 error on past exams by rote learning\n• Student B  understands the reasons for givenanswers",
+    "slide_image_url": "/slides/slide_004.png"
+  },
+  {
+    "page_num": 5,
+    "ppt_text": "Validation Dataset and TestDataset\n• Validation dataset: a dataset used to evaluate themodel\n• Should not be mixed with the training data (#1 mistake)\n• Model selection purpose •Test dataset: a dataset can be used once, e.g.\n• A future exam\n• The house sale price I bided\n• Dataset used in private leaderboard in Kaggle",
+    "slide_image_url": "/slides/slide_005.png"
+  },
+  {
+    "page_num": 6,
+    "ppt_text": "• Previous ML: 70/30\n• Big data: 1,000,000 10,000 10,000\n• Percentages: 98/1/1\n• Percentages: 99.5/0.4/0.1\n• K-fold CV is expensive for deep learning",
+    "slide_image_url": "/slides/slide_006.png"
+  },
+  {
+    "page_num": 7,
+    "ppt_text": "Hyperparameter:\n•  Learning rate\n•  Batch size\n•  #hidden layers\n•  #hidden units\n•  Choice of activation function\n• ...\n•  Model selection",
+    "slide_image_url": "/slides/slide_007.png"
+  },
+  {
+    "page_num": 8,
+    "ppt_text": "•Training dataset: train parameters with givenhyper-parameters •Validation dataset: choose hyper-parameters •Test dataset: leave it alone",
+    "slide_image_url": "/slides/slide_008.png"
+  },
+  {
+    "page_num": 9,
+    "ppt_text": "Applied DL is a very empiricalprocess This game is called while True: learn()",
+    "slide_image_url": "/slides/slide_009.png"
+  },
+  {
+    "page_num": 10,
+    "ppt_text": "Applied DL is a very empiricalprocess # of iterations",
+    "slide_image_url": "/slides/slide_010.png"
+  },
+  {
+    "page_num": 11,
+    "ppt_text": "",
+    "slide_image_url": "/slides/slide_011.png"
+  },
+  {
+    "page_num": 12,
+    "ppt_text": "",
+    "slide_image_url": "/slides/slide_012.png"
+  },
+  {
+    "page_num": 13,
+    "ppt_text": "• The ability to fit variety offunctions\n• Low-capacity models struggles to fit trainingset\n• High-capacity models can memorize the training set",
+    "slide_image_url": "/slides/slide_013.png"
+  },
+  {
+    "page_num": 14,
+    "ppt_text": "Influence of ModelComplexity",
+    "slide_image_url": "/slides/slide_014.png"
+  },
+  {
+    "page_num": 15,
+    "ppt_text": "",
+    "slide_image_url": "/slides/slide_015.png"
+  },
+  {
+    "page_num": 16,
+    "ppt_text": "• It’s hard to compare complexity between different algorithms\n• e.g. tree vs neural network\n• Given an algorithm family, two main factors matter:\n• The number of parameters\n• The values taken by each parameter",
+    "slide_image_url": "/slides/slide_016.png"
+  },
+  {
+    "page_num": 17,
+    "ppt_text": "•Multiple factors matters •# of examples •# of elements in eachexample",
+    "slide_image_url": "/slides/slide_017.png"
+  },
+  {
+    "page_num": 18,
+    "ppt_text": "Basic recipe for machinelearning •High bias (training data performance) → Underfitting → •High variance (validation set performance) → Overfitting →",
+    "slide_image_url": "/slides/slide_018.png"
+  },
+  {
+    "page_num": 19,
+    "ppt_text": "•Model capacity and data capacity should be matched to prevent overfitting and underfitting.\n•Understand fitting and bias/variance relationship •Empirically, use training/validation error to evaluate •Know what to do under whichcircumstance",
+    "slide_image_url": "/slides/slide_019.png"
+  }
+]

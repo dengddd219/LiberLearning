@@ -177,7 +177,8 @@ def transcribe_openai(
         chunk_dir = os.path.dirname(chunks[0][0])
         shutil.rmtree(chunk_dir, ignore_errors=True)
 
-    return _merge_into_sentences(all_segments)
+    sentences = _merge_into_sentences(all_segments)
+    return sentences, all_segments
 
 
 def transcribe_aliyun(
@@ -208,11 +209,15 @@ def transcribe(
     wav_path: str,
     language: str = "en",
     prompt: Optional[str] = None,
-) -> list[dict]:
+) -> tuple[list[dict], list[dict]]:
     """
     Unified transcription entry point.
     Routes to Alibaba Cloud for Chinese if keys are available,
     otherwise falls back to OpenAI Whisper.
+
+    Returns:
+        (sentences, raw_segments) — sentences are Whisper segments merged into
+        complete sentences; raw_segments are the unmerged Whisper output.
 
     Args:
         prompt: Domain vocabulary hint for Whisper (e.g. "CNN, LSTM, backpropagation").

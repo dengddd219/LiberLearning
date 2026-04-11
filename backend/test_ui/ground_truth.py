@@ -1,69 +1,151 @@
 """
-Ground Truth tab — bullet alignment labeling + accuracy metrics.
+Ground Truth 标签页 — 人工标注 ASR 句子所属 PPT 页码。
+
+UI 设计：
+- 所有句子平铺显示（不折叠）
+- 每句直接显示页码单选按钮，随时可更改
+- 每页有两个选项：Slide N（PPT 文本直接覆盖）和 Slide N (ext)（老师口头扩展，不在 PPT 文本中但属于该页）
+- 一个保存按钮，最后统一保存
 """
 import streamlit as st
 
 from test_ui.helpers import (
-    _asr_path, _ppt_path, _gt_path, _aligned_path,
-    _load_json, _save_json, _render_accuracy_table,
+    _asr_path, _ppt_path, _gt_path,
+    _load_json, _save_json,
 )
 
 
+def _fmt_time(sec: float) -> str:
+    s = int(sec)
+    return f"{s // 60:02d}:{s % 60:02d}"
+
+
+def _load_gt() -> dict:
+    p = _gt_path()
+    return _load_json(p) if p.exists() else {}
+
+
 def render_ground_truth():
-    st.title("Ground Truth — Bullet Alignment Labeling")
-    st.caption("Label which transcript segment matches each PPT bullet. "
-               "Used to compute accuracy metrics for the three alignment methods.")
+    st.title("Ground Truth 标注")
 
-    asr = _asr_path()
-    ppt = _ppt_path()
-    gt  = _gt_path()
-
-    if not asr.exists() or not ppt.exists():
-        st.warning("Complete Steps 1 and 2 in the Pipeline tab first.")
+    if not _asr_path().exists():
+        st.info("请先完成 Step 2（ASR 转录）再进行标注。")
         return
 
-    segments  = _load_json(asr)
-    ppt_pages = _load_json(ppt)
-    gt_data   = _load_json(gt) if gt.exists() else {}
+    segments: list[dict] = _load_json(_asr_path())
+    if not segments:
+        st.info("ASR 转录结果为空。")
+        return
 
-    seg_labels = [
-        f"[{int(s['start'])//60:02d}:{int(s['start'])%60:02d}] {s['text'][:60]}…"
-        for s in segments
-    ]
-    seg_idx = st.selectbox("Select transcript segment to label",
-                           range(len(segments)),
-                           format_func=lambda i: seg_labels[i])
-    seg = segments[seg_idx]
+    # 读取 PPT 页码列表（用于选项）
+    # 每页两个选项：Slide N（PPT 文本直接覆盖）、Slide N (ext)（口头扩展，不在 PPT 文本中）
+    if _ppt_path().exists():
+        ppt_pages: list[dict] = _load_json(_ppt_path())
+        page_nums = [p["page_num"] for p in ppt_pages]
+    else:
+        page_nums = list(range(1, 21))
+    page_options: list[str] = []
+    for n in page_nums:
+        page_options.append(f"Slide {n}")
+        page_options.append(f"Slide {n} (ext)")
+    page_options.append("off-slide")
 
-    ts, te = int(seg["start"]), int(seg["end"])
-    st.info(f"[{ts//60:02d}:{ts%60:02d}–{te//60:02d}:{te%60:02d}] {seg['text']}")
+    # 从磁盘加载已有标注，作为初始值
+    saved_gt: dict = _load_gt()
 
-    page_labels = [f"Slide {p['page_num']}" for p in ppt_pages]
-    page_idx = st.selectbox("Which slide?", range(len(ppt_pages)),
-                            format_func=lambda i: page_labels[i])
-    page = ppt_pages[page_idx]
-
-    bullet_lines   = [l.strip() for l in page["ppt_text"].splitlines() if l.strip()]
-    bullet_options = ["(off-slide — not on PPT)"] + bullet_lines
-    bullet_idx = st.radio("Which bullet point?", range(len(bullet_options)),
-                          format_func=lambda i: bullet_options[i])
-
-    if st.button("💾 Save label", key="btn_gt_save"):
-        gt_data[f"seg_{seg_idx}"] = {
-            "segment_idx":   seg_idx,
-            "segment_text":  seg["text"],
-            "segment_start": seg["start"],
-            "page_num":      page["page_num"],
-            "bullet_idx":    bullet_idx - 1,
-            "bullet_text":   bullet_options[bullet_idx],
-        }
-        _save_json(gt, gt_data)
-        st.success(f"Saved: seg {seg_idx} → Slide {page['page_num']}, bullet {bullet_idx}")
-
+    st.caption(f"共 {len(segments)} 条句子，每句选择所属页码后点击底部「保存」。")
     st.divider()
-    st.subheader(f"Labeled: {len(gt_data)} / {len(segments)} segments")
 
-    if _aligned_path().exists() and len(gt_data) >= 5:
-        st.subheader("Alignment Method Accuracy")
-        aligned = _load_json(_aligned_path())
-        _render_accuracy_table(segments, ppt_pages, aligned, gt_data)
+    # 用 session_state 暂存本次选择
+    state_key = "gt_labels"
+    if state_key not in st.session_state:
+        # 初始化：优先用磁盘已有标注
+        init: dict[str, str] = {}
+        for i, seg in enumerate(segments):
+            saved = saved_gt.get(f"seg_{i}", {})
+            if isinstance(saved, dict):
+                page_label = saved.get("page_label", "")
+            else:
+                # 兼容旧格式（直接存 page_num int）
+                pn = saved.get("page_num") if isinstance(saved, dict) else None
+                page_label = f"Slide {pn}" if pn else ""
+            init[f"seg_{i}"] = page_label
+        st.session_state[state_key] = init
+
+    labels: dict[str, str] = st.session_state[state_key]
+
+    # 平铺渲染每条句子
+    for i, seg in enumerate(segments):
+        seg_key = f"seg_{i}"
+        ts = _fmt_time(seg.get("start", 0))
+        te = _fmt_time(seg.get("end", 0))
+        text = seg.get("text", "")
+
+        current_label = labels.get(seg_key, "")
+        # 计算默认 index（未标注时默认选第一个）
+        try:
+            default_idx = page_options.index(current_label) if current_label in page_options else 0
+        except ValueError:
+            default_idx = 0
+
+        col_info, col_radio = st.columns([2, 3])
+        with col_info:
+            st.markdown(f"**#{i+1}** `[{ts}–{te}]`")
+            st.caption(text[:120] + ("…" if len(text) > 120 else ""))
+        with col_radio:
+            chosen = st.radio(
+                label="所属页面",
+                options=page_options,
+                index=default_idx,
+                key=f"radio_{seg_key}",
+                horizontal=True,
+                label_visibility="collapsed",
+            )
+            labels[seg_key] = chosen
+
+        st.divider()
+
+    # 统一保存按钮
+    if st.button("💾 保存所有标注", type="primary"):
+        gt_data: dict = {}
+        for i, seg in enumerate(segments):
+            seg_key = f"seg_{i}"
+            label = labels.get(seg_key, "")
+            if label == "off-slide":
+                page_num = None
+                is_extension = False
+            elif label.endswith(" (ext)"):
+                base = label[: -len(" (ext)")]
+                try:
+                    page_num = int(base.replace("Slide ", ""))
+                except ValueError:
+                    page_num = None
+                is_extension = True
+            else:
+                try:
+                    page_num = int(label.replace("Slide ", ""))
+                except ValueError:
+                    page_num = None
+                is_extension = False
+            gt_data[seg_key] = {
+                "page_label": label,
+                "page_num": page_num,
+                "is_extension": is_extension,
+                "text": seg.get("text", ""),
+                "start": seg.get("start", 0),
+                "end": seg.get("end", 0),
+            }
+        _save_json(_gt_path(), gt_data)
+        st.success(f"已保存 {len(gt_data)} 条标注至 ground_truth.json")
+
+    # 准确率评估（5条以上时显示）
+    labeled = {k: v for k, v in saved_gt.items() if isinstance(v, dict) and v.get("page_num")}
+    if len(labeled) >= 5 and _asr_path().exists():
+        st.divider()
+        st.subheader("准确率评估（基于已保存标注）")
+        from test_ui.helpers import _aligned_path, _render_accuracy_table
+        if _aligned_path().exists():
+            aligned = _load_json(_aligned_path())
+            _render_accuracy_table(segments, [], aligned, saved_gt)
+        else:
+            st.info("请先完成 Step 3（语义对齐）再查看准确率。")

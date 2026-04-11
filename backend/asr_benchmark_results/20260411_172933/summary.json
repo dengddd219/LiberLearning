@@ -1,0 +1,12 @@
+{
+  "audio": "C:\\Users\\19841\\Desktop\\github\\LiberLearning\\LiberLearning\\backend\\test_documents\\lec01\\test_audio_10min.wav",
+  "duration_min": 10.0,
+  "language": "en",
+  "timestamp": "20260411_172933",
+  "engines": {
+    "xunfei": {
+      "status": "error",
+      "error": "('Connection aborted.', TimeoutError('The write operation timed out'))"
+    }
+  }
+}

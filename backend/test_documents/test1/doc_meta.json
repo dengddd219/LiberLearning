@@ -1,0 +1,18 @@
+{
+  "doc_id": "test1",
+  "display_name": "test1",
+  "notes": "",
+  "created_at": "2026-04-11T17:50:36",
+  "ground_truth": {
+    "seg_0": {
+      "segment_idx": 0,
+      "segment_text": "Okay, so let's get started.",
+      "segment_start": 90.0,
+      "segment_end": 112.87999725341797,
+      "label": "off-slide",
+      "page_num": null,
+      "bullet_idx": -1,
+      "bullet_text": "(off-slide)"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "audio": "C:\\Users\\19841\\Desktop\\github\\LiberLearning\\LiberLearning\\backend\\test_documents\\lec01\\test_audio_1min.wav",
+  "duration_min": 1.0,
+  "language": "en",
+  "timestamp": "20260411_174250",
+  "engines": {
+    "xunfei": {
+      "status": "error",
+      "error": "讯飞上传失败: {'code': '26601', 'descInfo': '非法应用信息|signa verify fail'}"
+    }
+  }
+}

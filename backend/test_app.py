@@ -1,7 +1,8 @@
 """
 LiberStudy — Visual Testing Platform
-Run: cd backend && ..\.venv\Scripts\streamlit run test_app.py
+Run: cd backend && ../.venv/Scripts/streamlit run test_app.py
 """
+import time
 import sys
 from pathlib import Path
 
@@ -20,26 +21,64 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-from test_ui.helpers import _list_runs, _get_run_dir, _save_json
-from test_ui.helpers import _wav_path, _asr_path, _aligned_path, _ppt_path
-from test_ui.helpers import _get_slides_dir
+from test_ui.helpers import (
+    _list_runs, _list_runs_for_doc, _get_run_dir, _save_json, _load_json,
+    _wav_path, _asr_path, _aligned_path, _ppt_path,
+    _list_docs, _get_doc_dir, _save_doc_meta,
+    ALIGNMENT_STRATEGIES,
+)
 
 
-@st.dialog("Create New Test")
-def _create_test_dialog():
-    name = st.text_input("Test name", placeholder="e.g. lecture_01")
-    note = st.text_area("Note (optional)", placeholder="e.g. CS101 week3, threshold=0.3 experiment", height=80)
+@st.dialog("Create New Document")
+def _create_doc_dialog():
+    doc_id = st.text_input("Document ID", placeholder="e.g. lec01")
+    display_name = st.text_input("Display name", placeholder="e.g. CS101 Lecture 01")
+    notes = st.text_area("Notes (optional)", height=80)
     col_ok, col_cancel = st.columns(2)
     with col_ok:
         if st.button("Create", use_container_width=True, type="primary"):
-            clean = name.strip().replace(" ", "_")
+            clean = doc_id.strip().replace(" ", "_")
             if not clean:
-                st.error("Please enter a test name.")
+                st.error("Please enter a document ID.")
             else:
-                _get_run_dir(clean)
-                _save_json(_get_run_dir(clean) / "meta.json", {"note": note.strip()})
-                st.session_state["run_id"] = clean
+                _save_doc_meta(clean, {
+                    "doc_id": clean,
+                    "display_name": display_name.strip() or clean,
+                    "notes": notes.strip(),
+                    "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                })
+                st.session_state["doc_id"] = clean
+                st.session_state.pop("run_id", None)
                 st.rerun()
+    with col_cancel:
+        if st.button("Cancel", use_container_width=True):
+            st.rerun()
+
+
+@st.dialog("New Strategy Run")
+def _create_run_dialog(doc_id: str):
+    strat_keys = list(ALIGNMENT_STRATEGIES.keys())
+    strat_labels = [ALIGNMENT_STRATEGIES[k]["label"] for k in strat_keys]
+    sel_idx = st.selectbox("Alignment strategy", range(len(strat_keys)),
+                           format_func=lambda i: strat_labels[i])
+    strategy_key = strat_keys[sel_idx]
+    note = st.text_area("Run note (optional)", height=60,
+                        placeholder="e.g. threshold=0.3 test")
+    col_ok, col_cancel = st.columns(2)
+    with col_ok:
+        if st.button("Create", use_container_width=True, type="primary"):
+            ts = time.strftime("%Y%m%d_%H%M%S")
+            run_id = f"{ts}_{strategy_key}"
+            _get_run_dir(run_id)
+            _save_json(_get_run_dir(run_id) / "meta.json", {
+                "doc_id": doc_id,
+                "strategy": strategy_key,
+                "note": note.strip(),
+                "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            })
+            st.session_state["run_id"] = run_id
+            st.session_state["tl_current_page"] = 0
+            st.rerun()
     with col_cancel:
         if st.button("Cancel", use_container_width=True):
             st.rerun()
@@ -49,72 +88,104 @@ def _create_test_dialog():
 with st.sidebar:
     st.title("⚙️ Config")
 
-    st.subheader("📁 Test Runs")
+    # ── Document selector ─────────────────────────────────────────────────────
+    st.subheader("📁 Test Documents")
+    docs = _list_docs()
+    doc_ids = [d["doc_id"] for d in docs]
 
-    runs = _list_runs()
-    run_ids = [r["run_id"] for r in runs]
-
-    if "run_id" not in st.session_state or st.session_state["run_id"] not in run_ids:
-        if runs:
-            st.session_state["run_id"] = runs[0]["run_id"]
+    if "doc_id" not in st.session_state or st.session_state["doc_id"] not in doc_ids:
+        if docs:
+            st.session_state["doc_id"] = docs[0]["doc_id"]
         else:
-            _get_run_dir("default")
-            st.session_state["run_id"] = "default"
-            runs = _list_runs()
-            run_ids = [r["run_id"] for r in runs]
+            st.session_state["doc_id"] = ""
 
-    def _run_label(r):
-        note_part = f" — {r['note']}" if r.get("note") else ""
-        return f"{r['run_id']}  ({r['ts'][:10]}  |  ${r['cost']:.4f}){note_part}"
+    current_doc_id = st.session_state.get("doc_id", "")
 
-    if runs:
-        run_labels = [_run_label(r) for r in runs]
-        current_id = st.session_state["run_id"]
-        current_idx = run_ids.index(current_id) if current_id in run_ids else 0
-        selected_label = st.selectbox("Switch test", run_labels, index=current_idx)
-        selected_run = run_ids[run_labels.index(selected_label)]
-        if selected_run != st.session_state.get("run_id"):
-            st.session_state["run_id"] = selected_run
+    def _doc_label(d):
+        name = d.get("display_name") or d["doc_id"]
+        return f"{name} [{d['doc_id']}]"
+
+    if docs:
+        doc_labels = [_doc_label(d) for d in docs]
+        current_doc_idx = doc_ids.index(current_doc_id) if current_doc_id in doc_ids else 0
+        selected_doc_label = st.selectbox("Switch test document", doc_labels, index=current_doc_idx)
+        selected_doc_id = doc_ids[doc_labels.index(selected_doc_label)]
+        if selected_doc_id != st.session_state.get("doc_id"):
+            st.session_state["doc_id"] = selected_doc_id
+            st.session_state.pop("run_id", None)
+            st.session_state["tl_current_page"] = 0
             st.rerun()
+    else:
+        st.info("No documents yet. Create one below.")
 
-    if st.button("➕ Create New Test", use_container_width=True):
-        _create_test_dialog()
+    if st.button("➕ Create New Document", use_container_width=True):
+        _create_doc_dialog()
 
-    current_run_meta = next((r for r in runs if r["run_id"] == st.session_state.get("run_id")), None)
-    if current_run_meta and current_run_meta.get("note"):
-        st.caption(f"📝 {current_run_meta['note']}")
-    st.caption(f"📁 {_get_run_dir()}")
     st.divider()
 
-    language    = st.selectbox("Language", ["en", "zh"], index=0)
-    template    = st.selectbox("Note Template", [
-        "passive_ppt_notes", "passive_outline_summary",
-        "active_expand", "active_comprehensive",
-    ], format_func=lambda x: {
-        "passive_ppt_notes":       "② 全PPT讲解笔记",
-        "passive_outline_summary": "④ 大纲摘要",
-        "active_expand":           "① 基于我的笔记扩写",
-        "active_comprehensive":    "③ 完整综合笔记",
-    }[x])
-    granularity = st.radio("Granularity", ["simple", "detailed"], horizontal=True)
-    threshold   = st.slider("Alignment threshold", 0.1, 0.9, 0.30, 0.05)
+    # ── Run selector within document ──────────────────────────────────────────
+    st.subheader("🧪 Strategy Runs")
+
+    current_doc_id = st.session_state.get("doc_id", "")
+    if current_doc_id:
+        doc_runs = _list_runs_for_doc(current_doc_id)
+        run_ids = [r["run_id"] for r in doc_runs]
+
+        if "run_id" not in st.session_state or st.session_state["run_id"] not in run_ids:
+            if doc_runs:
+                st.session_state["run_id"] = doc_runs[0]["run_id"]
+            else:
+                st.session_state["run_id"] = ""
+
+        def _run_label(r):
+            strat_info = ALIGNMENT_STRATEGIES.get(r.get("strategy", ""), {})
+            strat_label = strat_info.get("label", r.get("strategy", ""))
+            date_part = r["ts"][:10] if r["ts"] != "unknown" else "?"
+            note_part = f" — {r['note']}" if r.get("note") else ""
+            return f"{r['run_id'][:16]}  ({date_part} | {strat_label}){note_part}"
+
+        if doc_runs:
+            run_labels = [_run_label(r) for r in doc_runs]
+            current_run_id = st.session_state.get("run_id", "")
+            current_run_idx = run_ids.index(current_run_id) if current_run_id in run_ids else 0
+            selected_run_label = st.selectbox("Switch run", run_labels, index=current_run_idx)
+            selected_run_id = run_ids[run_labels.index(selected_run_label)]
+            if selected_run_id != st.session_state.get("run_id"):
+                st.session_state["run_id"] = selected_run_id
+                st.session_state["tl_current_page"] = 0
+                st.rerun()
+        else:
+            st.info("No runs for this document yet.")
+
+        if st.button("➕ New Strategy Run", use_container_width=True):
+            _create_run_dialog(current_doc_id)
+    else:
+        st.info("Select or create a document first.")
+
     st.divider()
 
-    import shutil
+    # ── Pipeline config ───────────────────────────────────────────────────────
+    language  = st.selectbox("Language", ["en", "zh"], index=0)
+    threshold = st.slider("Alignment threshold", 0.1, 0.9, 0.30, 0.05)
+    st.divider()
+
     col1, col2 = st.columns(2)
     with col1:
         realign_btn = st.button("↺ Re-align", use_container_width=True)
     with col2:
         if st.button("🗑 Clear cache", use_container_width=True):
-            slides_dir = _get_slides_dir()
-            for f in [_wav_path(), _asr_path(), _aligned_path(), _ppt_path()]:
+            # Only clear run-level outputs (alignment + notes).
+            # Doc-level data (wav, asr, ppt, slides) is shared and NOT cleared here.
+            for f in _get_run_dir().glob("aligned_pages*.json"):
                 f.unlink(missing_ok=True)
-            shutil.rmtree(slides_dir, ignore_errors=True)
-            slides_dir.mkdir(exist_ok=True)
             for g in _get_run_dir().glob("notes_*.json"):
                 g.unlink(missing_ok=True)
-            st.success("Cache cleared for this run")
+            st.success("Alignment & note cache cleared for this run")
             st.rerun()
+
+    current_run_id = st.session_state.get("run_id", "")
+    if current_run_id:
+        st.caption(f"📁 {_get_run_dir()}")
 
 # ── Tab layout ────────────────────────────────────────────────────────────────
 tab_main, tab_dashboard, tab_gt, tab_batch = st.tabs([
@@ -127,7 +198,7 @@ from test_ui.ground_truth import render_ground_truth
 from test_ui.batch        import render_batch
 
 with tab_main:
-    render_pipeline(language, template, granularity, threshold, realign_btn)
+    render_pipeline(language, threshold, realign_btn)
 
 with tab_dashboard:
     render_dashboard()

@@ -15,7 +15,7 @@ from test_ui.helpers import (
     _badge, _confidence_color, _run_sync, _log_run,
     _render_bullets, _render_notes, _build_noppt_pages, _build_markdown, _build_pdf,
     _get_run_dir, _get_slides_dir,
-    _wav_path, _asr_path, _aligned_path, _ppt_path,
+    _wav_path, _asr_path, _asr_raw_path, _aligned_path, _ppt_path,
     _notes_cache, _slides_dir, _log_path,
     _save_json, _load_json,
     _aligned_path_for_strategy, _load_strategy_module,
@@ -146,15 +146,35 @@ def render_pipeline(language: str, threshold: float, realign_btn: bool):
     with st.expander("Step 2 — ASR transcription", expanded=False):
         wav = _wav_path()
         asr = _asr_path()
+        asr_raw = _asr_raw_path()
         if asr.exists():
             segments = _load_json(asr)
             total_chars = sum(len(s["text"]) for s in segments)
-            st.success(f"✅ Cached — {len(segments)} segments, {total_chars:,} chars")
-            for seg in segments[:10]:
-                ms, me = int(seg["start"]), int(seg["end"])
-                st.text(f"[{ms//60:02d}:{ms%60:02d}–{me//60:02d}:{me%60:02d}] {seg['text']}")
-            if len(segments) > 10:
-                st.caption(f"… and {len(segments)-10} more")
+            st.success(f"✅ Cached — {len(segments)} sentences, {total_chars:,} chars")
+
+            # Show before/after merge comparison
+            with st.expander("🔍 Merge comparison — raw Whisper vs sentence-merged", expanded=False):
+                col_raw, col_merged = st.columns(2)
+                with col_raw:
+                    st.markdown("**Raw Whisper segments** (pre-merge)")
+                    if asr_raw.exists():
+                        raw_segs = _load_json(asr_raw)
+                        st.caption(f"{len(raw_segs)} raw segments")
+                        for seg in raw_segs[:20]:
+                            ms, me = int(seg["start"]), int(seg["end"])
+                            st.text(f"[{ms//60:02d}:{ms%60:02d}–{me//60:02d}:{me%60:02d}] {seg['text']}")
+                        if len(raw_segs) > 20:
+                            st.caption(f"… and {len(raw_segs)-20} more")
+                    else:
+                        st.info("Raw segments not available (re-run ASR to generate).")
+                with col_merged:
+                    st.markdown("**Merged sentences** (used in Step 3+)")
+                    st.caption(f"{len(segments)} sentences")
+                    for seg in segments[:20]:
+                        ms, me = int(seg["start"]), int(seg["end"])
+                        st.text(f"[{ms//60:02d}:{ms%60:02d}–{me//60:02d}:{me%60:02d}] {seg['text']}")
+                    if len(segments) > 20:
+                        st.caption(f"… and {len(segments)-20} more")
         elif wav.exists():
             if st.button("▶ Run ASR", key="btn_step2"):
                 t0 = time.time()
@@ -162,14 +182,15 @@ def render_pipeline(language: str, threshold: float, realign_btn: bool):
                 dur = get_audio_duration(str(wav))
                 prog = st.progress(0, text="Sending to Whisper API…")
                 from services.asr import transcribe_openai
-                segments = transcribe_openai(str(wav), language=language)
-                _save_json(asr, segments)
+                sentences, raw_segments = transcribe_openai(str(wav), language=language)
+                _save_json(asr_raw, raw_segments)
+                _save_json(asr, sentences)
                 prog.progress(100, text="Done")
                 elapsed = time.time() - t0
                 cost = (dur / 60) * WHISPER_COST_PER_MIN
                 _log_run("asr", elapsed, cost=cost,
-                         extra={"n_segments": len(segments), "duration_s": dur})
-                st.success(f"✅ {_badge(elapsed, cost=cost)} — {len(segments)} segments")
+                         extra={"n_sentences": len(sentences), "n_raw": len(raw_segments), "duration_s": dur})
+                st.success(f"✅ {_badge(elapsed, cost=cost)} — {len(raw_segments)} raw → {len(sentences)} sentences")
                 st.rerun()
         else:
             st.info("Complete Step 0 first.")
