@@ -359,8 +359,29 @@ def render_step3(has_ppt, threshold, realign_btn):
                     return ""
                 return " ✅" if result else " ❌"
 
+            def _build_copy_text(seg_range):
+                lines = []
+                for seg_abs_idx, seg in seg_range:
+                    ms = int(seg["start"])
+                    me = int(seg["end"])
+                    li = left_lookup.get(seg["start"])
+                    ri = right_lookup.get(seg["start"])
+                    gt_entry = gt_lookup.get(seg_abs_idx)
+                    lines.append(f"[{ms//60:02d}:{ms%60:02d}–{me//60:02d}:{me%60:02d}] {seg['text']}")
+                    lines.append(f"L: {_fmt_info(li, strat_labels[left_strat_idx])}{_correct_marker(li, gt_entry)}")
+                    lines.append(f"R: {_fmt_info(ri, strat_labels[right_strat_idx])}{_correct_marker(ri, gt_entry)}")
+                    lines.append(f"GT: {_fmt_gt(gt_entry)}")
+                    lines.append("")
+                return "\n".join(lines).rstrip()
+
+            # 一键复制：生成当前页所有 segment 的纯文本
             s_start = cur_tl * page_size
-            for seg_abs_idx, seg in enumerate(asr_segs[s_start: s_start + page_size], start=s_start):
+            page_segs = list(enumerate(asr_segs[s_start: s_start + page_size], start=s_start))
+            copy_text = _build_copy_text(page_segs)
+            with st.expander("📋 复制当前页内容（点击展开后全选复制）", expanded=False):
+                st.code(copy_text, language=None)
+
+            for seg_abs_idx, seg in page_segs:
                 ms = int(seg["start"])
                 me = int(seg["end"])
                 st.markdown(f"`[{ms//60:02d}:{ms%60:02d}–{me//60:02d}:{me%60:02d}]` {seg['text']}")

@@ -421,5 +421,23 @@
     "cost_usd": 4.2e-05,
     "strategy": "v5",
     "threshold": 0.3
+  },
+  {
+    "ts": "2026-04-12T18:37:23",
+    "step": "alignment_v5_1",
+    "elapsed_s": 7.04,
+    "tokens": 2105,
+    "cost_usd": 4.2e-05,
+    "strategy": "v5_1",
+    "threshold": 0.3
+  },
+  {
+    "ts": "2026-04-12T18:37:28",
+    "step": "alignment_v4_1",
+    "elapsed_s": 5.06,
+    "tokens": 2105,
+    "cost_usd": 4.2e-05,
+    "strategy": "v4_1",
+    "threshold": 0.3
   }
 ]

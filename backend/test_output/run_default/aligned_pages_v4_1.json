@@ -1,0 +1,810 @@
+[
+  {
+    "page_num": 1,
+    "ppt_text": "Practical aspects of training / validation",
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 1,
+    "aligned_segments": [
+      {
+        "text": "Okay, so let's get started.",
+        "start": 90.0,
+        "end": 112.87999725341797,
+        "page_num": 1,
+        "similarity": 0.1476,
+        "segment_class": "filler",
+        "context_similarity": 0.1476
+      },
+      {
+        "text": "So before the break, we have mentioned that you should try to train a model with two layers and a model with six layers.",
+        "start": 112.87999725341797,
+        "end": 124.31999969482422,
+        "page_num": 1,
+        "similarity": 0.3258,
+        "segment_class": "filler",
+        "context_similarity": 0.2367
+      },
+      {
+        "text": "And one thing that you may have observed is that a six-layer model may not be as good as a simple model.",
+        "start": 124.31999969482422,
+        "end": 133.63999938964844,
+        "page_num": 1,
+        "similarity": 0.2327,
+        "segment_class": "filler",
+        "context_similarity": 0.2793
+      },
+      {
+        "text": "And this is weird because we have mentioned that deep neural network becomes powerful because we have more layers.",
+        "start": 133.63999938964844,
+        "end": 143.60000610351562,
+        "page_num": 1,
+        "similarity": 0.1598,
+        "segment_class": "filler",
+        "context_similarity": 0.1963
+      },
+      {
+        "text": "But now this is not the case.",
+        "start": 143.60000610351562,
+        "end": 145.9600067138672,
+        "page_num": 1,
+        "similarity": 0.0607,
+        "segment_class": "filler",
+        "context_similarity": 0.1103
+      },
+      {
+        "text": "So in the rest of this lecture, we are going to discuss several practical aspects in training neural network models.",
+        "start": 145.9600067138672,
+        "end": 155.97999572753906,
+        "page_num": 1,
+        "similarity": 0.5315,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "So let's start with the easy thing.",
+        "start": 155.97999572753906,
+        "end": 159.16000366210938,
+        "page_num": 1,
+        "similarity": 0.1555,
+        "segment_class": "filler",
+        "context_similarity": 0.3435
+      },
+      {
+        "text": "Let's consider a practical scenario in our real life.",
+        "start": 159.16000366210938,
+        "end": 163.63999938964844,
+        "page_num": 1,
+        "similarity": 0.3754,
+        "segment_class": "filler",
+        "context_similarity": 0.2654
+      }
+    ],
+    "off_slide_segments": [],
+    "page_start_time": 90.0,
+    "page_end_time": 163.63999938964844,
+    "alignment_confidence": 0.24862499999999998,
+    "page_supplement": null
+  },
+  {
+    "page_num": 2,
+    "ppt_text": "Predict Who Will Repay TheirLoans •A lender hires you to investigate who will repay their  loans •You are given complete files on 100 •5 defaulted within 3 years Image creditdebt.org",
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 2,
+    "aligned_segments": [
+      {
+        "text": "That is, I may want to predict who will repay their loan and who will default.",
+        "start": 163.63999938964844,
+        "end": 169.52000427246094,
+        "page_num": 2,
+        "similarity": 0.616,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "So in such a scenario, a lender helps you to investigate this problem and you are given the files of 100 applicants.",
+        "start": 169.52000427246094,
+        "end": 179.47999572753906,
+        "page_num": 2,
+        "similarity": 0.54,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "Among these 100 applicants, there are five of them defaulted within three years.",
+        "start": 179.47999572753906,
+        "end": 186.0,
+        "page_num": 2,
+        "similarity": 0.5745,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "So your goal is to build a model and predict who else is going to default.",
+        "start": 186.0,
+        "end": 193.8000030517578,
+        "page_num": 2,
+        "similarity": 0.4426,
+        "segment_class": "extends",
+        "context_similarity": 0.5086
+      }
+    ],
+    "off_slide_segments": [],
+    "page_start_time": 163.63999938964844,
+    "page_end_time": 193.8000030517578,
+    "alignment_confidence": 0.5432750000000001,
+    "page_supplement": null
+  },
+  {
+    "page_num": 3,
+    "ppt_text": "A Surprising Finding\n• All 5 people who defaulted wore blue shirts during interviews\n• Your model may find this strong signal as well",
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 3,
+    "aligned_segments": [
+      {
+        "text": "For such a job, what you may find is they give you some photos and they find that all the five people who defaulted worn blue shirts during their interviews.",
+        "start": 193.8000030517578,
+        "end": 207.27999877929688,
+        "page_num": 3,
+        "similarity": 0.6414,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "And your model also find that blue shirts is a strong signal for default.",
+        "start": 207.27999877929688,
+        "end": 214.17999267578125,
+        "page_num": 3,
+        "similarity": 0.7145,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "So whether this is a valid feature or whether there are some problem when we make this conclusion.",
+        "start": 214.17999267578125,
+        "end": 223.16000366210938,
+        "page_num": 3,
+        "similarity": 0.2271,
+        "segment_class": "extends",
+        "context_similarity": 0.4708
+      },
+      {
+        "text": "This is a very classic problem of overfitting or there's no codal evidence that blue shirts actually predict applicant's default behavior, right?",
+        "start": 223.16000366210938,
+        "end": 241.52000427246094,
+        "page_num": 3,
+        "similarity": 0.6312,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "The reason is because all of them are wearing blue shirts.",
+        "start": 241.52000427246094,
+        "end": 245.32000732421875,
+        "page_num": 3,
+        "similarity": 0.5063,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "So you cannot say only those who default wear such a blue shirts.",
+        "start": 245.32000732421875,
+        "end": 250.44000244140625,
+        "page_num": 3,
+        "similarity": 0.5238,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "This is one thing.",
+        "start": 250.44000244140625,
+        "end": 251.44000244140625,
+        "page_num": 3,
+        "similarity": 0.1831,
+        "segment_class": "filler",
+        "context_similarity": 0.3534
+      },
+      {
+        "text": "And the other thing is using human logic, we know that the color of the shirts should have no codal inference with whether he's going to default or not.",
+        "start": 251.44000244140625,
+        "end": 264.1199951171875,
+        "page_num": 3,
+        "similarity": 0.4572,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "So because of that, we know that this feature may not be a valid feature.",
+        "start": 264.1199951171875,
+        "end": 270.7799987792969,
+        "page_num": 3,
+        "similarity": 0.1543,
+        "segment_class": "filler",
+        "context_similarity": 0.3057
+      }
+    ],
+    "off_slide_segments": [],
+    "page_start_time": 193.8000030517578,
+    "page_end_time": 270.7799987792969,
+    "alignment_confidence": 0.44876666666666665,
+    "page_supplement": null
+  },
+  {
+    "page_num": 4,
+    "ppt_text": "Training Error and Generalization Error\n• Training error (bias): model error on the training data\n• Generalization error (variance): model error on new data\n• Example: practice a future exam with past exams\n• Doing well on past exams (training error) doesn’t guarantee a  good score on the future exam (generalization error)\n• Student A gets 0 error on past exams by rote learning\n• Student B  understands the reasons for givenanswers",
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 4,
+    "aligned_segments": [
+      {
+        "text": "And this introduced our classic discussion of training error and generalization error.",
+        "start": 270.7799987792969,
+        "end": 277.5,
+        "page_num": 4,
+        "similarity": 0.5706,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "training error means the error on the training data set.",
+        "start": 277.5,
+        "end": 282.70001220703125,
+        "page_num": 4,
+        "similarity": 0.5627,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "And generalization error refers to your error on a new data.",
+        "start": 282.70001220703125,
+        "end": 287.5799865722656,
+        "page_num": 4,
+        "similarity": 0.5803,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "And we always say that the performance on the training data does not represent the performance on a new data set.",
+        "start": 287.5799865722656,
+        "end": 296.4599914550781,
+        "page_num": 4,
+        "similarity": 0.355,
+        "segment_class": "extends",
+        "context_similarity": 0.4677
+      },
+      {
+        "text": "This is very similar to we make practices for a future exam with past exams.",
+        "start": 296.4599914550781,
+        "end": 303.260009765625,
+        "page_num": 4,
+        "similarity": 0.3434,
+        "segment_class": "filler",
+        "context_similarity": 0.3492
+      },
+      {
+        "text": "For those who do well on past exam, that means you get a very small training error that does not guarantee a good score on the future exam, where the future exam actually represent the generalization error, right?",
+        "start": 303.260009765625,
+        "end": 319.2200012207031,
+        "page_num": 4,
+        "similarity": 0.6678,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "And one student may get zero error on past exam by root learning.",
+        "start": 319.2200012207031,
+        "end": 324.5400085449219,
+        "page_num": 4,
+        "similarity": 0.4919,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "That means he remember all the answers mechanically.",
+        "start": 324.5400085449219,
+        "end": 329.0199890136719,
+        "page_num": 4,
+        "similarity": 0.2277,
+        "segment_class": "filler",
+        "context_similarity": 0.3598
+      },
+      {
+        "text": "But that student may have a worse score compared to another student who understand the reasons for a given number of answers.",
+        "start": 329.0199890136719,
+        "end": 337.760009765625,
+        "page_num": 4,
+        "similarity": 0.395,
+        "segment_class": "filler",
+        "context_similarity": 0.3114
+      },
+      {
+        "text": "So even if student B may not have good score on past exam, may not that good at past exam, as long as he can understand the reasonings, he should be able to have a higher score.",
+        "start": 337.760009765625,
+        "end": 350.6199951171875,
+        "page_num": 4,
+        "similarity": 0.4642,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "So this is the trade-off we have mentioned in your Model 3 class about training and generalization or they call it bias and virus in some cases, right?",
+        "start": 350.6199951171875,
+        "end": 363.1000061035156,
+        "page_num": 4,
+        "similarity": 0.5386,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "So because of that, we need to evaluate our model to understand whether it has a good generalization performance.",
+        "start": 363.1000061035156,
+        "end": 372.3399963378906,
+        "page_num": 4,
+        "similarity": 0.4475,
+        "segment_class": "extends",
+        "context_similarity": 0.4931
+      }
+    ],
+    "off_slide_segments": [],
+    "page_start_time": 270.7799987792969,
+    "page_end_time": 372.3399963378906,
+    "alignment_confidence": 0.4703916666666666,
+    "page_supplement": null
+  },
+  {
+    "page_num": 5,
+    "ppt_text": "Validation Dataset and TestDataset\n• Validation dataset: a dataset used to evaluate themodel\n• Should not be mixed with the training data (#1 mistake)\n• Model selection purpose •Test dataset: a dataset can be used once, e.g.\n• A future exam\n• The house sale price I bided\n• Dataset used in private leaderboard in Kaggle",
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 5,
+    "aligned_segments": [
+      {
+        "text": "So in this process, we say that we can have two data sets.",
+        "start": 372.3399963378906,
+        "end": 377.260009765625,
+        "page_num": 5,
+        "similarity": 0.291,
+        "segment_class": "filler",
+        "context_similarity": 0.2899
+      },
+      {
+        "text": "One data set is called validation data set.",
+        "start": 377.260009765625,
+        "end": 380.260009765625,
+        "page_num": 5,
+        "similarity": 0.6587,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "This is the data used to evaluate the model.",
+        "start": 380.260009765625,
+        "end": 383.9800109863281,
+        "page_num": 5,
+        "similarity": 0.4504,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "And this data should not be mixed with your training data.",
+        "start": 383.9800109863281,
+        "end": 387.1400146484375,
+        "page_num": 5,
+        "similarity": 0.3817,
+        "segment_class": "filler",
+        "context_similarity": 0.4161
+      },
+      {
+        "text": "And the validation data set will be used to do model selection, which model should I train.",
+        "start": 387.1400146484375,
+        "end": 395.29998779296875,
+        "page_num": 5,
+        "similarity": 0.6164,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "The test data set will be the data set that to evaluate your final performance.",
+        "start": 395.29998779296875,
+        "end": 401.1400146484375,
+        "page_num": 5,
+        "similarity": 0.47,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "So that could be a future exam or the health cell price I bid it or the data set we use to determine the final winner on a Kaggle computation that is called private leaderboard.",
+        "start": 401.1400146484375,
+        "end": 415.05999755859375,
+        "page_num": 5,
+        "similarity": 0.3922,
+        "segment_class": "filler",
+        "context_similarity": 0.4311
+      },
+      {
+        "text": "So in your homework 2, you will actually have such a test data set.",
+        "start": 415.05999755859375,
+        "end": 421.29998779296875,
+        "page_num": 5,
+        "similarity": 0.3718,
+        "segment_class": "filler",
+        "context_similarity": 0.382
+      },
+      {
+        "text": "So I'm sure you have learned how to use training validation and test the procedure in the machine learning course.",
+        "start": 421.29998779296875,
+        "end": 432.6199951171875,
+        "page_num": 5,
+        "similarity": 0.3816,
+        "segment_class": "filler",
+        "context_similarity": 0.3767
+      }
+    ],
+    "off_slide_segments": [],
+    "page_start_time": 372.3399963378906,
+    "page_end_time": 432.6199951171875,
+    "alignment_confidence": 0.44597777777777775,
+    "page_supplement": null
+  },
+  {
+    "page_num": 6,
+    "ppt_text": "• Previous ML: 70/30\n• Big data: 1,000,000 10,000 10,000\n• Percentages: 98/1/1\n• Percentages: 99.5/0.4/0.1\n• K-fold CV is expensive for deep learning",
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 6,
+    "aligned_segments": [
+      {
+        "text": ", you may have learned I should split the data 70-30.",
+        "start": 432.6199951171875,
+        "end": 438.17999267578125,
+        "page_num": 6,
+        "similarity": 0.3906,
+        "segment_class": "filler",
+        "context_similarity": 0.3878
+      },
+      {
+        "text": "This is the most classic way.",
+        "start": 438.17999267578125,
+        "end": 439.6600036621094,
+        "page_num": 6,
+        "similarity": 0.1518,
+        "segment_class": "filler",
+        "context_similarity": 0.2712
+      },
+      {
+        "text": "And you have also learned about k-fold cross-validation.",
+        "start": 439.6600036621094,
+        "end": 443.17999267578125,
+        "page_num": 6,
+        "similarity": 0.3892,
+        "segment_class": "filler",
+        "context_similarity": 0.2705
+      },
+      {
+        "text": "However, all of them are not applicable for deep learning models.",
+        "start": 443.17999267578125,
+        "end": 451.1000061035156,
+        "page_num": 6,
+        "similarity": 0.4159,
+        "segment_class": "filler",
+        "context_similarity": 0.4025
+      },
+      {
+        "text": "So k-fold cross-validation is too expensive because you have known that training a deep learning model should take hours or even millions of hours.",
+        "start": 451.1000061035156,
+        "end": 460.260009765625,
+        "page_num": 6,
+        "similarity": 0.5211,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "So because of that, it is impossible to just determine which model structure is better using k-fold.",
+        "start": 460.260009765625,
+        "end": 467.5199890136719,
+        "page_num": 6,
+        "similarity": 0.3699,
+        "segment_class": "filler",
+        "context_similarity": 0.4455
+      },
+      {
+        "text": "On the other hand, splitting the data in a 70-30 proportion may also not a good idea because now I have a very large data.",
+        "start": 467.5199890136719,
+        "end": 480.20001220703125,
+        "page_num": 6,
+        "similarity": 0.4155,
+        "segment_class": "filler",
+        "context_similarity": 0.3927
+      },
+      {
+        "text": "I may have 1 million or even 1 billion data points.",
+        "start": 480.20001220703125,
+        "end": 483.8800048828125,
+        "page_num": 6,
+        "similarity": 0.4147,
+        "segment_class": "filler",
+        "context_similarity": 0.4151
+      },
+      {
+        "text": "In that case, using 30% of the data to be validation or testing data may be a waste of your data.",
+        "start": 483.8800048828125,
+        "end": 491.6000061035156,
+        "page_num": 6,
+        "similarity": 0.4286,
+        "segment_class": "filler",
+        "context_similarity": 0.4216
+      },
+      {
+        "text": "So because of that, for deep learning, people usually leave 10,000 or 1,000 data points as testing data and use all the other data as training data.",
+        "start": 491.6000061035156,
+        "end": 503.1199951171875,
+        "page_num": 6,
+        "similarity": 0.5132,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "So the percentage of training validation and testing could be very extreme.",
+        "start": 503.1199951171875,
+        "end": 507.9200134277344,
+        "page_num": 6,
+        "similarity": 0.4097,
+        "segment_class": "extends",
+        "context_similarity": 0.4614
+      },
+      {
+        "text": "It could be 98% for training and 1% for validation and test.",
+        "start": 507.9200134277344,
+        "end": 512.52001953125,
+        "page_num": 6,
+        "similarity": 0.4887,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "Or even if you have really 1 million data, then I will only leave 5,000 for validation and testing and use all the 99.5% of the data to train the model.",
+        "start": 512.52001953125,
+        "end": 523.8800048828125,
+        "page_num": 6,
+        "similarity": 0.4729,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "So this is a difference between traditional machine learning model training as well as deep learning model training.",
+        "start": 523.8800048828125,
+        "end": 532.280029296875,
+        "page_num": 6,
+        "similarity": 0.3749,
+        "segment_class": "filler",
+        "context_similarity": 0.4239
+      },
+      {
+        "text": "And here we have mentioned two concepts.",
+        "start": 532.280029296875,
+        "end": 535.3200073242188,
+        "page_num": 6,
+        "similarity": 0.1279,
+        "segment_class": "filler",
+        "context_similarity": 0.2514
+      }
+    ],
+    "off_slide_segments": [],
+    "page_start_time": 432.6199951171875,
+    "page_end_time": 535.3200073242188,
+    "alignment_confidence": 0.39230666666666664,
+    "page_supplement": null
+  },
+  {
+    "page_num": 7,
+    "ppt_text": "Hyperparameter:\n•  Learning rate\n•  Batch size\n•  #hidden layers\n•  #hidden units\n•  Choice of activation function\n• ...\n•  Model selection",
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 7,
+    "aligned_segments": [
+      {
+        "text": "One is called parameter.",
+        "start": 535.3200073242188,
+        "end": 536.8800048828125,
+        "page_num": 7,
+        "similarity": 0.3886,
+        "segment_class": "filler",
+        "context_similarity": 0.2418
+      },
+      {
+        "text": "The other is called hyperparameters.",
+        "start": 536.8800048828125,
+        "end": 540.280029296875,
+        "page_num": 7,
+        "similarity": 0.5428,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "Parameters in neural networks refers to the weight and bias.",
+        "start": 540.280029296875,
+        "end": 547.0,
+        "page_num": 7,
+        "similarity": 0.4795,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "Hyperparameters are the parameters that you are going to choose using model selection.",
+        "start": 547.0,
+        "end": 552.760009765625,
+        "page_num": 7,
+        "similarity": 0.6922,
+        "segment_class": "belongs"
+      }
+    ],
+    "off_slide_segments": [],
+    "page_start_time": 535.3200073242188,
+    "page_end_time": 552.760009765625,
+    "alignment_confidence": 0.525775,
+    "page_supplement": null
+  },
+  {
+    "page_num": 8,
+    "ppt_text": "•Training dataset: train parameters with givenhyper-parameters •Validation dataset: choose hyper-parameters •Test dataset: leave it alone",
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 8,
+    "aligned_segments": [
+      {
+        "text": "And your model selection criteria is the performance on the validation data set.",
+        "start": 552.760009765625,
+        "end": 558.5599975585938,
+        "page_num": 8,
+        "similarity": 0.4698,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "So far, we have mentioned so many hyperparameters learning rate, epochs, batch size, hidden layers, hidden units, so on and so forth.",
+        "start": 558.5599975585938,
+        "end": 567.280029296875,
+        "page_num": 8,
+        "similarity": 0.391,
+        "segment_class": "filler",
+        "context_similarity": 0.4304
+      },
+      {
+        "text": "All of them should be determined using the validation data set.",
+        "start": 567.280029296875,
+        "end": 573.6400146484375,
+        "page_num": 8,
+        "similarity": 0.4864,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "So how to decide what is the best combination of hyperparameters?",
+        "start": 573.6400146484375,
+        "end": 579.52001953125,
+        "page_num": 8,
+        "similarity": 0.5436,
+        "segment_class": "belongs"
+      }
+    ],
+    "off_slide_segments": [],
+    "page_start_time": 552.760009765625,
+    "page_end_time": 579.52001953125,
+    "alignment_confidence": 0.4727,
+    "page_supplement": null
+  },
+  {
+    "page_num": 9,
+    "ppt_text": "Applied DL is a very empiricalprocess This game is called while True: learn()",
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 9,
+    "aligned_segments": [
+      {
+        "text": ", when we train deep learning models, this process is a very empirical process.",
+        "start": 579.52001953125,
+        "end": 586.760009765625,
+        "page_num": 9,
+        "similarity": 0.5191,
+        "segment_class": "belongs"
+      },
+      {
+        "text": "So some people actually compare training a deep learning model with alchemy because people believe that there are so many hidden secrets that human cannot explain why on earth.",
+        "start": 586.760009765625,
+        "end": 600.0,
+        "page_num": 9,
+        "similarity": 0.3747,
+        "segment_class": "filler",
+        "context_similarity": 0.4469
+      }
+    ],
+    "off_slide_segments": [],
+    "page_start_time": 579.52001953125,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.44689999999999996,
+    "page_supplement": null
+  },
+  {
+    "page_num": 10,
+    "ppt_text": "Applied DL is a very empiricalprocess # of iterations",
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 10,
+    "aligned_segments": [],
+    "off_slide_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null
+  },
+  {
+    "page_num": 11,
+    "ppt_text": "",
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 11,
+    "aligned_segments": [],
+    "off_slide_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null
+  },
+  {
+    "page_num": 12,
+    "ppt_text": "",
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 12,
+    "aligned_segments": [],
+    "off_slide_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null
+  },
+  {
+    "page_num": 13,
+    "ppt_text": "• The ability to fit variety offunctions\n• Low-capacity models struggles to fit trainingset\n• High-capacity models can memorize the training set",
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 13,
+    "aligned_segments": [],
+    "off_slide_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null
+  },
+  {
+    "page_num": 14,
+    "ppt_text": "Influence of ModelComplexity",
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 14,
+    "aligned_segments": [],
+    "off_slide_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null
+  },
+  {
+    "page_num": 15,
+    "ppt_text": "",
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 15,
+    "aligned_segments": [],
+    "off_slide_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null
+  },
+  {
+    "page_num": 16,
+    "ppt_text": "• It’s hard to compare complexity between different algorithms\n• e.g. tree vs neural network\n• Given an algorithm family, two main factors matter:\n• The number of parameters\n• The values taken by each parameter",
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 16,
+    "aligned_segments": [],
+    "off_slide_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null
+  },
+  {
+    "page_num": 17,
+    "ppt_text": "•Multiple factors matters •# of examples •# of elements in eachexample",
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 17,
+    "aligned_segments": [],
+    "off_slide_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null
+  },
+  {
+    "page_num": 18,
+    "ppt_text": "Basic recipe for machinelearning •High bias (training data performance) → Underfitting → •High variance (validation set performance) → Overfitting →",
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 18,
+    "aligned_segments": [],
+    "off_slide_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null
+  },
+  {
+    "page_num": 19,
+    "ppt_text": "•Model capacity and data capacity should be matched to prevent overfitting and underfitting.\n•Understand fitting and bias/variance relationship •Empirically, use training/validation error to evaluate •Know what to do under whichcircumstance",
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 19,
+    "aligned_segments": [],
+    "off_slide_segments": [],
+    "page_start_time": 600.0,
+    "page_end_time": 600.0,
+    "alignment_confidence": 0.0,
+    "page_supplement": null
+  }
+]

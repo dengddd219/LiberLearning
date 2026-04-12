@@ -74,6 +74,14 @@ ALIGNMENT_STRATEGIES = {
         "module": "services.step3_alignment_test.alignment_v5",
         "label":  "V5 — Viterbi/HMM 全局解码",
     },
+    "v5_1": {
+        "module": "services.step3_alignment_test.alignment_v5_1",
+        "label":  "V5.1 — Viterbi/HMM 边界调优（修复换页滞后/过早跳页）",
+    },
+    "v4_1": {
+        "module": "services.step3_alignment_test.alignment_v4_1",
+        "label":  "V4.1 — 两阶段状态机+前向敏感（修复 Drag-Back）",
+    },
 }
 
 
