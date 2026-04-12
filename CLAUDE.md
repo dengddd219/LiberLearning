@@ -211,10 +211,10 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 | 文件 | 对应模板 |
 |------|----------|
-| `backend/prompts/passive_ppt_notes.md` | Template 2：全PPT讲解笔记（按 bullet 加时间戳） |
-| `backend/prompts/passive_outline_summary.md` | Template 4：大纲摘要 |
-| `backend/prompts/active_expand.md` | Template 1：基于我的笔记扩写 |
-| `backend/prompts/active_comprehensive.md` | Template 3：完整综合笔记 |
+| `backend/prompts/passive_ppt_notes/prompt.md` | Template 2：全PPT讲解笔记（按 bullet 加时间戳） |
+| `backend/prompts/passive_outline_summary/prompt.md` | Template 4：大纲摘要 |
+| `backend/prompts/active_expand/prompt.md` | Template 1：基于我的笔记扩写 |
+| `backend/prompts/active_comprehensive/prompt.md` | Template 3：完整综合笔记 |
 
 每个 prompt 目录同级还有 `v1_baseline.py`（测试平台 prompt A/B 用）。
 

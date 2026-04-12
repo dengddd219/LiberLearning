@@ -91,8 +91,8 @@ def _load_strategy_module(strategy_key: str):
 
 
 def _load_prompt_section(template_key: str, granularity: str) -> str:
-    """Load a prompt section from prompts/<template_key>.md."""
-    md_file = Path(__file__).parent.parent / "prompts" / f"{template_key}.md"
+    """Load a prompt section from prompts/<template_key>/prompt.md."""
+    md_file = Path(__file__).parent.parent / "prompts" / template_key / "prompt.md"
     if not md_file.exists():
         return ""
     text = md_file.read_text(encoding="utf-8")

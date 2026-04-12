@@ -200,8 +200,8 @@ def _get_async_call_fn(provider: str):
 # ---------------------------------------------------------------------------
 
 def _load_prompt(template: str, granularity: str) -> str:
-    """Load system prompt from prompts/<template>.md, extract SIMPLE or DETAILED section."""
-    prompt_file = PROMPTS_DIR / f"{template}.md"
+    """Load system prompt from prompts/<template>/prompt.md, extract SIMPLE or DETAILED section."""
+    prompt_file = PROMPTS_DIR / template / "prompt.md"
     if not prompt_file.exists():
         raise FileNotFoundError(
             f"Prompt file not found: {prompt_file}. "
