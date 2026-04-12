@@ -24,19 +24,43 @@ TEST_DOCS_BASE.mkdir(exist_ok=True)
 ALIGNMENT_STRATEGIES = {
     "v1_0410": {
         "module": "services.alignment_v1",
-        "label":  "V1 (0410) — 单遍扫描",
+        "label":  "V1 — 单遍扫描",
+    },
+    "v1_1": {
+        "module": "services.alignment_v1_1",
+        "label":  "V1.1 — 单遍扫描 + 时间约束",
+    },
+    "v1_2": {
+        "module": "services.alignment_v1_2",
+        "label":  "V1.2 — 单遍扫描 + 后处理平滑",
     },
     "v2_d004": {
         "module": "services.alignment_v2",
-        "label":  "V2 (D-004) — K=3去抖+升级",
+        "label":  "V2 — K=3去抖+升级",
+    },
+    "v2_1": {
+        "module": "services.alignment_v2_1",
+        "label":  "V2.1 — K=3去抖+升级 + 时间约束",
     },
     "v3a": {
         "module": "services.alignment_v3a",
         "label":  "V3a — 三分类（逻辑词规则）",
     },
+    "v3a_1": {
+        "module": "services.alignment_v3a_1",
+        "label":  "V3a.1 — 三分类（逻辑词规则）+ 时间约束",
+    },
     "v3b": {
         "module": "services.alignment_v3b",
         "label":  "V3b — 三分类（滑窗embedding）",
+    },
+    "v3b_1": {
+        "module": "services.alignment_v3b_1",
+        "label":  "V3b.1 — 三分类（滑窗embedding）+ 时间约束",
+    },
+    "v4": {
+        "module": "services.alignment_v4",
+        "label":  "V4 — 两阶段状态机+防抖",
     },
 }
 

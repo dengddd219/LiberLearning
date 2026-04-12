@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import anthropic
+from anthropic.types import TextBlock
 from pydantic import BaseModel, Field, field_validator
 
 logger = logging.getLogger(__name__)
@@ -187,7 +188,8 @@ def _get_async_call_fn(provider: str):
                 system=system,
                 messages=[{"role": "user", "content": user_msg}],
             )
-            text = resp.content[0].text
+            text_blocks = [b for b in resp.content if isinstance(b, TextBlock)]
+            text = text_blocks[0].text if text_blocks else ""
             return text, resp.usage.input_tokens, resp.usage.output_tokens
 
         return call_fn, model
