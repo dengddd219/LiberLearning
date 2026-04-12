@@ -1,21 +1,22 @@
 """
-Semantic alignment service — Strategy V1.1.
+Semantic alignment service — Strategy V3a.1.
 
-基于 V1，新增时间轴硬窗口约束：
+基于 V3a，新增时间轴硬窗口约束：
 - 搜索范围限定在 [current_page, current_page + 3]
 - 窗口外的页面相似度直接屏蔽，不参与竞争
 - current_page 单调递增，只能前进不能后退
-- 其余逻辑与 V1 完全相同（单遍 argmax，二分类 on/off-slide）
+- 其余逻辑与 V3a 完全相同（三分类：正则关键词判 extends）
 """
 
 STRATEGY_DESCRIPTION = (
-    "V1.1：V1 基础上加时间轴硬窗口约束。"
+    "V3a.1：V3a 基础上加时间轴硬窗口约束。"
     "搜索范围限定在 [current_page, current_page+3]，"
     "窗口外页面直接屏蔽，current_page 单调递增。"
-    "其余与 V1 相同（argmax，无去抖动，二分类）。"
+    "其余与 V3a 相同（三分类，正则关键词判 extends）。"
 )
 
 import os
+import re
 from typing import Optional
 
 import numpy as np
@@ -23,8 +24,15 @@ from openai import OpenAI
 
 from .alignment_utils import apply_time_mask
 
-OFF_SLIDE_THRESHOLD = 0.30
-LOW_CONFIDENCE_THRESHOLD = 0.60
+BELONGS_THRESHOLD = 0.45
+OFF_SLIDE_THRESHOLD = 0.25
+
+EXTEND_PATTERNS = re.compile(
+    r"\b(so|therefore|thus|hence|because|since|this|it|that|which|where|"
+    r"as a result|in other words|for example|for instance)\b"
+    r"|因此|所以|由此|因而|因为|这说明|这意味|这表明|这就是|它说明|换句话说|举个例子|比如说",
+    re.IGNORECASE,
+)
 
 
 def _get_client() -> tuple[OpenAI, str]:
@@ -33,19 +41,27 @@ def _get_client() -> tuple[OpenAI, str]:
         raise RuntimeError("OPENAI_API_KEY not set. Add a real key to backend/.env")
     base_url = os.environ.get("OPENAI_BASE_URL", "").strip() or None
     model = os.environ.get("OPENAI_EMBEDDING_MODEL", "").strip() or "text-embedding-3-small"
-    client = OpenAI(api_key=api_key, **({"base_url": base_url} if base_url else {}))
+    client = OpenAI(api_key=api_key, **({} if not base_url else {"base_url": base_url}))
     return client, model
 
 
 def _embed_texts(texts: list[str], client: OpenAI, model: str) -> np.ndarray:
-    response = client.embeddings.create(model=model, input=texts)
-    return np.array([item.embedding for item in response.data], dtype=np.float32)
+    resp = client.embeddings.create(model=model, input=texts)
+    return np.array([item.embedding for item in resp.data], dtype=np.float32)
 
 
 def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    a_norm = a / (np.linalg.norm(a, axis=1, keepdims=True) + 1e-8)
-    b_norm = b / (np.linalg.norm(b, axis=1, keepdims=True) + 1e-8)
-    return a_norm @ b_norm.T
+    a_n = a / (np.linalg.norm(a, axis=1, keepdims=True) + 1e-8)
+    b_n = b / (np.linalg.norm(b, axis=1, keepdims=True) + 1e-8)
+    return a_n @ b_n.T
+
+
+def _classify(text: str, score: float) -> str:
+    if score >= BELONGS_THRESHOLD:
+        return "belongs"
+    if score >= OFF_SLIDE_THRESHOLD and EXTEND_PATTERNS.search(text):
+        return "extends"
+    return "filler"
 
 
 def build_page_timeline(
@@ -58,15 +74,15 @@ def build_page_timeline(
         return _empty_timeline(ppt_pages, total_audio_duration)
 
     client, embed_model = _get_client()
-
     page_texts = [p.get("ppt_text", "") or f"Page {p['page_num']}" for p in ppt_pages]
     seg_texts = [s["text"] for s in segments]
     page_nums = [p["page_num"] for p in ppt_pages]
 
-    page_embeddings = _embed_texts(page_texts, client, embed_model)
-    seg_embeddings = _embed_texts(seg_texts, client, embed_model)
+    all_vecs = _embed_texts(page_texts + seg_texts, client, embed_model)
+    page_vecs = all_vecs[:len(page_texts)]
+    seg_vecs = all_vecs[len(page_texts):]
 
-    sim_matrix = _cosine_similarity(seg_embeddings, page_embeddings)  # (S, P)
+    sim_matrix = _cosine_similarity(seg_vecs, page_vecs)  # (S, P)
 
     # User anchors as hard constraints
     if user_anchors:
@@ -96,43 +112,27 @@ def build_page_timeline(
     for i, seg in enumerate(segments):
         masked_row = apply_time_mask(sim_matrix[i], current_page, page_nums)
         best_idx = int(np.argmax(masked_row))
-        score = float(sim_matrix[i, best_idx])  # 原始相似度用于 confidence
+        score = float(sim_matrix[i, best_idx])
         page_num = page_nums[best_idx]
+        cls = _classify(seg["text"], score)
 
-        if score < OFF_SLIDE_THRESHOLD:
-            page_map[last_page_num]["off_slide_segments"].append(
-                {**seg, "similarity": score, "segment_class": "filler"}
-            )
-        else:
-            page_map[page_num]["aligned_segments"].append(
-                {**seg, "similarity": score, "segment_class": "belongs"}
-            )
-            current_page = max(current_page, page_num)
-            last_page_num = page_num
+        seg_dict = {**seg, "similarity": score, "segment_class": cls}
+
+        page_map[page_num]["aligned_segments"].append(seg_dict)
+        current_page = max(current_page, page_num)
+        last_page_num = page_num
 
     results = []
     for page_num in sorted(page_map.keys()):
         entry = page_map[page_num]
         aligned = entry["aligned_segments"]
-        off_slide = entry["off_slide_segments"]
 
         if aligned:
             entry["page_start_time"] = aligned[0]["start"]
             entry["page_end_time"] = aligned[-1]["end"]
             entry["alignment_confidence"] = float(np.mean([s["similarity"] for s in aligned]))
-        else:
-            entry["page_start_time"] = None
-            entry["page_end_time"] = None
-            entry["alignment_confidence"] = 0.0
 
-        entry["page_supplement"] = (
-            {
-                "content": " ".join(s["text"] for s in off_slide),
-                "timestamp_start": off_slide[0]["start"],
-                "timestamp_end": off_slide[-1]["end"],
-            }
-            if off_slide else None
-        )
+        entry["page_supplement"] = None
         results.append(entry)
 
     _fill_time_gaps(results, total_audio_duration)

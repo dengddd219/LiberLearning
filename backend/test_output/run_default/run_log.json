@@ -304,5 +304,122 @@
     "cost_usd": 4.2e-05,
     "strategy": "v1_2",
     "threshold": 0.3
+  },
+  {
+    "ts": "2026-04-12T16:05:38",
+    "step": "alignment_v1_0410",
+    "elapsed_s": 13.1,
+    "tokens": 2105,
+    "cost_usd": 4.2e-05,
+    "strategy": "v1_0410",
+    "threshold": 0.3
+  },
+  {
+    "ts": "2026-04-12T16:05:46",
+    "step": "alignment_v1_1",
+    "elapsed_s": 7.99,
+    "tokens": 2105,
+    "cost_usd": 4.2e-05,
+    "strategy": "v1_1",
+    "threshold": 0.3
+  },
+  {
+    "ts": "2026-04-12T16:05:52",
+    "step": "alignment_v1_2",
+    "elapsed_s": 6.13,
+    "tokens": 2105,
+    "cost_usd": 4.2e-05,
+    "strategy": "v1_2",
+    "threshold": 0.3
+  },
+  {
+    "ts": "2026-04-12T16:05:57",
+    "step": "alignment_v2_d004",
+    "elapsed_s": 5.78,
+    "tokens": 2105,
+    "cost_usd": 4.2e-05,
+    "strategy": "v2_d004",
+    "threshold": 0.3
+  },
+  {
+    "ts": "2026-04-12T16:06:04",
+    "step": "alignment_v2_1",
+    "elapsed_s": 6.33,
+    "tokens": 2105,
+    "cost_usd": 4.2e-05,
+    "strategy": "v2_1",
+    "threshold": 0.3
+  },
+  {
+    "ts": "2026-04-12T16:06:09",
+    "step": "alignment_v3a",
+    "elapsed_s": 5.62,
+    "tokens": 2105,
+    "cost_usd": 4.2e-05,
+    "strategy": "v3a",
+    "threshold": 0.3
+  },
+  {
+    "ts": "2026-04-12T16:06:14",
+    "step": "alignment_v3a_1",
+    "elapsed_s": 5.0,
+    "tokens": 2105,
+    "cost_usd": 4.2e-05,
+    "strategy": "v3a_1",
+    "threshold": 0.3
+  },
+  {
+    "ts": "2026-04-12T16:06:19",
+    "step": "alignment_v3b",
+    "elapsed_s": 4.86,
+    "tokens": 2105,
+    "cost_usd": 4.2e-05,
+    "strategy": "v3b",
+    "threshold": 0.3
+  },
+  {
+    "ts": "2026-04-12T16:06:25",
+    "step": "alignment_v3b_1",
+    "elapsed_s": 5.58,
+    "tokens": 2105,
+    "cost_usd": 4.2e-05,
+    "strategy": "v3b_1",
+    "threshold": 0.3
+  },
+  {
+    "ts": "2026-04-12T16:06:30",
+    "step": "alignment_v4",
+    "elapsed_s": 5.54,
+    "tokens": 2105,
+    "cost_usd": 4.2e-05,
+    "strategy": "v4",
+    "threshold": 0.3
+  },
+  {
+    "ts": "2026-04-12T16:33:27",
+    "step": "alignment_v1_3_1",
+    "elapsed_s": 19.26,
+    "tokens": 2105,
+    "cost_usd": 4.2e-05,
+    "strategy": "v1_3_1",
+    "threshold": 0.3
+  },
+  {
+    "ts": "2026-04-12T16:33:45",
+    "step": "alignment_v1_3_2",
+    "elapsed_s": 17.96,
+    "tokens": 2105,
+    "cost_usd": 4.2e-05,
+    "strategy": "v1_3_2",
+    "threshold": 0.3
+  },
+  {
+    "ts": "2026-04-12T16:34:17",
+    "step": "alignment_v5",
+    "elapsed_s": 31.82,
+    "tokens": 2105,
+    "cost_usd": 4.2e-05,
+    "strategy": "v5",
+    "threshold": 0.3
   }
 ]

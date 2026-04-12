@@ -1,27 +1,32 @@
 """
-Semantic alignment service — Strategy V3b.
+Semantic alignment service — Strategy V3a.
 
-三分类方案（滑窗 embedding 判拓展）：
+三分类方案（逻辑词规则判拓展）：
 - 属于 (belongs)：cosine(seg, best_page) >= BELONGS_THRESHOLD
-- 拓展 (extends)：相似度介于 OFF_SLIDE_THRESHOLD ~ BELONGS_THRESHOLD，
-                  且当前句与前 CONTEXT_WINDOW 句的均值余弦 >= CONTEXT_SIM_THRESHOLD
+- 拓展 (extends)：相似度介于 OFF_SLIDE_THRESHOLD ~ BELONGS_THRESHOLD，且句中命中逻辑词/指代词正则
 - 废话 (filler)：其他
 """
 import os
+import re
 from typing import Optional
 
 import numpy as np
 from openai import OpenAI
 
 STRATEGY_DESCRIPTION = (
-    "V3b — 三分类（滑窗embedding）：cosine≥0.45→属于，"
-    "与前3句均值相似度≥0.55→拓展，其余→废话。"
+    "V3a — 三分类（逻辑词规则）：cosine≥0.45→属于，"
+    "逻辑词/指代词命中→拓展，其余→废话。"
 )
 
 BELONGS_THRESHOLD = 0.45
 OFF_SLIDE_THRESHOLD = 0.25
-CONTEXT_SIM_THRESHOLD = 0.55
-CONTEXT_WINDOW = 3
+
+EXTEND_PATTERNS = re.compile(
+    r"\b(so|therefore|thus|hence|because|since|this|it|that|which|where|"
+    r"as a result|in other words|for example|for instance)\b"
+    r"|因此|所以|由此|因而|因为|这说明|这意味|这表明|这就是|它说明|换句话说|举个例子|比如说",
+    re.IGNORECASE,
+)
 
 
 def _get_client() -> tuple[OpenAI, str]:
@@ -45,25 +50,13 @@ def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return a_n @ b_n.T
 
 
-def _context_sim(seg_idx: int, seg_vecs: np.ndarray, window: int) -> float:
-    """当前句与前 window 句的均值余弦相似度，不足时用所有前序句。"""
-    if seg_idx == 0:
-        return 0.0
-    start    = max(0, seg_idx - window)
-    ctx_vecs = seg_vecs[start:seg_idx]        # (k, D)
-    cur_vec  = seg_vecs[seg_idx:seg_idx + 1]  # (1, D)
-    sims     = _cosine_similarity(cur_vec, ctx_vecs)  # (1, k)
-    return float(sims.mean())
-
-
-def _classify(score: float, seg_idx: int, seg_vecs: np.ndarray) -> tuple[str, float]:
-    """返回 ('belongs'|'extends'|'filler', context_sim)"""
+def _classify(text: str, score: float) -> str:
+    """返回 'belongs' | 'extends' | 'filler'"""
     if score >= BELONGS_THRESHOLD:
-        return "belongs", 0.0
-    ctx_sim = _context_sim(seg_idx, seg_vecs, CONTEXT_WINDOW)
-    if score >= OFF_SLIDE_THRESHOLD and ctx_sim >= CONTEXT_SIM_THRESHOLD:
-        return "extends", ctx_sim
-    return "filler", ctx_sim
+        return "belongs"
+    if score >= OFF_SLIDE_THRESHOLD and EXTEND_PATTERNS.search(text):
+        return "extends"
+    return "filler"
 
 
 def build_page_timeline(
@@ -77,14 +70,14 @@ def build_page_timeline(
 
     client, embed_model = _get_client()
     page_texts = [p.get("ppt_text", "") or f"Page {p['page_num']}" for p in ppt_pages]
-    seg_texts  = [s["text"] for s in segments]
+    seg_texts = [s["text"] for s in segments]
 
     # 单次 batch 调用
-    all_vecs  = _embed_texts(page_texts + seg_texts, client, embed_model)
+    all_vecs = _embed_texts(page_texts + seg_texts, client, embed_model)
     page_vecs = all_vecs[:len(page_texts)]
     seg_vecs  = all_vecs[len(page_texts):]
 
-    sim_matrix    = _cosine_similarity(seg_vecs, page_vecs)  # (S, P)
+    sim_matrix = _cosine_similarity(seg_vecs, page_vecs)  # (S, P)
     best_page_idx = np.argmax(sim_matrix, axis=1)
     best_scores   = sim_matrix[np.arange(len(segments)), best_page_idx]
 
@@ -96,15 +89,15 @@ def build_page_timeline(
             if 0 <= aidx < len(ppt_pages):
                 closest = int(np.argmin(np.abs(seg_starts - anchor["timestamp"])))
                 best_page_idx[closest] = aidx
-                best_scores[closest]   = 1.0
+                best_scores[closest] = 1.0
 
     page_map = {
         p["page_num"]: {
             **p,
-            "aligned_segments":   [],
+            "aligned_segments": [],
             "off_slide_segments": [],
-            "page_start_time":    None,
-            "page_end_time":      None,
+            "page_start_time": None,
+            "page_end_time": None,
             "alignment_confidence": 0.0,
         }
         for p in ppt_pages
@@ -114,38 +107,24 @@ def build_page_timeline(
     for i, seg in enumerate(segments):
         score    = float(best_scores[i])
         page_num = ppt_pages[int(best_page_idx[i])]["page_num"]
-        cls, ctx_sim = _classify(score, i, seg_vecs)
+        cls      = _classify(seg["text"], score)
 
         seg_dict = {**seg, "similarity": score, "segment_class": cls}
-        if ctx_sim > 0.0:
-            seg_dict["context_similarity"] = round(ctx_sim, 4)
-
-        if cls == "filler":
-            page_map[last_page_num]["off_slide_segments"].append(seg_dict)
-        else:
-            page_map[page_num]["aligned_segments"].append(seg_dict)
-            last_page_num = page_num
+        page_map[page_num]["aligned_segments"].append(seg_dict)
+        last_page_num = page_num
 
     results = []
     for page_num in sorted(page_map.keys()):
         entry     = page_map[page_num]
         aligned   = entry["aligned_segments"]
-        off_slide = entry["off_slide_segments"]
 
         if aligned:
-            entry["page_start_time"]      = aligned[0]["start"]
-            entry["page_end_time"]        = aligned[-1]["end"]
-            entry["alignment_confidence"] = float(np.mean([s["similarity"] for s in aligned]))
+            entry["page_start_time"]       = aligned[0]["start"]
+            entry["page_end_time"]         = aligned[-1]["end"]
+            entry["alignment_confidence"]  = float(np.mean([s["similarity"] for s in aligned]))
         # else: leave page_start_time as None — _fill_time_gaps will interpolate
 
-        entry["page_supplement"] = (
-            {
-                "content":         " ".join(s["text"] for s in off_slide),
-                "timestamp_start": off_slide[0]["start"],
-                "timestamp_end":   off_slide[-1]["end"],
-            }
-            if off_slide else None
-        )
+        entry["page_supplement"] = None
         results.append(entry)
 
     _fill_time_gaps(results, total_audio_duration)

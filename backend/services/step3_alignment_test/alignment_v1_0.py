@@ -128,31 +128,19 @@ def build_page_timeline(
         for p in ppt_pages
     }
 
-    # Track the last assigned page for off-slide fallback
-    last_page_num = ppt_pages[0]["page_num"]
-
     for i, seg in enumerate(segments):
         score = float(best_scores[i])
         page_idx = int(best_page_idx[i])
         page_num = ppt_pages[page_idx]["page_num"]
-
-        if score < OFF_SLIDE_THRESHOLD:
-            # Off-slide: attach to the most recently active page as supplement
-            page_map[last_page_num]["off_slide_segments"].append(
-                {**seg, "similarity": score}
-            )
-        else:
-            page_map[page_num]["aligned_segments"].append(
-                {**seg, "similarity": score}
-            )
-            last_page_num = page_num
+        page_map[page_num]["aligned_segments"].append(
+            {**seg, "similarity": score}
+        )
 
     # Compute timing + confidence per page
     results = []
     for page_num in sorted(page_map.keys()):
         entry = page_map[page_num]
         aligned = entry["aligned_segments"]
-        off_slide = entry["off_slide_segments"]
 
         if aligned:
             entry["page_start_time"] = aligned[0]["start"]
@@ -165,17 +153,7 @@ def build_page_timeline(
             entry["page_end_time"] = 0.0
             entry["alignment_confidence"] = 0.0
 
-        # Build page_supplement from off-slide segments
-        if off_slide:
-            supplement_text = " ".join(s["text"] for s in off_slide)
-            entry["page_supplement"] = {
-                "content": supplement_text,
-                "timestamp_start": off_slide[0]["start"],
-                "timestamp_end": off_slide[-1]["end"],
-            }
-        else:
-            entry["page_supplement"] = None
-
+        entry["page_supplement"] = None
         results.append(entry)
 
     # Fill gaps: pages with no alignment use adjacent page boundaries

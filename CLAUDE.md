@@ -190,9 +190,19 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 | `backend/services/audio.py` | FFmpeg 封装：格式转换、chunk 合并、时长获取 |
 | `backend/services/ppt_parser.py` | LibreOffice→PDF + PyMuPDF 文本提取 + 术语抽取 |
 | `backend/services/asr.py` | Whisper API（支持 >25MB 分段）+ 阿里云 stub |
-| `backend/services/alignment.py` | **当前生产对齐算法（V2/D-004）**：embedding cosine + K=3 debounce + 锚点约束 |
-| `backend/services/alignment_v1.py` | 历史 V1 算法（argmax，无 debounce），测试平台 A/B 用 |
-| `backend/services/alignment_v2.py` | V2 快照，测试平台 strategy dropdown 用 |
+| `backend/services/alignment.py` | **当前生产对齐算法**：embedding cosine + K=3 debounce + 锚点约束 |
+| `backend/services/step3_alignment_test/` | 对齐算法实验版本集合（10个版本 + utils），测试平台 strategy dropdown 用 |
+| `backend/services/step3_alignment_test/alignment_utils.py` | 共享工具函数：`apply_time_mask` |
+| `backend/services/step3_alignment_test/alignment_v1.py` | V1 — 单遍扫描（argmax，无 debounce） |
+| `backend/services/step3_alignment_test/alignment_v1_1.py` | V1.1 — 单遍扫描 + 时间约束 |
+| `backend/services/step3_alignment_test/alignment_v1_2.py` | V1.2 — 单遍扫描 + 后处理平滑 |
+| `backend/services/step3_alignment_test/alignment_v2.py` | V2 — K=3去抖 + 升级（D-004 快照） |
+| `backend/services/step3_alignment_test/alignment_v2_1.py` | V2.1 — K=3去抖 + 时间约束 |
+| `backend/services/step3_alignment_test/alignment_v3a.py` | V3a — 三分类（逻辑词规则） |
+| `backend/services/step3_alignment_test/alignment_v3a_1.py` | V3a.1 — 三分类（逻辑词规则）+ 时间约束 |
+| `backend/services/step3_alignment_test/alignment_v3b.py` | V3b — 三分类（滑窗 embedding） |
+| `backend/services/step3_alignment_test/alignment_v3b_1.py` | V3b.1 — 三分类（滑窗 embedding）+ 时间约束 |
+| `backend/services/step3_alignment_test/alignment_v4.py` | V4 — 两阶段状态机 + 防抖 |
 | `backend/services/bullet_alignment.py` | 实验性 bullet 级对齐（Method A/B/C） |
 | `backend/services/note_generator.py` | Claude 笔记生成：4模板×2粒度 + 批注扩写 `generate_annotations()` |
 | `backend/services/judge.py` | LLM-as-a-Judge 评分（完整性/准确性/可读性 1–5 分） |

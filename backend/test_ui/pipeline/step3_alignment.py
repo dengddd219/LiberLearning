@@ -40,16 +40,6 @@ def render_step3(has_ppt, threshold, realign_btn):
                     cls = s.get("segment_class", "") or "belongs"
                     lookup[s["start"]] = {
                         "page_num": pg["page_num"],
-                        "is_off_slide": False,
-                        "similarity": s.get("similarity", 0),
-                        "conf": pg.get("alignment_confidence", 0),
-                        "segment_class": cls,
-                    }
-                for s in pg.get("off_slide_segments", []):
-                    cls = s.get("segment_class", "") or "filler"
-                    lookup[s["start"]] = {
-                        "page_num": pg["page_num"],
-                        "is_off_slide": True,
                         "similarity": s.get("similarity", 0),
                         "conf": pg.get("alignment_confidence", 0),
                         "segment_class": cls,
@@ -57,14 +47,12 @@ def render_step3(has_ppt, threshold, realign_btn):
             return lookup
 
         def _is_page_correct(info, gt_entry):
-            """Check if strategy assigned the segment to the correct page."""
+            """Check if strategy assigned the segment to the correct page (page_num match only)."""
             if info is None or gt_entry is None:
                 return None
             gt_page = gt_entry.get("page_num")
-            if info["is_off_slide"]:
-                return gt_page is None
             if gt_page is None:
-                return False
+                return None  # GT 无标注（off-slide GT），不参与计算
             return info.get("page_num") == gt_page
 
         gt_path = _gt_path()
@@ -176,8 +164,9 @@ def render_step3(has_ppt, threshold, realign_btn):
             st.table(df.set_index("排名"))
             st.caption(
                 "统计规则：策略分配的页码 = GT 标注页码 → ✅；"
-                "策略判为 off-slide 且 GT 也为 off-slide → ✅；"
-                "其余情况 → ❌。所有 GT 句段均计入分母。按准确率降序排名。"
+                "其余情况（含页码错误）→ ❌。"
+                "GT 标注为 off-slide（page_num=null）的句段不计入分母。"
+                "ext 标签仅供参考，不影响正确性判断。按准确率降序排名。"
             )
 
         # ── Strategy selection row ────────────────────────────────────
@@ -283,7 +272,6 @@ def render_step3(has_ppt, threshold, realign_btn):
                 covered = sum(1 for p in aligned_data if p.get("aligned_segments"))
                 avg_conf = sum(p.get("alignment_confidence", 0) for p in aligned_data) / max(len(aligned_data), 1)
                 high_conf_count = sum(1 for p in aligned_data if p.get("alignment_confidence", 0) >= 0.6)
-                off_slide_count = sum(len(p.get("off_slide_segments", [])) for p in aligned_data)
                 st.caption(f"Covered: {covered}/{len(aligned_data)} | Avg conf: {avg_conf:.2f}")
                 for pg in aligned_data:
                     conf = pg.get("alignment_confidence", 0)
@@ -296,7 +284,7 @@ def render_step3(has_ppt, threshold, realign_btn):
                         f"conf={conf:.2f}, {len(segs)} segs "
                         f"[{ts//60:02d}:{ts%60:02d}–{te//60:02d}:{te%60:02d}]"
                     )
-                return avg_conf, high_conf_count, off_slide_count
+                return avg_conf, high_conf_count
 
             col_a_l, col_a_r = st.columns(2)
             with col_a_l:
@@ -307,20 +295,16 @@ def render_step3(has_ppt, threshold, realign_btn):
                 right_stats = _render_confidence_column(right_aligned, strat_labels[right_strat_idx])
 
             if (left_stats is not None and right_stats is not None
-                    and len(left_stats) == 3 and len(right_stats) == 3):
-                l_avg, l_high, l_off = left_stats
-                r_avg, r_high, r_off = right_stats
+                    and len(left_stats) == 2 and len(right_stats) == 2):
+                l_avg, l_high = left_stats
+                r_avg, r_high = right_stats
                 avg_delta = r_avg - l_avg
                 high_delta = r_high - l_high
                 n_pages = max(len(left_aligned), len(right_aligned), 1)
                 high_pct = f"{high_delta/n_pages*100:+.0f}%"
-                off_delta = r_off - l_off
-                l_off_safe = max(l_off, 1)
-                off_pct = f"{off_delta/l_off_safe*100:+.0f}%"
                 st.info(
                     f"Delta (R vs L): Avg conf {avg_delta:+.2f} | "
-                    f"高置信度页面 (≥0.6) {high_delta:+d} ({high_pct}) | "
-                    f"Off-slide 段 {off_delta:+d} ({off_pct})"
+                    f"高置信度页面 (≥0.6) {high_delta:+d} ({high_pct})"
                 )
 
         # ── Section B — Transcript Timeline (collapsible) ─────────────
@@ -356,8 +340,6 @@ def render_step3(has_ppt, threshold, realign_btn):
                     return f"({label} — not run)"
                 cls = info.get("segment_class", "")
                 cls_tag = f" [{CLASS_ICONS.get(cls, cls)}]" if cls else ""
-                if info["is_off_slide"]:
-                    return f"off-slide (near Slide {info['page_num']}), sim={info['similarity']:.3f}{cls_tag}"
                 return f"Slide {info['page_num']}, sim={info['similarity']:.3f}, conf={info['conf']:.2f}{cls_tag}"
 
             def _fmt_gt(gt_entry):
@@ -365,7 +347,7 @@ def render_step3(has_ppt, threshold, realign_btn):
                     return "（无 GT）"
                 pn = gt_entry.get("page_num")
                 if pn is None:
-                    return "⚪废话 (off-slide)"
+                    return "⚪废话 (off-slide GT，不计分)"
                 label = "🔵拓展" if gt_entry.get("is_extension") else "🟢属于"
                 return f"Slide {pn} {label}"
 
@@ -511,6 +493,20 @@ def render_step3(has_ppt, threshold, realign_btn):
                 )
 
             if st.button("生成 Excel", key="btn_export_excel", disabled=not export_keys):
+                # ── GT 改动检测 ──────────────────────────────────────────────
+                import hashlib, json as _json
+                gt_snapshot_key = "export_gt_snapshot"
+                current_gt_hash = hashlib.md5(
+                    _json.dumps(gt_data, sort_keys=True, ensure_ascii=False).encode()
+                ).hexdigest()
+                prev_gt_hash = st.session_state.get(gt_snapshot_key)
+                if prev_gt_hash is not None and prev_gt_hash != current_gt_hash:
+                    st.warning(
+                        "⚠️ 检测到 Ground Truth 标注自上次导出后已发生改动！"
+                        "本次导出将使用最新 GT 重新计算正确与否。"
+                    )
+                st.session_state[gt_snapshot_key] = current_gt_hash
+
                 rows = []
                 for ekey in export_keys:
                     elabel = ALIGNMENT_STRATEGIES[ekey]["label"]
@@ -529,20 +525,20 @@ def render_step3(has_ppt, threshold, realign_btn):
                         if info is None:
                             sim_val = None
                             assigned_page = None
-                        elif info["is_off_slide"]:
-                            sim_val = round(info["similarity"], 4)
-                            assigned_page = f"off-slide(near {info['page_num']})"
                         else:
                             sim_val = round(info["similarity"], 4)
                             assigned_page = info["page_num"]
-                        # GT 页码
+                        # GT 页码和正确性
                         if gt_entry is None:
                             gt_page = None
                             is_correct = None
                         else:
-                            gt_page = gt_entry.get("page_num")  # None 表示 off-slide
+                            gt_page = gt_entry.get("page_num")
                             correct = _is_page_correct(info, gt_entry)
-                            is_correct = "✅" if correct else ("❌" if correct is not None else "")
+                            if correct is None:
+                                is_correct = None  # GT 无页码（off-slide GT），不计分
+                            else:
+                                is_correct = 1 if correct else 0
                         rows.append({
                             "版本名称": elabel,
                             "seg_index": i,

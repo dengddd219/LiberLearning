@@ -328,20 +328,14 @@ def build_page_timeline(
 
     for r in seg_results:
         page_num = r["page_num"]
-        cls = r["segment_class"]
         seg_dict = {k: v for k, v in r.items() if k != "locked_slide_idx"}
-
-        if cls == "filler":
-            page_map[last_page_num]["off_slide_segments"].append(seg_dict)
-        else:
-            page_map[page_num]["aligned_segments"].append(seg_dict)
-            last_page_num = page_num
+        page_map[page_num]["aligned_segments"].append(seg_dict)
+        last_page_num = page_num
 
     results = []
     for page_num in sorted(page_map.keys()):
         entry = page_map[page_num]
         aligned = entry["aligned_segments"]
-        off_slide = entry["off_slide_segments"]
 
         if aligned:
             entry["page_start_time"] = aligned[0]["start"]
@@ -350,15 +344,7 @@ def build_page_timeline(
                 np.mean([s["similarity"] for s in aligned])
             )
 
-        entry["page_supplement"] = (
-            {
-                "content": " ".join(s["text"] for s in off_slide),
-                "timestamp_start": off_slide[0]["start"],
-                "timestamp_end": off_slide[-1]["end"],
-            }
-            if off_slide
-            else None
-        )
+        entry["page_supplement"] = None
         results.append(entry)
 
     _fill_time_gaps(results, total_audio_duration)
