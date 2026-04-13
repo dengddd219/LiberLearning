@@ -21,6 +21,7 @@ export async function uploadFiles(pptFile?: File, audioFile?: File): Promise<{ s
   const form = new FormData()
   if (pptFile) form.append('ppt', pptFile)
   if (audioFile) form.append('audio', audioFile)
+  // TODO: change to '/api/process' when connecting to real pipeline
   return apiPost('/api/process-mock', form)
 }
 

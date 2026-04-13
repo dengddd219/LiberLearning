@@ -14,13 +14,16 @@ const STAGES: Stage[] = [
   { id: 'notes', label: '笔记生成', description: '逐页生成结构化学习笔记…' },
 ]
 
+const STEP_MAP: Record<string, number> = { asr: 0, ppt: 1, align: 2, notes: 3, done: 4 }
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+
 export default function ProcessingPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const sessionId = searchParams.get('session_id') ?? 'mock-session-001'
 
   const [currentStage, setCurrentStage] = useState(0)
-  const [pageProgress, setPageProgress] = useState({ current: 0, total: 3 })
   const [failed, setFailed] = useState(false)
   const [elapsed, setElapsed] = useState(0)
 
@@ -31,31 +34,34 @@ export default function ProcessingPage() {
 
     const timer = setInterval(() => setElapsed((t) => t + 1), 1000)
 
-    const timings = [1500, 2500, 4000, 6000]
-    const timeouts: ReturnType<typeof setTimeout>[] = []
-
-    STAGES.forEach((_, i) => {
-      timeouts.push(
-        setTimeout(() => {
-          setCurrentStage(i + 1)
-          if (i === 3) {
-            let p = 0
-            const pageTick = setInterval(() => {
-              p++
-              setPageProgress({ current: p, total: 3 })
-              if (p >= 3) {
-                clearInterval(pageTick)
-                setTimeout(() => navigate(`/notes/${sessionId}`), 600)
-              }
-            }, 400)
-          }
-        }, timings[i])
-      )
-    })
+    let done = false
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`)
+        if (!res.ok) return
+        const data = await res.json()
+        if (data.progress?.step) {
+          const stageIndex = STEP_MAP[data.progress.step] ?? 0
+          setCurrentStage(stageIndex)
+        }
+        if ((data.status === 'ready' || data.status === 'partial_ready') && !done) {
+          done = true
+          clearInterval(poll)
+          setCurrentStage(STAGES.length)
+          setTimeout(() => navigate(`/notes/${sessionId}`), 400)
+        } else if (data.status === 'error' && !done) {
+          done = true
+          clearInterval(poll)
+          setFailed(true)
+        }
+      } catch {
+        // network error — keep polling
+      }
+    }, 2000)
 
     return () => {
       clearInterval(timer)
-      timeouts.forEach(clearTimeout)
+      clearInterval(poll)
     }
   }, [failed, navigate, sessionId])
 
@@ -70,7 +76,7 @@ export default function ProcessingPage() {
           <h2 className="text-lg font-bold text-gray-900 mb-2">处理失败</h2>
           <p className="text-sm text-gray-500 mb-6">语音转录服务暂时不可用，请稍后重试</p>
           <button
-            onClick={() => { setFailed(false); setCurrentStage(0); setElapsed(0) }}
+            onClick={() => window.location.reload()}
             className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700"
           >
             重新处理
@@ -116,9 +122,7 @@ export default function ProcessingPage() {
                   </p>
                   {active && (
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {i === 3
-                        ? `第 ${pageProgress.current}/${pageProgress.total} 页笔记生成中…`
-                        : stage.description}
+                      {stage.description}
                     </p>
                   )}
                 </div>

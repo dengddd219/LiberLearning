@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 
 // Static mock data — replace with real API call when backend is ready
@@ -59,6 +60,8 @@ const MOCK_NOTE = {
 export default function DetailedNotePage() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
+  const headingRefs = useRef<Map<number, HTMLHeadingElement>>(new Map())
+  const aiSectionRef = useRef<HTMLDivElement>(null)
 
   return (
     <div className="min-h-screen" style={{ background: '#FAF9F7', fontFamily: 'Inter, sans-serif' }}>
@@ -81,6 +84,7 @@ export default function DetailedNotePage() {
             {['Dashboard', 'Courses', 'Detailed Note'].map((item) => (
               <button
                 key={item}
+                onClick={() => { if (item !== 'Detailed Note') navigate('/') }}
                 className="px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-all duration-150"
                 style={{
                   color: item === 'Detailed Note' ? '#2F3331' : '#777C79',
@@ -149,6 +153,7 @@ export default function DetailedNotePage() {
               .map((s, i) => (
                 <button
                   key={i}
+                  onClick={() => headingRefs.current.get(i)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                   className="px-3 py-2 rounded-lg text-sm cursor-pointer transition-all duration-150 w-full text-left hover:bg-black/5"
                   style={{ color: '#777C79', lineHeight: '1.4' }}
                 >
@@ -156,6 +161,7 @@ export default function DetailedNotePage() {
                 </button>
               ))}
             <button
+              onClick={() => aiSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm cursor-pointer transition-all duration-150 w-full text-left hover:bg-black/5"
               style={{ color: '#556071' }}
             >
@@ -206,92 +212,98 @@ export default function DetailedNotePage() {
 
             {/* Content sections */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {MOCK_NOTE.sections.map((section, i) => {
-                if (section.type === 'heading') {
-                  return (
-                    <h3
-                      key={i}
-                      style={{
-                        fontSize: '18px',
-                        fontWeight: '700',
-                        color: '#2F3331',
-                        marginTop: '8px',
-                        paddingBottom: '8px',
-                        borderBottom: '1px solid rgba(175,179,176,0.2)',
-                      }}
-                    >
-                      {'text' in section ? section.text : ''}
-                    </h3>
-                  )
-                }
+              {(() => {
+                let headingIndex = 0
+                return MOCK_NOTE.sections.map((section, i) => {
+                  if (section.type === 'heading') {
+                    const idx = headingIndex++
+                    return (
+                      <h3
+                        key={i}
+                        ref={(el) => { if (el) headingRefs.current.set(idx, el) }}
+                        style={{
+                          fontSize: '18px',
+                          fontWeight: '700',
+                          color: '#2F3331',
+                          marginTop: '8px',
+                          paddingBottom: '8px',
+                          borderBottom: '1px solid rgba(175,179,176,0.2)',
+                        }}
+                      >
+                        {'text' in section ? section.text : ''}
+                      </h3>
+                    )
+                  }
 
-                if (section.type === 'paragraph') {
-                  return (
-                    <p
-                      key={i}
-                      style={{
-                        fontSize: '15px',
-                        color: '#2F3331',
-                        lineHeight: '1.8',
-                      }}
-                    >
-                      {'text' in section ? section.text : ''}
-                    </p>
-                  )
-                }
-
-                if (section.type === 'bullets') {
-                  return (
-                    <ul key={i} style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingLeft: '4px' }}>
-                      {'items' in section && section.items.map((item, j) => (
-                        <li key={j} className="flex items-start gap-3">
-                          <span
-                            className="flex-shrink-0 mt-1.5 w-1.5 h-1.5 rounded-full"
-                            style={{ background: '#556071' }}
-                          />
-                          <span style={{ fontSize: '15px', color: '#2F3331', lineHeight: '1.7' }}>
-                            {item}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )
-                }
-
-                if (section.type === 'definition') {
-                  return (
-                    <div
-                      key={i}
-                      className="rounded-lg p-4"
-                      style={{ background: '#F3F4F1', border: '1px solid rgba(175,179,176,0.2)' }}
-                    >
-                      <p className="mb-2">
-                        <code
-                          style={{
-                            fontSize: '13px',
-                            fontWeight: '700',
-                            color: '#556071',
-                            background: 'rgba(85,96,113,0.08)',
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            fontFamily: 'monospace',
-                          }}
-                        >
-                          {'term' in section ? section.term : ''}
-                        </code>
-                      </p>
-                      <p style={{ fontSize: '14px', color: '#2F3331', lineHeight: '1.7' }}>
+                  if (section.type === 'paragraph') {
+                    return (
+                      <p
+                        key={i}
+                        style={{
+                          fontSize: '15px',
+                          color: '#2F3331',
+                          lineHeight: '1.8',
+                        }}
+                      >
                         {'text' in section ? section.text : ''}
                       </p>
-                    </div>
-                  )
-                }
+                    )
+                  }
 
-                return null
-              })}
+                  if (section.type === 'bullets') {
+                    return (
+                      <ul key={i} style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingLeft: '4px' }}>
+                        {'items' in section && section.items.map((item, j) => (
+                          <li key={j} className="flex items-start gap-3">
+                            <span
+                              className="flex-shrink-0 mt-1.5 w-1.5 h-1.5 rounded-full"
+                              style={{ background: '#556071' }}
+                            />
+                            <span style={{ fontSize: '15px', color: '#2F3331', lineHeight: '1.7' }}>
+                              {item}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )
+                  }
+
+                  if (section.type === 'definition') {
+                    return (
+                      <div
+                        key={i}
+                        className="rounded-lg p-4"
+                        style={{ background: '#F3F4F1', border: '1px solid rgba(175,179,176,0.2)' }}
+                      >
+                        <p className="mb-2">
+                          <code
+                            style={{
+                              fontSize: '13px',
+                              fontWeight: '700',
+                              color: '#556071',
+                              background: 'rgba(85,96,113,0.08)',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontFamily: 'monospace',
+                            }}
+                          >
+                            {'term' in section ? section.term : ''}
+                          </code>
+                        </p>
+                        <p style={{ fontSize: '14px', color: '#2F3331', lineHeight: '1.7' }}>
+                          {'text' in section ? section.text : ''}
+                        </p>
+                      </div>
+                    )
+                  }
+
+                  return null
+                })
+              })()}
 
               {/* AI Notes section */}
               <div
+                ref={aiSectionRef}
                 className="rounded-xl p-6 mt-4"
                 style={{
                   background: '#FAFAFA',

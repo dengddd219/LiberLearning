@@ -3,13 +3,6 @@ import { useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { uploadFiles } from '../lib/api'
 
-const C = {
-  bg: '#FAF9F7', fg: '#2F3331', secondary: '#556071', muted: '#777C79',
-  placeholder: '#AFB3B0', border: 'rgba(175,179,176,0.1)',
-  borderStrong: 'rgba(175,179,176,0.15)', sidebar: '#F3F4F1',
-  dark: '#5F5E5E', white: '#FFFFFF',
-}
-
 // ─── Icons (inline SVG) ──────────────────────────────────────────────────────
 
 function IconGrid() {

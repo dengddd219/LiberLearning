@@ -2,10 +2,11 @@ import { useParams } from 'react-router-dom'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getSession } from '../lib/api'
 
-interface Bullet { text: string; ai_comment: string; timestamp: number }
+interface Bullet { text: string; ai_comment: string; timestamp_start: number; timestamp_end: number }
 interface PageData {
   page_num: number
-  slide_image_url: string
+  pdf_url: string
+  pdf_page_num: number
   ppt_text: string
   page_start_time: number
   page_end_time: number
@@ -24,6 +25,19 @@ interface SessionData {
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+
+const FONT_SERIF = "'Lora', Georgia, serif"
+const FONT_SANS  = "'Inter', system-ui, sans-serif"
+const C = {
+  bg: '#F0EFEA',
+  sidebar: '#E8E7E2',
+  fg: '#1A1916',
+  secondary: '#6B6A64',
+  muted: '#9B9A94',
+  dark: '#3D3B35',
+  white: '#FAFAF8',
+  divider: '#E4E3DE',
+}
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
@@ -136,11 +150,11 @@ export default function NotesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#FAF9F7' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: C.bg }}>
         <div className="text-center">
           <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3"
-            style={{ borderColor: '#556071', borderTopColor: 'transparent' }} />
-          <p className="text-sm" style={{ color: '#777C79' }}>加载笔记中…</p>
+            style={{ borderColor: C.secondary, borderTopColor: 'transparent' }} />
+          <p className="text-sm" style={{ color: C.muted }}>加载笔记中…</p>
         </div>
       </div>
     )
@@ -148,13 +162,13 @@ export default function NotesPage() {
 
   if (error || !session) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#FAF9F7' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: C.bg }}>
         <div className="text-center">
-          <p className="text-sm mb-4" style={{ color: '#556071' }}>{error ?? '未知错误'}</p>
+          <p className="text-sm mb-4" style={{ color: C.secondary }}>{error ?? '未知错误'}</p>
           <button
             onClick={() => window.location.reload()}
             className="text-sm px-4 py-2 rounded-lg cursor-pointer transition-all duration-150"
-            style={{ background: '#F3F4F1', color: '#2F3331' }}
+            style={{ background: C.sidebar, color: C.fg }}
           >
             重试
           </button>
@@ -169,18 +183,19 @@ export default function NotesPage() {
   // Build mock slides for sidebar (use real data)
   const slides = session.pages.map((p) => ({
     pageNum: p.page_num,
-    imageUrl: `${API_BASE}${p.slide_image_url}`,
+    pdfUrl: `${API_BASE}${p.pdf_url}`,
+    pdfPageNum: p.pdf_page_num,
   }))
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden" style={{ background: '#FAF9F7', fontFamily: 'Inter, sans-serif' }}>
+    <div className="flex flex-col h-screen overflow-hidden" style={{ background: C.bg, fontFamily: FONT_SERIF }}>
 
       {/* TopAppBar */}
       <header
         className="flex items-center justify-between px-6 flex-shrink-0 z-30"
         style={{
           height: '64px',
-          background: 'rgba(250,249,247,0.8)',
+          background: 'rgba(240,239,234,0.85)',
           backdropFilter: 'blur(24px)',
           borderBottom: '1px solid rgba(175,179,176,0.1)',
           position: 'fixed',
@@ -191,14 +206,14 @@ export default function NotesPage() {
       >
         {/* Left: Logo + Nav */}
         <div className="flex items-center gap-6">
-          <span className="font-bold" style={{ fontSize: '20px', color: '#2F3331' }}>LiberStudy</span>
+          <span className="font-bold" style={{ fontSize: '20px', color: C.fg }}>LiberStudy</span>
           <nav className="flex items-center gap-1">
             {['Dashboard', 'Courses', 'Detailed Note'].map((item) => (
               <button
                 key={item}
                 className="px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-all duration-150"
                 style={{
-                  color: item === 'Courses' ? '#2F3331' : '#777C79',
+                  color: item === 'Courses' ? C.fg : C.muted,
                   fontWeight: item === 'Courses' ? '500' : '400',
                   background: item === 'Courses' ? 'rgba(175,179,176,0.1)' : 'transparent',
                 }}
@@ -212,14 +227,14 @@ export default function NotesPage() {
         {/* Right: Bell + Avatar */}
         <div className="flex items-center gap-3">
           <button className="cursor-pointer transition-all duration-150 p-1.5 rounded-lg hover:bg-black/5">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#777C79" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke=C.muted strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
           </button>
           <div
             className="rounded-full flex items-center justify-center cursor-pointer"
-            style={{ width: '32px', height: '32px', background: '#5F5E5E', color: '#FFFFFF', fontSize: '13px', fontWeight: '600' }}
+            style={{ width: '32px', height: '32px', background: C.dark, color: C.white, fontSize: '13px', fontWeight: '600' }}
           >
             U
           </div>
@@ -232,18 +247,18 @@ export default function NotesPage() {
         {/* Left sidebar: Lecture Slides */}
         <aside
           className="flex-shrink-0 flex flex-col overflow-hidden"
-          style={{ width: '200px', background: '#F3F4F1', borderRight: '1px solid rgba(175,179,176,0.1)' }}
+          style={{ width: '200px', background: C.sidebar, borderRight: '1px solid rgba(175,179,176,0.1)' }}
         >
           {/* Sidebar header */}
           <div
             className="flex items-center justify-between flex-shrink-0 px-4"
             style={{ height: '48px', borderBottom: '1px solid rgba(175,179,176,0.1)' }}
           >
-            <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: '#556071' }}>
+            <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.secondary }}>
               LECTURE SLIDES
             </span>
             <button className="cursor-pointer transition-all duration-150 opacity-60 hover:opacity-100">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#556071" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke=C.secondary strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="15 18 9 12 15 6" />
               </svg>
             </button>
@@ -257,28 +272,26 @@ export default function NotesPage() {
                 <div
                   key={slide.pageNum}
                   onClick={() => setScrollToPage(slide.pageNum)}
-                  className="relative cursor-pointer transition-all duration-150 rounded-md overflow-hidden flex-shrink-0"
+                  className="relative cursor-pointer transition-all duration-150 rounded-md overflow-hidden flex-shrink-0 flex items-center justify-center"
                   style={{
                     height: '96px',
                     borderRadius: '6px',
-                    background: '#EDEEEB',
+                    background: C.divider,
                     boxShadow: isActive
                       ? '0px 0px 0px 2px rgba(95,94,94,1)'
                       : '0 1px 3px rgba(0,0,0,0.08)',
                     opacity: isActive ? 1 : 0.7,
                   }}
                 >
-                  <img
-                    src={slide.imageUrl}
-                    alt={`幻灯片 ${slide.pageNum}`}
-                    className="w-full h-full object-cover"
-                  />
+                  <span style={{ fontSize: '22px', fontWeight: '700', color: '#AFB3B0' }}>
+                    {slide.pageNum}
+                  </span>
                   {/* Page badge */}
                   <span
                     className="absolute top-1.5 left-1.5 flex items-center justify-center"
                     style={{
-                      background: '#2F3331',
-                      color: '#FFFFFF',
+                      background: C.fg,
+                      color: C.white,
                       fontSize: '9px',
                       fontWeight: '700',
                       borderRadius: '3px',
@@ -295,14 +308,14 @@ export default function NotesPage() {
         </aside>
 
         {/* Center: PPT Canvas */}
-        <main className="flex-1 flex flex-col overflow-hidden" style={{ background: '#FAF9F7' }}>
+        <main className="flex-1 flex flex-col overflow-hidden" style={{ background: C.bg }}>
 
           {/* PDF-style Toolbar */}
           <div
             className="flex items-center justify-between px-4 flex-shrink-0"
             style={{
               height: '48px',
-              background: '#FFFFFF',
+              background: C.white,
               borderBottom: '1px solid rgba(175,179,176,0.15)',
               boxShadow: '0px 1px 2px rgba(0,0,0,0.05)',
             }}
@@ -314,11 +327,11 @@ export default function NotesPage() {
                 className="cursor-pointer transition-all duration-150 p-1.5 rounded hover:bg-black/5 disabled:opacity-30"
                 disabled={currentPage <= 1}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#556071" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke=C.secondary strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
               </button>
-              <span className="text-xs" style={{ color: '#777C79' }}>
+              <span className="text-xs" style={{ color: C.muted }}>
                 {currentPage} / {totalPages}
               </span>
               <button
@@ -326,7 +339,7 @@ export default function NotesPage() {
                 className="cursor-pointer transition-all duration-150 p-1.5 rounded hover:bg-black/5 disabled:opacity-30"
                 disabled={currentPage >= totalPages}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#556071" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke=C.secondary strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
               </button>
@@ -334,9 +347,9 @@ export default function NotesPage() {
 
             {/* Center: Zoom */}
             <div className="flex items-center gap-2">
-              <button className="cursor-pointer transition-all duration-150 w-6 h-6 flex items-center justify-center rounded hover:bg-black/5" style={{ color: '#556071', fontSize: '16px' }}>−</button>
-              <span className="text-xs" style={{ color: '#2F3331', minWidth: '36px', textAlign: 'center' }}>125%</span>
-              <button className="cursor-pointer transition-all duration-150 w-6 h-6 flex items-center justify-center rounded hover:bg-black/5" style={{ color: '#556071', fontSize: '16px' }}>+</button>
+              <button className="cursor-pointer transition-all duration-150 w-6 h-6 flex items-center justify-center rounded hover:bg-black/5" style={{ color: C.secondary, fontSize: '16px' }}>−</button>
+              <span className="text-xs" style={{ color: C.fg, minWidth: '36px', textAlign: 'center' }}>125%</span>
+              <button className="cursor-pointer transition-all duration-150 w-6 h-6 flex items-center justify-center rounded hover:bg-black/5" style={{ color: C.secondary, fontSize: '16px' }}>+</button>
             </div>
 
             {/* Right: Download */}
@@ -346,7 +359,7 @@ export default function NotesPage() {
                 className="cursor-pointer transition-all duration-150 p-1.5 rounded hover:bg-black/5"
                 title="导出 Markdown"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#556071" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke=C.secondary strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                   <polyline points="7 10 12 15 17 10" />
                   <line x1="12" y1="15" x2="12" y2="3" />
@@ -356,7 +369,7 @@ export default function NotesPage() {
           </div>
 
           {/* Canvas area */}
-          <div className="flex-1 overflow-y-auto p-12" style={{ background: 'rgba(243,244,241,0.6)' }}>
+          <div className="flex-1 overflow-y-auto p-12" style={{ background: 'rgba(232,231,226,0.6)' }}>
             <div className="flex flex-col items-center gap-8 max-w-4xl mx-auto">
               {session.pages.map((page) => (
                 <div
@@ -373,20 +386,21 @@ export default function NotesPage() {
                   <div
                     className="relative w-full rounded-lg overflow-hidden"
                     style={{
-                      background: '#FFFFFF',
+                      background: C.white,
                       boxShadow: '0 4px 24px rgba(0,0,0,0.10)',
                     }}
                   >
-                    <img
-                      src={`${API_BASE}${page.slide_image_url}`}
-                      alt={`第${page.page_num}页`}
-                      className="w-full block"
+                    <embed
+                      src={`${API_BASE}${page.pdf_url}#page=${page.pdf_page_num}`}
+                      type="application/pdf"
+                      style={{ width: '100%', minHeight: '500px', display: 'block' }}
+                      title={`第${page.page_num}页`}
                     />
                     {/* Confidence warning */}
                     {page.alignment_confidence < 0.6 && (
                       <div
                         className="absolute top-3 right-3 text-xs px-2 py-0.5 rounded-full"
-                        style={{ background: '#F59E0B', color: '#FFFFFF' }}
+                        style={{ background: '#F59E0B', color: C.white }}
                       >
                         对齐置信度低
                       </div>
@@ -395,14 +409,14 @@ export default function NotesPage() {
                     <button
                       onClick={() => handleTimestampClick(page.page_start_time)}
                       className="absolute top-3 left-3 text-xs px-2 py-0.5 rounded cursor-pointer transition-all duration-150"
-                      style={{ background: 'rgba(47,51,49,0.7)', color: '#FFFFFF' }}
+                      style={{ background: 'rgba(47,51,49,0.7)', color: C.white }}
                     >
                       ▶ {formatTime(page.page_start_time)}
                     </button>
                     {/* Slide label bottom-right */}
                     <div
                       className="absolute bottom-3 right-3 text-xs px-2 py-0.5 rounded"
-                      style={{ background: 'rgba(47,51,49,0.5)', color: '#FFFFFF', letterSpacing: '0.05em' }}
+                      style={{ background: 'rgba(47,51,49,0.5)', color: C.white, letterSpacing: '0.05em' }}
                     >
                       SLIDE {String(page.page_num).padStart(2, '0')} / {String(totalPages).padStart(2, '0')}
                     </div>
@@ -416,14 +430,14 @@ export default function NotesPage() {
         {/* Right panel: Notes */}
         <aside
           className="flex-shrink-0 flex flex-col overflow-hidden"
-          style={{ width: '320px', background: '#FFFFFF', borderLeft: '1px solid rgba(175,179,176,0.1)' }}
+          style={{ width: '320px', background: C.white, borderLeft: '1px solid rgba(175,179,176,0.1)' }}
         >
           {/* Top: Pill toggle */}
           <div className="flex-shrink-0 px-6 pt-6 pb-4" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* Pill */}
             <div
               className="flex items-center p-1"
-              style={{ background: '#F3F4F1', borderRadius: '9999px' }}
+              style={{ background: C.sidebar, borderRadius: '9999px' }}
             >
               <button
                 onClick={() => setNoteMode('my')}
@@ -431,8 +445,8 @@ export default function NotesPage() {
                 style={{
                   borderRadius: '9999px',
                   fontWeight: noteMode === 'my' ? '500' : '400',
-                  background: noteMode === 'my' ? '#FFFFFF' : 'transparent',
-                  color: noteMode === 'my' ? '#2F3331' : '#777C79',
+                  background: noteMode === 'my' ? C.white : 'transparent',
+                  color: noteMode === 'my' ? C.fg : C.muted,
                   boxShadow: noteMode === 'my' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
                 }}
               >
@@ -444,19 +458,19 @@ export default function NotesPage() {
                 style={{
                   borderRadius: '9999px',
                   fontWeight: noteMode === 'ai' ? '500' : '400',
-                  background: noteMode === 'ai' ? '#FFFFFF' : 'transparent',
-                  color: noteMode === 'ai' ? '#2F3331' : '#777C79',
+                  background: noteMode === 'ai' ? C.white : 'transparent',
+                  color: noteMode === 'ai' ? C.fg : C.muted,
                   boxShadow: noteMode === 'ai' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
                 }}
               >
                 {noteMode === 'ai' && (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#556071" strokeWidth="2">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke=C.secondary strokeWidth="2">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                   </svg>
                 )}
                 AI Notes
                 {noteMode === 'ai' && (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#777C79" strokeWidth="2" strokeLinecap="round">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke=C.muted strokeWidth="2" strokeLinecap="round">
                     <polyline points="6 9 12 15 18 9" />
                   </svg>
                 )}
@@ -468,7 +482,7 @@ export default function NotesPage() {
           <div className="flex-1 overflow-y-auto px-6 pb-4">
             {/* Section label */}
             <div className="mb-4">
-              <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: '#777C79' }}>
+              <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.muted }}>
                 ACTIVE ANNOTATION
               </span>
             </div>
@@ -485,7 +499,7 @@ export default function NotesPage() {
                       </span>
                       <div className="flex-1 h-px" style={{ background: 'rgba(175,179,176,0.3)' }} />
                     </div>
-                    <p style={{ fontSize: '14px', color: '#2F3331', fontWeight: '500', lineHeight: '1.6' }}>
+                    <p style={{ fontSize: '14px', color: C.fg, fontWeight: '500', lineHeight: '1.6' }}>
                       {currentPageData.active_notes.user_note}
                     </p>
                   </div>
@@ -496,7 +510,7 @@ export default function NotesPage() {
                         <span style={{ fontSize: '11px', color: '#AFB3B0', fontWeight: '500' }}>{ann.time}</span>
                         <div className="flex-1 h-px" style={{ background: 'rgba(175,179,176,0.3)' }} />
                       </div>
-                      <p style={{ fontSize: '14px', color: '#2F3331', fontWeight: '500', lineHeight: '1.6' }}>
+                      <p style={{ fontSize: '14px', color: C.fg, fontWeight: '500', lineHeight: '1.6' }}>
                         {ann.note}
                       </p>
                     </div>
@@ -514,20 +528,20 @@ export default function NotesPage() {
                       </span>
                       <div className="flex-1 h-px" style={{ background: 'rgba(175,179,176,0.3)' }} />
                     </div>
-                    <p style={{ fontSize: '14px', color: '#2F3331', fontWeight: '500', lineHeight: '1.6', marginBottom: '12px' }}>
+                    <p style={{ fontSize: '14px', color: C.fg, fontWeight: '500', lineHeight: '1.6', marginBottom: '12px' }}>
                       {currentPageData.active_notes.user_note}
                     </p>
                     {/* AI clarification block */}
                     <div style={{ borderLeft: '2px solid rgba(85,96,113,0.2)', paddingLeft: '16px' }}>
                       <div className="flex items-center gap-1.5 mb-2">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#556071" strokeWidth="2">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke=C.secondary strokeWidth="2">
                           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                         </svg>
-                        <span style={{ fontSize: '9px', fontWeight: '700', letterSpacing: '0.08em', color: '#556071' }}>
+                        <span style={{ fontSize: '9px', fontWeight: '700', letterSpacing: '0.08em', color: C.secondary }}>
                           AI CLARIFICATION
                         </span>
                       </div>
-                      <p style={{ fontSize: '14px', color: '#374151', lineHeight: '1.6' }}>
+                      <p style={{ fontSize: '14px', color: C.fg, lineHeight: '1.6' }}>
                         {currentPageData.active_notes.ai_expansion}
                       </p>
                     </div>
@@ -539,20 +553,20 @@ export default function NotesPage() {
                         <span style={{ fontSize: '11px', color: '#AFB3B0', fontWeight: '500' }}>{ann.time}</span>
                         <div className="flex-1 h-px" style={{ background: 'rgba(175,179,176,0.3)' }} />
                       </div>
-                      <p style={{ fontSize: '14px', color: '#2F3331', fontWeight: '500', lineHeight: '1.6', marginBottom: '12px' }}>
+                      <p style={{ fontSize: '14px', color: C.fg, fontWeight: '500', lineHeight: '1.6', marginBottom: '12px' }}>
                         {ann.note}
                       </p>
                       {/* AI clarification block */}
                       <div style={{ borderLeft: '2px solid rgba(85,96,113,0.2)', paddingLeft: '16px' }}>
                         <div className="flex items-center gap-1.5 mb-2">
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#556071" strokeWidth="2">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke=C.secondary strokeWidth="2">
                             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                           </svg>
-                          <span style={{ fontSize: '9px', fontWeight: '700', letterSpacing: '0.08em', color: '#556071' }}>
+                          <span style={{ fontSize: '9px', fontWeight: '700', letterSpacing: '0.08em', color: C.secondary }}>
                             AI CLARIFICATION
                           </span>
                         </div>
-                        <p style={{ fontSize: '14px', color: '#374151', lineHeight: '1.6' }}>
+                        <p style={{ fontSize: '14px', color: C.fg, lineHeight: '1.6' }}>
                           {ann.aiComment}
                         </p>
                       </div>
@@ -564,7 +578,7 @@ export default function NotesPage() {
                 {currentPageData?.passive_notes && (
                   <div>
                     <div className="mb-3">
-                      <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: '#777C79' }}>
+                      <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.muted }}>
                         AI NOTES
                       </span>
                     </div>
@@ -573,9 +587,9 @@ export default function NotesPage() {
                         <div key={i} className="flex items-start gap-2">
                           <span style={{ color: '#AFB3B0', marginTop: '2px', flexShrink: 0 }}>•</span>
                           <button
-                            onClick={() => handleTimestampClick(bullet.timestamp)}
+                            onClick={() => handleTimestampClick(bullet.timestamp_start)}
                             className="text-left cursor-pointer transition-all duration-150"
-                            style={{ fontSize: '14px', color: '#2F3331', lineHeight: '1.6' }}
+                            style={{ fontSize: '14px', color: C.fg, lineHeight: '1.6' }}
                           >
                             {bullet.text}
                           </button>
@@ -601,8 +615,8 @@ export default function NotesPage() {
                 style={{
                   borderRadius: '9999px',
                   padding: '12px 52px 12px 16px',
-                  background: '#F3F4F1',
-                  color: '#2F3331',
+                  background: C.sidebar,
+                  color: C.fg,
                   border: 'none',
                 }}
               />
@@ -613,10 +627,10 @@ export default function NotesPage() {
                   width: '32px',
                   height: '32px',
                   borderRadius: '9999px',
-                  background: '#2F3331',
+                  background: C.fg,
                 }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke=C.white strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="22" y1="2" x2="11" y2="13" />
                   <polygon points="22 2 15 22 11 13 2 9 22 2" />
                 </svg>
@@ -631,7 +645,7 @@ export default function NotesPage() {
         className="flex-shrink-0 flex items-center justify-center"
         style={{
           height: '40px',
-          background: '#FAF9F7',
+          background: C.bg,
           borderTop: '1px solid rgba(175,179,176,0.1)',
           color: '#AFB3B0',
           fontSize: '11px',
@@ -644,7 +658,7 @@ export default function NotesPage() {
       {copyToast && (
         <div
           className="fixed bottom-12 left-1/2 -translate-x-1/2 text-sm px-4 py-2 rounded-full shadow-lg z-50"
-          style={{ background: '#2F3331', color: '#FFFFFF' }}
+          style={{ background: C.fg, color: C.white }}
         >
           已复制到剪贴板
         </div>

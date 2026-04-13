@@ -12,7 +12,8 @@
       "Bash(npx --yes figma-developer-mcp --help)",
       "Skill(update-config)",
       "mcp__figma__get_figma_data",
-      "Bash(python scripts/search.py \"academic lecture notes study tool productivity minimal editorial\" --design-system -p \"LiberStudy\" -f markdown)"
+      "Bash(python scripts/search.py \"academic lecture notes study tool productivity minimal editorial\" --design-system -p \"LiberStudy\" -f markdown)",
+      "mcp__figma__download_figma_images"
     ]
   }
 }
