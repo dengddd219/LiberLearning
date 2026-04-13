@@ -1,0 +1,882 @@
+[
+  {
+    "page_num": 1,
+    "is_off_slide": false,
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 1,
+    "ppt_text": "Practical aspects of training / validation",
+    "aligned_segments": [
+      {
+        "text": "Okay, so let's get started.",
+        "start": 90.0,
+        "end": 112.87999725341797,
+        "similarity": 0.14753802120685577
+      },
+      {
+        "text": "So before the break, we have mentioned that you should try to train a model with two layers and a model with six layers.",
+        "start": 112.87999725341797,
+        "end": 124.31999969482422,
+        "similarity": 0.32574713230133057
+      },
+      {
+        "text": "And one thing that you may have observed is that a six-layer model may not be as good as a simple model.",
+        "start": 124.31999969482422,
+        "end": 133.63999938964844,
+        "similarity": 0.23272496461868286
+      },
+      {
+        "text": "And this is weird because we have mentioned that deep neural network becomes powerful because we have more layers.",
+        "start": 133.63999938964844,
+        "end": 143.60000610351562,
+        "similarity": 0.15984074771404266
+      },
+      {
+        "text": "But now this is not the case.",
+        "start": 143.60000610351562,
+        "end": 145.9600067138672,
+        "similarity": 0.060736291110515594
+      },
+      {
+        "text": "So in the rest of this lecture, we are going to discuss several practical aspects in training neural network models.",
+        "start": 145.9600067138672,
+        "end": 155.97999572753906,
+        "similarity": 0.5314645171165466
+      },
+      {
+        "text": "So let's start with the easy thing.",
+        "start": 155.97999572753906,
+        "end": 159.16000366210938,
+        "similarity": 0.15551277995109558
+      },
+      {
+        "text": "Let's consider a practical scenario in our real life.",
+        "start": 159.16000366210938,
+        "end": 163.63999938964844,
+        "similarity": 0.3753921687602997
+      }
+    ],
+    "page_start_time": 90.0,
+    "page_end_time": 163.63999938964844,
+    "alignment_confidence": 0.24861957784742117,
+    "page_supplement": null,
+    "passive_notes": {
+      "bullets": [
+        {
+          "ppt_bullet": "Practical aspects of training / validation",
+          "ai_comment": "The teacher motivates this topic by noting that a 6-layer model may surprisingly underperform a simpler 2-layer model, which contradicts the expectation that deeper networks are always more powerful. The rest of the lecture is dedicated to discussing practical aspects of training neural networks to address such issues.",
+          "timestamp_start": 124,
+          "timestamp_end": 159,
+          "transcript_excerpt": "So in the rest of this lecture, we are going to discuss several practical aspects in training neural network models."
+        }
+      ]
+    },
+    "active_notes": null,
+    "status": "ready",
+    "_cost": {
+      "input_tokens": 908,
+      "output_tokens": 164,
+      "elapsed_s": 11.237,
+      "attempts": 1,
+      "provider": "中转站",
+      "model": "claude-sonnet-4-6",
+      "endpoint": "https://claude-zhongzhuan.cloud"
+    }
+  },
+  {
+    "page_num": 2,
+    "is_off_slide": false,
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 2,
+    "ppt_text": "Predict Who Will Repay TheirLoans •A lender hires you to investigate who will repay their  loans •You are given complete files on 100 •5 defaulted within 3 years Image creditdebt.org",
+    "aligned_segments": [
+      {
+        "text": "That is, I may want to predict who will repay their loan and who will default.",
+        "start": 163.63999938964844,
+        "end": 169.52000427246094,
+        "similarity": 0.6159856915473938
+      },
+      {
+        "text": "So in such a scenario, a lender helps you to investigate this problem and you are given the files of 100 applicants.",
+        "start": 169.52000427246094,
+        "end": 179.47999572753906,
+        "similarity": 0.5401633977890015
+      },
+      {
+        "text": "Among these 100 applicants, there are five of them defaulted within three years.",
+        "start": 179.47999572753906,
+        "end": 186.0,
+        "similarity": 0.5745304822921753
+      },
+      {
+        "text": "So your goal is to build a model and predict who else is going to default.",
+        "start": 186.0,
+        "end": 193.8000030517578,
+        "similarity": 0.44255340099334717
+      }
+    ],
+    "page_start_time": 163.63999938964844,
+    "page_end_time": 193.8000030517578,
+    "alignment_confidence": 0.5433082431554794,
+    "page_supplement": null,
+    "passive_notes": {
+      "bullets": [
+        {
+          "ppt_bullet": "Predict Who Will Repay Their Loans",
+          "ai_comment": "The teacher framed this as a prediction problem: identifying who will repay their loan and who will default. The goal is to build a model to predict future defaulters.",
+          "timestamp_start": 163,
+          "timestamp_end": 193,
+          "transcript_excerpt": "I may want to predict who will repay their loan and who will default. So your goal is to build a model and predict who else is going to default."
+        },
+        {
+          "ppt_bullet": "A lender hires you to investigate who will repay their loans",
+          "ai_comment": "The teacher described a scenario where a lender brings you in to investigate the repayment problem, providing files on loan applicants as your data source.",
+          "timestamp_start": 169,
+          "timestamp_end": 179,
+          "transcript_excerpt": "A lender helps you to investigate this problem and you are given the files of 100 applicants."
+        },
+        {
+          "ppt_bullet": "You are given complete files on 100",
+          "ai_comment": "The teacher confirmed that the dataset consists of complete files for 100 applicants, which serve as the basis for building the prediction model.",
+          "timestamp_start": 169,
+          "timestamp_end": 179,
+          "transcript_excerpt": "You are given the files of 100 applicants."
+        },
+        {
+          "ppt_bullet": "5 defaulted within 3 years",
+          "ai_comment": "The teacher specified that out of the 100 applicants, exactly five of them defaulted within three years, establishing the labeled examples for the model.",
+          "timestamp_start": 179,
+          "timestamp_end": 186,
+          "transcript_excerpt": "Among these 100 applicants, there are five of them defaulted within three years."
+        }
+      ]
+    },
+    "active_notes": null,
+    "status": "ready",
+    "_cost": {
+      "input_tokens": 867,
+      "output_tokens": 480,
+      "elapsed_s": 17.094,
+      "attempts": 1,
+      "provider": "中转站",
+      "model": "claude-sonnet-4-6",
+      "endpoint": "https://claude-zhongzhuan.cloud"
+    }
+  },
+  {
+    "page_num": 3,
+    "is_off_slide": false,
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 3,
+    "ppt_text": "A Surprising Finding\n• All 5 people who defaulted wore blue shirts during interviews\n• Your model may find this strong signal as well",
+    "aligned_segments": [
+      {
+        "text": "For such a job, what you may find is they give you some photos and they find that all the five people who defaulted worn blue shirts during their interviews.",
+        "start": 193.8000030517578,
+        "end": 207.27999877929688,
+        "similarity": 0.6414581537246704
+      },
+      {
+        "text": "And your model also find that blue shirts is a strong signal for default.",
+        "start": 207.27999877929688,
+        "end": 214.17999267578125,
+        "similarity": 0.7144150733947754
+      },
+      {
+        "text": "So whether this is a valid feature or whether there are some problem when we make this conclusion.",
+        "start": 214.17999267578125,
+        "end": 223.16000366210938,
+        "similarity": 0.2270875722169876
+      },
+      {
+        "text": "This is a very classic problem of overfitting or there's no codal evidence that blue shirts actually predict applicant's default behavior, right?",
+        "start": 223.16000366210938,
+        "end": 241.52000427246094,
+        "similarity": 0.6312313675880432
+      },
+      {
+        "text": "The reason is because all of them are wearing blue shirts.",
+        "start": 241.52000427246094,
+        "end": 245.32000732421875,
+        "similarity": 0.5062988996505737
+      },
+      {
+        "text": "So you cannot say only those who default wear such a blue shirts.",
+        "start": 245.32000732421875,
+        "end": 250.44000244140625,
+        "similarity": 0.5238267183303833
+      },
+      {
+        "text": "This is one thing.",
+        "start": 250.44000244140625,
+        "end": 251.44000244140625,
+        "similarity": 0.18298214673995972
+      },
+      {
+        "text": "And the other thing is using human logic, we know that the color of the shirts should have no codal inference with whether he's going to default or not.",
+        "start": 251.44000244140625,
+        "end": 264.1199951171875,
+        "similarity": 0.45718681812286377
+      },
+      {
+        "text": "So because of that, we know that this feature may not be a valid feature.",
+        "start": 264.1199951171875,
+        "end": 270.7799987792969,
+        "similarity": 0.15429726243019104
+      }
+    ],
+    "page_start_time": 193.8000030517578,
+    "page_end_time": 270.7799987792969,
+    "alignment_confidence": 0.4487537791331609,
+    "page_supplement": null,
+    "passive_notes": {
+      "bullets": [
+        {
+          "ppt_bullet": "A Surprising Finding",
+          "ai_comment": "The teacher introduces an example of a counterintuitive and misleading pattern discovered in loan default data. This sets up a discussion about overfitting and spurious correlations.",
+          "timestamp_start": 193,
+          "timestamp_end": 207,
+          "transcript_excerpt": "For such a job, what you may find is they give you some photos and they find that all the five people who defaulted worn blue shirts during their interviews."
+        },
+        {
+          "ppt_bullet": "• All 5 people who defaulted wore blue shirts during interviews",
+          "ai_comment": "The teacher explains that in this scenario, every single defaulting applicant happened to wear a blue shirt, which is a coincidental pattern with no causal basis. He warns this is a classic overfitting problem with no causal evidence linking shirt color to default behavior.",
+          "timestamp_start": 193,
+          "timestamp_end": 261,
+          "transcript_excerpt": "All the five people who defaulted worn blue shirts during their interviews... There's no codal evidence that blue shirts actually predict applicant's default behavior. The reason is because all of them are wearing blue shirts, so you cannot say only those who default wear such a blue shirts."
+        },
+        {
+          "ppt_bullet": "• Your model may find this strong signal as well",
+          "ai_comment": "The teacher points out that a machine learning model can mistakenly pick up blue shirts as a strong predictive signal, illustrating how models can learn spurious patterns. Using human logic, we know shirt color has no causal inference with default behavior, so this would not be a valid feature.",
+          "timestamp_start": 207,
+          "timestamp_end": 270,
+          "transcript_excerpt": "Your model also find that blue shirts is a strong signal for default... using human logic, we know that the color of the shirts should have no codal inference with whether he's going to default or not. So because of that, we know that this feature may not be a valid feature."
+        }
+      ]
+    },
+    "active_notes": null,
+    "status": "ready",
+    "_cost": {
+      "input_tokens": 993,
+      "output_tokens": 504,
+      "elapsed_s": 14.763,
+      "attempts": 1,
+      "provider": "中转站",
+      "model": "claude-sonnet-4-6",
+      "endpoint": "https://claude-zhongzhuan.cloud"
+    }
+  },
+  {
+    "page_num": 4,
+    "is_off_slide": false,
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 4,
+    "ppt_text": "Training Error and Generalization Error\n• Training error (bias): model error on the training data\n• Generalization error (variance): model error on new data\n• Example: practice a future exam with past exams\n• Doing well on past exams (training error) doesn’t guarantee a  good score on the future exam (generalization error)\n• Student A gets 0 error on past exams by rote learning\n• Student B  understands the reasons for givenanswers",
+    "aligned_segments": [
+      {
+        "text": "And this introduced our classic discussion of training error and generalization error.",
+        "start": 270.7799987792969,
+        "end": 277.5,
+        "similarity": 0.5706806182861328
+      },
+      {
+        "text": "training error means the error on the training data set.",
+        "start": 277.5,
+        "end": 282.70001220703125,
+        "similarity": 0.5626385807991028
+      },
+      {
+        "text": "And generalization error refers to your error on a new data.",
+        "start": 282.70001220703125,
+        "end": 287.5799865722656,
+        "similarity": 0.5803918242454529
+      },
+      {
+        "text": "And we always say that the performance on the training data does not represent the performance on a new data set.",
+        "start": 287.5799865722656,
+        "end": 296.4599914550781,
+        "similarity": 0.3545713722705841
+      },
+      {
+        "text": "This is very similar to we make practices for a future exam with past exams.",
+        "start": 296.4599914550781,
+        "end": 303.260009765625,
+        "similarity": 0.3434404134750366
+      },
+      {
+        "text": "For those who do well on past exam, that means you get a very small training error that does not guarantee a good score on the future exam, where the future exam actually represent the generalization error, right?",
+        "start": 303.260009765625,
+        "end": 319.2200012207031,
+        "similarity": 0.6678677797317505
+      },
+      {
+        "text": "And one student may get zero error on past exam by root learning.",
+        "start": 319.2200012207031,
+        "end": 324.5400085449219,
+        "similarity": 0.49195003509521484
+      },
+      {
+        "text": "That means he remember all the answers mechanically.",
+        "start": 324.5400085449219,
+        "end": 329.0199890136719,
+        "similarity": 0.22774450480937958
+      },
+      {
+        "text": "But that student may have a worse score compared to another student who understand the reasons for a given number of answers.",
+        "start": 329.0199890136719,
+        "end": 337.760009765625,
+        "similarity": 0.3949470520019531
+      },
+      {
+        "text": "So even if student B may not have good score on past exam, may not that good at past exam, as long as he can understand the reasonings, he should be able to have a higher score.",
+        "start": 337.760009765625,
+        "end": 350.6199951171875,
+        "similarity": 0.4641662836074829
+      },
+      {
+        "text": "So this is the trade-off we have mentioned in your Model 3 class about training and generalization or they call it bias and virus in some cases, right?",
+        "start": 350.6199951171875,
+        "end": 363.1000061035156,
+        "similarity": 0.5385513305664062
+      },
+      {
+        "text": "So because of that, we need to evaluate our model to understand whether it has a good generalization performance.",
+        "start": 363.1000061035156,
+        "end": 372.3399963378906,
+        "similarity": 0.44765231013298035
+      }
+    ],
+    "page_start_time": 270.7799987792969,
+    "page_end_time": 372.3399963378906,
+    "alignment_confidence": 0.47038350875178975,
+    "page_supplement": null,
+    "passive_notes": {
+      "bullets": [
+        {
+          "ppt_bullet": "Training Error and Generalization Error",
+          "ai_comment": "The teacher introduced training error and generalization error as a classic discussion topic. These two concepts are also referred to as bias and variance in some contexts.",
+          "timestamp_start": 270,
+          "timestamp_end": 277,
+          "transcript_excerpt": "And this introduced our classic discussion of training error and generalization error."
+        },
+        {
+          "ppt_bullet": "• Training error (bias): model error on the training data",
+          "ai_comment": "Training error is defined as the error measured on the training dataset. It is also referred to as bias.",
+          "timestamp_start": 277,
+          "timestamp_end": 282,
+          "transcript_excerpt": "training error means the error on the training data set."
+        },
+        {
+          "ppt_bullet": "• Generalization error (variance): model error on new data",
+          "ai_comment": "Generalization error refers to the model's error on new, unseen data. The teacher noted this is sometimes called variance.",
+          "timestamp_start": 282,
+          "timestamp_end": 303,
+          "transcript_excerpt": "And generalization error refers to your error on a new data... this is the trade-off we have mentioned... about training and generalization or they call it bias and virus in some cases."
+        },
+        {
+          "ppt_bullet": "• Example: practice a future exam with past exams",
+          "ai_comment": "The teacher used the analogy of preparing for a future exam using past exams to illustrate the difference between training and generalization error.",
+          "timestamp_start": 296,
+          "timestamp_end": 303,
+          "transcript_excerpt": "This is very similar to we make practices for a future exam with past exams."
+        },
+        {
+          "ppt_bullet": "• Doing well on past exams (training error) doesn't guarantee a  good score on the future exam (generalization error)",
+          "ai_comment": "The teacher emphasized that a low training error (doing well on past exams) does not guarantee good generalization performance (a good score on the future exam).",
+          "timestamp_start": 303,
+          "timestamp_end": 319,
+          "transcript_excerpt": "For those who do well on past exam, that means you get a very small training error that does not guarantee a good score on the future exam, where the future exam actually represent the generalization error, right?"
+        },
+        {
+          "ppt_bullet": "• Student A gets 0 error on past exams by rote learning",
+          "ai_comment": "Student A achieves zero error on past exams by mechanically memorizing all the answers (rote learning), but this does not reflect true understanding.",
+          "timestamp_start": 319,
+          "timestamp_end": 329,
+          "transcript_excerpt": "And one student may get zero error on past exam by root learning. That means he remember all the answers mechanically."
+        },
+        {
+          "ppt_bullet": "• Student B  understands the reasons for givenanswers",
+          "ai_comment": "Student B may not score as high on past exams but understands the reasoning behind the answers, which leads to better performance on the future (generalization) exam.",
+          "timestamp_start": 329,
+          "timestamp_end": 350,
+          "transcript_excerpt": "But that student may have a worse score compared to another student who understand the reasons for a given number of answers. So even if student B may not have good score on past exam... as long as he can understand the reasonings, he should be able to have a higher score."
+        }
+      ]
+    },
+    "active_notes": null,
+    "status": "ready",
+    "_cost": {
+      "input_tokens": 1196,
+      "output_tokens": 892,
+      "elapsed_s": 20.18,
+      "attempts": 1,
+      "provider": "中转站",
+      "model": "claude-sonnet-4-6",
+      "endpoint": "https://claude-zhongzhuan.cloud"
+    }
+  },
+  {
+    "page_num": 5,
+    "is_off_slide": false,
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 5,
+    "ppt_text": "Validation Dataset and TestDataset\n• Validation dataset: a dataset used to evaluate themodel\n• Should not be mixed with the training data (#1 mistake)\n• Model selection purpose •Test dataset: a dataset can be used once, e.g.\n• A future exam\n• The house sale price I bided\n• Dataset used in private leaderboard in Kaggle",
+    "aligned_segments": [
+      {
+        "text": "So in this process, we say that we can have two data sets.",
+        "start": 372.3399963378906,
+        "end": 377.260009765625,
+        "similarity": 0.29128915071487427
+      },
+      {
+        "text": "One data set is called validation data set.",
+        "start": 377.260009765625,
+        "end": 380.260009765625,
+        "similarity": 0.6586933135986328
+      },
+      {
+        "text": "This is the data used to evaluate the model.",
+        "start": 380.260009765625,
+        "end": 383.9800109863281,
+        "similarity": 0.4504023492336273
+      },
+      {
+        "text": "And this data should not be mixed with your training data.",
+        "start": 383.9800109863281,
+        "end": 387.1400146484375,
+        "similarity": 0.38177841901779175
+      },
+      {
+        "text": "And the validation data set will be used to do model selection, which model should I train.",
+        "start": 387.1400146484375,
+        "end": 395.29998779296875,
+        "similarity": 0.6164215803146362
+      },
+      {
+        "text": "The test data set will be the data set that to evaluate your final performance.",
+        "start": 395.29998779296875,
+        "end": 401.1400146484375,
+        "similarity": 0.4702204465866089
+      },
+      {
+        "text": "So that could be a future exam or the health cell price I bid it or the data set we use to determine the final winner on a Kaggle computation that is called private leaderboard.",
+        "start": 401.1400146484375,
+        "end": 415.05999755859375,
+        "similarity": 0.3924456834793091
+      },
+      {
+        "text": "So in your homework 2, you will actually have such a test data set.",
+        "start": 415.05999755859375,
+        "end": 421.29998779296875,
+        "similarity": 0.37247440218925476
+      }
+    ],
+    "page_start_time": 372.3399963378906,
+    "page_end_time": 421.29998779296875,
+    "alignment_confidence": 0.4542156681418419,
+    "page_supplement": null,
+    "passive_notes": {
+      "bullets": [
+        {
+          "ppt_bullet": "Validation Dataset and TestDataset",
+          "ai_comment": "The teacher introduced the concept of having two separate datasets in the model evaluation process. This slide covers both validation and test datasets as distinct concepts.",
+          "timestamp_start": 372,
+          "timestamp_end": 377,
+          "transcript_excerpt": "So in this process, we say that we can have two data sets."
+        },
+        {
+          "ppt_bullet": "• Validation dataset: a dataset used to evaluate the model",
+          "ai_comment": "The teacher defined the validation dataset as the data used to evaluate the model during training. It is one of the two datasets introduced in this section.",
+          "timestamp_start": 377,
+          "timestamp_end": 383,
+          "transcript_excerpt": "One data set is called validation data set. This is the data used to evaluate the model."
+        },
+        {
+          "ppt_bullet": "• Should not be mixed with the training data (#1 mistake)",
+          "ai_comment": "The teacher explicitly warned that the validation data should never be mixed with the training data, highlighting it as a critical rule to follow.",
+          "timestamp_start": 383,
+          "timestamp_end": 387,
+          "transcript_excerpt": "And this data should not be mixed with your training data."
+        },
+        {
+          "ppt_bullet": "• Model selection purpose •Test dataset: a dataset can be used once, e.g.",
+          "ai_comment": "The teacher explained that the validation dataset is used for model selection, while the test dataset is reserved to evaluate final performance and is used only once.",
+          "timestamp_start": 387,
+          "timestamp_end": 401,
+          "transcript_excerpt": "The validation data set will be used to do model selection, which model should I train. The test data set will be the data set that to evaluate your final performance."
+        },
+        {
+          "ppt_bullet": "• A future exam",
+          "ai_comment": "The teacher used a future exam as a real-life analogy for a test dataset — something you can only take once and cannot use to adjust your preparation afterward.",
+          "timestamp_start": 401,
+          "timestamp_end": 415,
+          "transcript_excerpt": "So that could be a future exam or the health cell price I bid it or the data set we use to determine the final winner on a Kaggle computation that is called private leaderboard."
+        },
+        {
+          "ppt_bullet": "• The house sale price I bided",
+          "ai_comment": "The teacher used the example of a house sale price they bid on as another analogy for a one-time-use test dataset, representing a real-world outcome you cannot revisit.",
+          "timestamp_start": 401,
+          "timestamp_end": 415,
+          "transcript_excerpt": "So that could be a future exam or the health cell price I bid it or the data set we use to determine the final winner on a Kaggle computation that is called private leaderboard."
+        },
+        {
+          "ppt_bullet": "• Dataset used in private leaderboard in Kaggle",
+          "ai_comment": "The teacher explained that in Kaggle competitions, the private leaderboard dataset is a test dataset used to determine the final winner, and it is only revealed once at the end.",
+          "timestamp_start": 401,
+          "timestamp_end": 421,
+          "transcript_excerpt": "The data set we use to determine the final winner on a Kaggle computation that is called private leaderboard. So in your homework 2, you will actually have such a test data set."
+        }
+      ]
+    },
+    "active_notes": null,
+    "status": "ready",
+    "_cost": {
+      "input_tokens": 1003,
+      "output_tokens": 879,
+      "elapsed_s": 20.479,
+      "attempts": 1,
+      "provider": "中转站",
+      "model": "claude-sonnet-4-6",
+      "endpoint": "https://claude-zhongzhuan.cloud"
+    }
+  },
+  {
+    "page_num": 6,
+    "is_off_slide": false,
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 6,
+    "ppt_text": "• Previous ML: 70/30\n• Big data: 1,000,000 10,000 10,000\n• Percentages: 98/1/1\n• Percentages: 99.5/0.4/0.1\n• K-fold CV is expensive for deep learning",
+    "aligned_segments": [
+      {
+        "text": "So I'm sure you have learned how to use training validation and test the procedure in the machine learning course.",
+        "start": 421.29998779296875,
+        "end": 432.6199951171875,
+        "similarity": 0.3851465582847595
+      },
+      {
+        "text": ", you may have learned I should split the data 70-30.",
+        "start": 432.6199951171875,
+        "end": 438.17999267578125,
+        "similarity": 0.3907056450843811
+      },
+      {
+        "text": "This is the most classic way.",
+        "start": 438.17999267578125,
+        "end": 439.6600036621094,
+        "similarity": 0.1517949104309082
+      },
+      {
+        "text": "And you have also learned about k-fold cross-validation.",
+        "start": 439.6600036621094,
+        "end": 443.17999267578125,
+        "similarity": 0.38930657505989075
+      },
+      {
+        "text": "However, all of them are not applicable for deep learning models.",
+        "start": 443.17999267578125,
+        "end": 451.1000061035156,
+        "similarity": 0.4158102869987488
+      },
+      {
+        "text": "So k-fold cross-validation is too expensive because you have known that training a deep learning model should take hours or even millions of hours.",
+        "start": 451.1000061035156,
+        "end": 460.260009765625,
+        "similarity": 0.5210007429122925
+      },
+      {
+        "text": "So because of that, it is impossible to just determine which model structure is better using k-fold.",
+        "start": 460.260009765625,
+        "end": 467.5199890136719,
+        "similarity": 0.37003031373023987
+      },
+      {
+        "text": "On the other hand, splitting the data in a 70-30 proportion may also not a good idea because now I have a very large data.",
+        "start": 467.5199890136719,
+        "end": 480.20001220703125,
+        "similarity": 0.41553372144699097
+      },
+      {
+        "text": "I may have 1 million or even 1 billion data points.",
+        "start": 480.20001220703125,
+        "end": 483.8800048828125,
+        "similarity": 0.4146943688392639
+      },
+      {
+        "text": "In that case, using 30% of the data to be validation or testing data may be a waste of your data.",
+        "start": 483.8800048828125,
+        "end": 491.6000061035156,
+        "similarity": 0.42862486839294434
+      },
+      {
+        "text": "So because of that, for deep learning, people usually leave 10,000 or 1,000 data points as testing data and use all the other data as training data.",
+        "start": 491.6000061035156,
+        "end": 503.1199951171875,
+        "similarity": 0.5132189393043518
+      },
+      {
+        "text": "So the percentage of training validation and testing could be very extreme.",
+        "start": 503.1199951171875,
+        "end": 507.9200134277344,
+        "similarity": 0.40971270203590393
+      },
+      {
+        "text": "It could be 98% for training and 1% for validation and test.",
+        "start": 507.9200134277344,
+        "end": 512.52001953125,
+        "similarity": 0.4886245131492615
+      },
+      {
+        "text": "Or even if you have really 1 million data, then I will only leave 5,000 for validation and testing and use all the 99.5% of the data to train the model.",
+        "start": 512.52001953125,
+        "end": 523.8800048828125,
+        "similarity": 0.4729098975658417
+      },
+      {
+        "text": "So this is a difference between traditional machine learning model training as well as deep learning model training.",
+        "start": 523.8800048828125,
+        "end": 532.280029296875,
+        "similarity": 0.37493202090263367
+      },
+      {
+        "text": "And here we have mentioned two concepts.",
+        "start": 532.280029296875,
+        "end": 535.3200073242188,
+        "similarity": 0.1278860718011856
+      }
+    ],
+    "page_start_time": 421.29998779296875,
+    "page_end_time": 535.3200073242188,
+    "alignment_confidence": 0.3918707584962249,
+    "page_supplement": null,
+    "passive_notes": {
+      "bullets": [
+        {
+          "ppt_bullet": "Previous ML: 70/30",
+          "ai_comment": "In traditional ML courses, students learned to split data 70-30, which is the most classic approach. However, the teacher explains this is not ideal for deep learning with large datasets.",
+          "timestamp_start": 432,
+          "timestamp_end": 467,
+          "transcript_excerpt": "you may have learned I should split the data 70-30. This is the most classic way. However, all of them are not applicable for deep learning models."
+        },
+        {
+          "ppt_bullet": "Big data: 1,000,000 10,000 10,000",
+          "ai_comment": "With very large datasets (e.g., 1 million points), using 30% for validation/test is wasteful, so deep learning practitioners typically reserve only around 10,000 points each for validation and testing.",
+          "timestamp_start": 467,
+          "timestamp_end": 503,
+          "transcript_excerpt": "I may have 1 million or even 1 billion data points. In that case, using 30% of the data to be validation or testing data may be a waste of your data. So because of that, for deep learning, people usually leave 10,000 or 1,000 data points as testing data and use all the other data as training data."
+        },
+        {
+          "ppt_bullet": "Percentages: 98/1/1",
+          "ai_comment": "When data is large enough, the split percentages become very extreme, such as 98% for training and only 1% each for validation and test.",
+          "timestamp_start": 503,
+          "timestamp_end": 512,
+          "transcript_excerpt": "So the percentage of training validation and testing could be very extreme. It could be 98% for training and 1% for validation and test."
+        },
+        {
+          "ppt_bullet": "Percentages: 99.5/0.4/0.1",
+          "ai_comment": "With truly massive datasets of around 1 million points, only 5,000 samples are reserved for validation and testing combined, leaving 99.5% of the data for training.",
+          "timestamp_start": 512,
+          "timestamp_end": 523,
+          "transcript_excerpt": "Or even if you have really 1 million data, then I will only leave 5,000 for validation and testing and use all the 99.5% of the data to train the model."
+        },
+        {
+          "ppt_bullet": "K-fold CV is expensive for deep learning",
+          "ai_comment": "K-fold cross-validation is impractical for deep learning because training a single model can take hours or even much longer, making it impossible to train multiple folds just to compare model structures.",
+          "timestamp_start": 451,
+          "timestamp_end": 467,
+          "transcript_excerpt": "k-fold cross-validation is too expensive because you have known that training a deep learning model should take hours or even millions of hours. So because of that, it is impossible to just determine which model structure is better using k-fold."
+        }
+      ]
+    },
+    "active_notes": null,
+    "status": "ready",
+    "_cost": {
+      "input_tokens": 1257,
+      "output_tokens": 770,
+      "elapsed_s": 23.632,
+      "attempts": 1,
+      "provider": "中转站",
+      "model": "claude-sonnet-4-6",
+      "endpoint": "https://claude-zhongzhuan.cloud"
+    }
+  },
+  {
+    "page_num": 7,
+    "is_off_slide": false,
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 7,
+    "ppt_text": "Hyperparameter:\n•  Learning rate\n•  Batch size\n•  #hidden layers\n•  #hidden units\n•  Choice of activation function\n• ...\n•  Model selection",
+    "aligned_segments": [
+      {
+        "text": "One is called parameter.",
+        "start": 535.3200073242188,
+        "end": 536.8800048828125,
+        "similarity": 0.38853684067726135
+      },
+      {
+        "text": "The other is called hyperparameters.",
+        "start": 536.8800048828125,
+        "end": 540.280029296875,
+        "similarity": 0.5427311658859253
+      },
+      {
+        "text": "Parameters in neural networks refers to the weight and bias.",
+        "start": 540.280029296875,
+        "end": 547.0,
+        "similarity": 0.47951728105545044
+      },
+      {
+        "text": "Hyperparameters are the parameters that you are going to choose using model selection.",
+        "start": 547.0,
+        "end": 552.760009765625,
+        "similarity": 0.6921634674072266
+      },
+      {
+        "text": "And your model selection criteria is the performance on the validation data set.",
+        "start": 552.760009765625,
+        "end": 558.5599975585938,
+        "similarity": 0.4012431204319
+      },
+      {
+        "text": "So far, we have mentioned so many hyperparameters learning rate, epochs, batch size, hidden layers, hidden units, so on and so forth.",
+        "start": 558.5599975585938,
+        "end": 567.280029296875,
+        "similarity": 0.6307991147041321
+      }
+    ],
+    "page_start_time": 535.3200073242188,
+    "page_end_time": 567.280029296875,
+    "alignment_confidence": 0.5224984983603159,
+    "page_supplement": null,
+    "passive_notes": {
+      "bullets": [
+        {
+          "ppt_bullet": "Hyperparameter:",
+          "ai_comment": "Hyperparameters are distinct from parameters (weights and biases) and are chosen via model selection based on validation set performance.",
+          "timestamp_start": 536,
+          "timestamp_end": 552,
+          "transcript_excerpt": "Hyperparameters are the parameters that you are going to choose using model selection. And your model selection criteria is the performance on the validation data set."
+        },
+        {
+          "ppt_bullet": "Learning rate",
+          "ai_comment": "The teacher listed learning rate as one of the many hyperparameters introduced so far in the course.",
+          "timestamp_start": 558,
+          "timestamp_end": 567,
+          "transcript_excerpt": "So far, we have mentioned so many hyperparameters learning rate, epochs, batch size, hidden layers, hidden units, so on and so forth."
+        },
+        {
+          "ppt_bullet": "Batch size",
+          "ai_comment": "Batch size was explicitly listed as one of the hyperparameters mentioned throughout the course.",
+          "timestamp_start": 558,
+          "timestamp_end": 567,
+          "transcript_excerpt": "So far, we have mentioned so many hyperparameters learning rate, epochs, batch size, hidden layers, hidden units, so on and so forth."
+        },
+        {
+          "ppt_bullet": "#hidden layers",
+          "ai_comment": "The number of hidden layers was listed as one of the many hyperparameters covered so far.",
+          "timestamp_start": 558,
+          "timestamp_end": 567,
+          "transcript_excerpt": "So far, we have mentioned so many hyperparameters learning rate, epochs, batch size, hidden layers, hidden units, so on and so forth."
+        },
+        {
+          "ppt_bullet": "#hidden units",
+          "ai_comment": "The number of hidden units was explicitly mentioned as one of the hyperparameters introduced in the course.",
+          "timestamp_start": 558,
+          "timestamp_end": 567,
+          "transcript_excerpt": "So far, we have mentioned so many hyperparameters learning rate, epochs, batch size, hidden layers, hidden units, so on and so forth."
+        },
+        {
+          "ppt_bullet": "Choice of activation function",
+          "ai_comment": "(not covered in lecture)",
+          "timestamp_start": -1,
+          "timestamp_end": -1,
+          "transcript_excerpt": ""
+        },
+        {
+          "ppt_bullet": "...",
+          "ai_comment": "The teacher implied there are additional hyperparameters beyond those listed, using 'so on and so forth'.",
+          "timestamp_start": 558,
+          "timestamp_end": 567,
+          "transcript_excerpt": "So far, we have mentioned so many hyperparameters learning rate, epochs, batch size, hidden layers, hidden units, so on and so forth."
+        },
+        {
+          "ppt_bullet": "Model selection",
+          "ai_comment": "Model selection is the process used to choose hyperparameters, with the validation dataset performance serving as the selection criterion.",
+          "timestamp_start": 547,
+          "timestamp_end": 558,
+          "transcript_excerpt": "Hyperparameters are the parameters that you are going to choose using model selection. And your model selection criteria is the performance on the validation data set."
+        }
+      ]
+    },
+    "active_notes": null,
+    "status": "ready",
+    "_cost": {
+      "input_tokens": 897,
+      "output_tokens": 841,
+      "elapsed_s": 27.797,
+      "attempts": 1,
+      "provider": "中转站",
+      "model": "claude-sonnet-4-6",
+      "endpoint": "https://claude-zhongzhuan.cloud"
+    }
+  },
+  {
+    "page_num": 8,
+    "is_off_slide": false,
+    "pdf_url": "/slides/slides.pdf",
+    "pdf_page_num": 8,
+    "ppt_text": "•Training dataset: train parameters with givenhyper-parameters •Validation dataset: choose hyper-parameters •Test dataset: leave it alone",
+    "aligned_segments": [
+      {
+        "text": "All of them should be determined using the validation data set.",
+        "start": 567.280029296875,
+        "end": 573.6400146484375,
+        "similarity": 0.48632824420928955
+      },
+      {
+        "text": "So how to decide what is the best combination of hyperparameters?",
+        "start": 573.6400146484375,
+        "end": 579.52001953125,
+        "similarity": 0.5437984466552734
+      }
+    ],
+    "page_start_time": 567.280029296875,
+    "page_end_time": 579.52001953125,
+    "alignment_confidence": 0.5150633454322815,
+    "page_supplement": null,
+    "passive_notes": {
+      "bullets": [
+        {
+          "ppt_bullet": "Training dataset: train parameters with given hyper-parameters",
+          "ai_comment": "(not covered in lecture)",
+          "transcript_excerpt": "",
+          "timestamp_start": -1,
+          "timestamp_end": -1
+        },
+        {
+          "ppt_bullet": "Validation dataset: choose hyper-parameters",
+          "ai_comment": "The teacher emphasized that hyperparameters should all be determined using the validation dataset, and posed the question of how to find the best combination.",
+          "transcript_excerpt": "All of them should be determined using the validation data set. So how to decide what is the best combination of hyperparameters?",
+          "timestamp_start": 567,
+          "timestamp_end": 579
+        },
+        {
+          "ppt_bullet": "Test dataset: leave it alone",
+          "ai_comment": "(not covered in lecture)",
+          "transcript_excerpt": "",
+          "timestamp_start": -1,
+          "timestamp_end": -1
+        }
+      ]
+    },
+    "active_notes": null,
+    "status": "ready",
+    "_cost": {
+      "input_tokens": 768,
+      "output_tokens": 266,
+      "elapsed_s": 21.949,
+      "attempts": 1,
+      "provider": "中转站",
+      "model": "claude-sonnet-4-6",
+      "endpoint": "https://claude-zhongzhuan.cloud"
+    }
+  }
+]

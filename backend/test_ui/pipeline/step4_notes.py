@@ -336,7 +336,7 @@ def _render_section_a(has_ppt, aligned, asr, config):
         return
 
     async def _call_once():
-        call_fn, _ = _get_async_call_fn(provider)
+        call_fn, _, _meta = _get_async_call_fn(provider)
         return await call_fn(edited_prompt, user_msg)
 
     with st.spinner("调用 LLM…"):
@@ -466,12 +466,12 @@ def _render_section_b(has_ppt, aligned, asr, config, note_cache):
         )
 
         async def _run_batch():
-            call_fn, _ = _get_async_call_fn(provider)
+            call_fn, _, call_meta = _get_async_call_fn(provider)
             sem = asyncio.Semaphore(5)
             is_passive = template in PASSIVE_TEMPLATES
             typed = [PageData.model_validate(p) for p in selected_pages]
             tasks, expanded = _prepare_tasks(typed, system_prompt, template, is_passive)
-            results = await _execute_llm_batch(tasks, call_fn, sem)
+            results = await _execute_llm_batch(tasks, call_fn, sem, call_meta)
             return _parse_and_merge(expanded, results, is_passive)
 
         notes = _run_sync(_run_batch())

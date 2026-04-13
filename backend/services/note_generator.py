@@ -141,10 +141,13 @@ class LLMTask(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _get_async_call_fn(provider: str):
-    """Return (async_call_fn, model).
+    """Return (async_call_fn, model, call_meta).
 
     async_call_fn(system, user_msg) -> (text, input_tokens, output_tokens)
+    call_meta: dict with keys model, endpoint, provider — logged into _cost per page.
     """
+    import time as _time
+
     model = os.environ.get("ANTHROPIC_MODEL", "").strip() or DEFAULT_MODEL
 
     if provider == PROVIDER_ZHIZENGZENG:
@@ -154,6 +157,11 @@ def _get_async_call_fn(provider: str):
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY not set. Add it to backend/.env")
         client = _openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
+        call_meta = {
+            "provider": provider,
+            "model": model,
+            "endpoint": base_url or "https://api.openai.com/v1",
+        }
 
         async def call_fn(system: str, user_msg: str):
             resp = await client.chat.completions.create(
@@ -168,7 +176,7 @@ def _get_async_call_fn(provider: str):
             usage = resp.usage
             return text, usage.prompt_tokens, usage.completion_tokens
 
-        return call_fn, model
+        return call_fn, model, call_meta
 
     else:  # 中转站 (default)
         api_key = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -180,6 +188,11 @@ def _get_async_call_fn(provider: str):
         base_url = os.environ.get("ANTHROPIC_BASE_URL", "").strip() or None
         kwargs = {"base_url": base_url} if base_url else {}
         client = anthropic.AsyncAnthropic(api_key=api_key, **kwargs)
+        call_meta = {
+            "provider": provider,
+            "model": model,
+            "endpoint": base_url or "https://api.anthropic.com",
+        }
 
         async def call_fn(system: str, user_msg: str):
             resp = await client.messages.create(
@@ -192,7 +205,7 @@ def _get_async_call_fn(provider: str):
             text = text_blocks[0].text if text_blocks else ""
             return text, resp.usage.input_tokens, resp.usage.output_tokens
 
-        return call_fn, model
+        return call_fn, model, call_meta
 
 
 # ---------------------------------------------------------------------------
@@ -351,22 +364,43 @@ async def _execute_llm_batch(
     tasks: list[LLMTask],
     call_fn,
     semaphore: asyncio.Semaphore,
+    call_meta: dict | None = None,
 ) -> list[tuple[LLMTask, dict, dict]]:
     """
     Stage 2: Pure concurrent network layer.
     Returns list of (task, parsed_data, usage) tuples.
     No business logic — only retry + concurrency control.
+
+    usage dict keys: input_tokens, output_tokens, elapsed_s, attempts,
+                     model, endpoint, provider (from call_meta if supplied).
     """
+    import time as _time
+
+    base_meta = call_meta or {}
+
     async def _call_one(task: LLMTask) -> tuple[LLMTask, dict, dict]:
         last_err = None
         for attempt in range(MAX_RETRIES):
             try:
+                t0 = _time.monotonic()
                 async with semaphore:
                     text, in_tok, out_tok = await call_fn(
                         task.system_prompt, task.user_msg
                     )
+                elapsed = round(_time.monotonic() - t0, 3)
                 data = _safe_extract_json(text, task.page.page_num, task.template)
-                usage = {"input_tokens": in_tok, "output_tokens": out_tok}
+                usage = {
+                    "input_tokens": in_tok,
+                    "output_tokens": out_tok,
+                    "elapsed_s": elapsed,
+                    "attempts": attempt + 1,
+                    **base_meta,
+                }
+                logger.debug(
+                    "page %s — %d in + %d out tokens, %.2fs, attempt %d/%d",
+                    task.page.page_num, in_tok, out_tok, elapsed,
+                    attempt + 1, MAX_RETRIES,
+                )
                 return task, data, usage
             except Exception as e:
                 last_err = e
@@ -387,7 +421,10 @@ async def _execute_llm_batch(
             "bullets": [],
             "ai_expansion": "",
         }
-        return task, failed_data, {"input_tokens": 0, "output_tokens": 0}
+        return task, failed_data, {
+            "input_tokens": 0, "output_tokens": 0,
+            "elapsed_s": 0.0, "attempts": MAX_RETRIES, **base_meta,
+        }
 
     return list(await asyncio.gather(*[_call_one(t) for t in tasks]))
 
@@ -486,7 +523,7 @@ async def generate_notes_for_all_pages(
           - _cost: {input_tokens, output_tokens}
     """
     system_prompt = _load_prompt(template, granularity)
-    call_fn, _model = _get_async_call_fn(provider)
+    call_fn, _model, call_meta = _get_async_call_fn(provider)
     semaphore = asyncio.Semaphore(MAX_CONCURRENT)
     is_passive = template in PASSIVE_TEMPLATES
 
@@ -498,7 +535,7 @@ async def generate_notes_for_all_pages(
     tasks, expanded_pages = _prepare_tasks(typed_pages, system_prompt, template, is_passive)
 
     # Stage 2: concurrent LLM calls
-    results = await _execute_llm_batch(tasks, call_fn, semaphore)
+    results = await _execute_llm_batch(tasks, call_fn, semaphore, call_meta)
 
     # Stage 3: stitch results back
     return _parse_and_merge(expanded_pages, results, is_passive)
@@ -529,7 +566,7 @@ async def generate_annotations(
         }
     """
     system_prompt = _load_prompt(template, granularity)
-    call_fn, _model = _get_async_call_fn(provider)
+    call_fn, _model, call_meta = _get_async_call_fn(provider)
     semaphore = asyncio.Semaphore(MAX_CONCURRENT)
 
     typed_page = PageData.model_validate(page)
@@ -565,7 +602,7 @@ async def generate_annotations(
     non_empty_tasks = [t for _, t in ann_tasks if t is not None]
     batch_results: dict[int, tuple[dict, dict]] = {}
     if non_empty_tasks:
-        raw = await _execute_llm_batch(non_empty_tasks, call_fn, semaphore)
+        raw = await _execute_llm_batch(non_empty_tasks, call_fn, semaphore, call_meta)
         # Index by task object id so we can match back
         task_to_result = {id(task): (data, usage) for task, data, usage in raw}
         for ann, task in ann_tasks:

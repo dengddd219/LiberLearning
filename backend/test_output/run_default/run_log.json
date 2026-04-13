@@ -439,5 +439,27 @@
     "cost_usd": 4.2e-05,
     "strategy": "v4_1",
     "threshold": 0.3
+  },
+  {
+    "ts": "2026-04-12T20:15:35",
+    "step": "note_gen",
+    "elapsed_s": 36.3,
+    "tokens": 11011,
+    "cost_usd": 0.113013,
+    "template": "passive_ppt_notes",
+    "granularity": "simple",
+    "prompt_version": "(production)",
+    "n_pages": 8
+  },
+  {
+    "ts": "2026-04-13T15:05:47",
+    "step": "note_gen",
+    "elapsed_s": 28.79,
+    "tokens": 12685,
+    "cost_usd": 0.095607,
+    "template": "passive_ppt_notes",
+    "granularity": "simple",
+    "prompt_version": "(production)",
+    "n_pages": 8
   }
 ]

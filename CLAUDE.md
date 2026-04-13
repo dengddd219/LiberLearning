@@ -2,9 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Skill 使用规则
-
-- **禁止主动触发 `crash-hard` skill**。仅当用户明确输入 `/crash-hard` 时才能调用，任何其他情况下不得触发。
+## language
+You must use Chinese to communicate with the user!
 
 ## Project Overview
 
@@ -278,7 +277,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 | 文件 | 内容 |
 |------|------|
 | `LiberStudy-PRD.md` | PRD v0.4（完整产品需求） |
-| `UI-Design-Guide.md` | 前端 UI/UX 设计规范 |
+| `UI/reference/UI-Design-Guide.md` | 前端 UI/UX 设计规范（已迁移至 UI/reference/） |
 | `CHANGELOG.md` | 项目变更记录 |
 | `step.md` | SDD 流程模板（AI 编码提示用） |
 | `wrong-log.md` | AI 编码历史错误记录 |
@@ -331,10 +330,50 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ### 前端（未与真实 API 联通）
 
+#### 入口 & 配置
+
 | 路径 | 内容 |
 |------|------|
-| `frontend/src/App.tsx` | React app 根组件 |
+| `frontend/src/App.tsx` | React app 根组件，路由定义：`/` → LobbyPage，`/session` → SessionPage，`/upload` → UploadPage，`/processing` → ProcessingPage，`/notes/:id` → NotesPage，`/notes/detail/:id` → DetailedNotePage |
 | `frontend/vite.config.ts` | Vite 配置 |
 | `frontend/package.json` | React + Vite + Tailwind + shadcn/ui 依赖 |
+
+#### Pages
+
+| 路径 | 内容 |
+|------|------|
+| `frontend/src/pages/LobbyPage.tsx` | 大厅工作台：侧边栏（用户信息 + 新建按钮）+ session 卡片网格/列表视图切换，基于 Figma 实现 |
+| `frontend/src/pages/UploadPage.tsx` | 上传页：PPT + 音频文件上传，调用 `/api/process-mock` |
+| `frontend/src/pages/SessionPage.tsx` | 课中录音页：实时录音 + inline 文字标注 |
+| `frontend/src/pages/ProcessingPage.tsx` | 处理中等待页：流水线进度显示 |
+| `frontend/src/pages/NotesPage.tsx` | 笔记主视图：三栏布局（slide nav + PPT 画布 + 笔记面板）|
+| `frontend/src/pages/DetailedNotePage.tsx` | 单页笔记详情视图 |
+
+#### Components
+
+| 路径 | 内容 |
+|------|------|
+| `frontend/src/components/ThreeColumnLayout.tsx` | 三栏布局容器 |
+| `frontend/src/components/SlideCanvas.tsx` | PPT 页面渲染画布 |
+| `frontend/src/components/OutlineNav.tsx` | 左侧 slide 导航列表 |
+| `frontend/src/components/PageNotes.tsx` | 单页笔记容器（含 My Notes / AI Notes 切换） |
+| `frontend/src/components/PassiveNotes.tsx` | 被动学习笔记展示 |
+| `frontend/src/components/ActiveNotes.tsx` | 主动学习笔记展示 |
+| `frontend/src/components/PillToggle.tsx` | pill 样式「我的笔记 / AI 笔记」切换按钮 |
+| `frontend/src/components/TemplateSelector.tsx` | 笔记模板选择（4 模板 × 2 粒度） |
+| `frontend/src/components/InlineAnnotation.tsx` | PPT 画布上的 inline 文字标注组件 |
+| `frontend/src/components/RecordingControl.tsx` | 录音控制条（开始/暂停/停止） |
+| `frontend/src/components/AudioPlayer.tsx` | 音频回放组件 |
+| `frontend/src/components/FileUpload.tsx` | 文件上传拖拽区域 |
+
+#### UI 参考设计文档
+
+| 路径 | 内容 |
+|------|------|
+| `UI/reference/UI-Design-Guide.md` | 前端 UI/UX 设计规范（色彩、间距、组件规范） |
+| `UI/reference/融合设计文档与AI开发指南.md` | 融合设计文档与 AI 开发指南 |
+| `UI/stitch/` | Figma 设计稿截图（LobbyPage 卡片、首页等参考图） |
+| `UI/figma-wireframe-script.js` | Figma 线框生成脚本 |
+| `UI/figma-plugin/` | Figma 插件（manifest.json + code.js） |
 
 > 当前前端仍调用 `/api/process-mock`，未接真实流水线。

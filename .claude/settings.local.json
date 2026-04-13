@@ -8,7 +8,11 @@
       "Bash(ls src/assets/)",
       "Bash(npx tsc:*)",
       "Bash(node prepare-digest.js)",
-      "Bash(python3 -c \" import sys, json data = json.load\\(sys.stdin\\) builders = data.get\\('x', []\\) for b in builders[5:]: print\\(f'--- {b[\\\\\"name\\\\\"]} \\(@{b[\\\\\"handle\\\\\"]}\\) ---'\\) print\\(f'Bio: {b.get\\(\\\\\"bio\\\\\",\\\\\"\\\\\"\\)}'\\) tweets = b.get\\('tweets', []\\) for t in tweets[:3]: print\\(f' Tweet: {t.get\\(\\\\\"text\\\\\",\\\\\"\\\\\"\\)[:300]}'\\) print\\(f' URL: {t.get\\(\\\\\"url\\\\\",\\\\\"\\\\\"\\)}'\\) \")"
+      "Bash(python3 -c \" import sys, json data = json.load\\(sys.stdin\\) builders = data.get\\('x', []\\) for b in builders[5:]: print\\(f'--- {b[\\\\\"name\\\\\"]} \\(@{b[\\\\\"handle\\\\\"]}\\) ---'\\) print\\(f'Bio: {b.get\\(\\\\\"bio\\\\\",\\\\\"\\\\\"\\)}'\\) tweets = b.get\\('tweets', []\\) for t in tweets[:3]: print\\(f' Tweet: {t.get\\(\\\\\"text\\\\\",\\\\\"\\\\\"\\)[:300]}'\\) print\\(f' URL: {t.get\\(\\\\\"url\\\\\",\\\\\"\\\\\"\\)}'\\) \")",
+      "Bash(npx --yes figma-developer-mcp --help)",
+      "Skill(update-config)",
+      "mcp__figma__get_figma_data",
+      "Bash(python scripts/search.py \"academic lecture notes study tool productivity minimal editorial\" --design-system -p \"LiberStudy\" -f markdown)"
     ]
   }
 }
