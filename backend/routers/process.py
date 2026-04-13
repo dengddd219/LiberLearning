@@ -12,7 +12,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, UploadFile, File
+from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, Request, UploadFile, File
 
 import db
 from db import check_and_record_rate_limit, get_rate_limit_status, RateLimitExceeded
@@ -64,8 +64,8 @@ async def process_real(
     background_tasks: BackgroundTasks,
     ppt: Optional[UploadFile] = File(None),
     audio: UploadFile = File(...),
-    language: str = "en",
-    user_anchors: str = "[]",
+    language: str = Form("en"),
+    user_anchors: str = Form("[]"),
 ):
     # 1. 参数校验
     if language not in ALLOWED_LANGUAGES:
