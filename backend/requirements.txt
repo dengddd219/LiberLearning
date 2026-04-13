@@ -26,3 +26,4 @@ httpx==0.28.1
 # Testing platform
 streamlit>=1.35.0
 fpdf2>=2.7.9
+sqlmodel==0.0.21
