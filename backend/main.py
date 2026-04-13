@@ -6,11 +6,14 @@ from dotenv import load_dotenv
 import os
 
 from routers import process, sessions
+from db import init_db
 
-# 明确加载 backend/.env（无论从哪个目录启动）
 load_dotenv(Path(__file__).parent / ".env")
 
 app = FastAPI(title="LiberStudy API", version="0.1.0")
+
+# 初始化数据库（创建表）
+init_db()
 
 # CORS
 frontend_origin = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
@@ -22,11 +25,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Static files (PPT slide PNGs and audio)
 app.mount("/slides", StaticFiles(directory="static/slides"), name="slides")
 app.mount("/audio", StaticFiles(directory="static/audio"), name="audio")
 
-# Routers
 app.include_router(process.router, prefix="/api")
 app.include_router(sessions.router, prefix="/api")
 
