@@ -132,9 +132,8 @@ def get_session(session_id: str):
     if session_id == "mock-session-001":
         return MOCK_SESSION
 
-    # Look up real sessions from the process router's in-memory store
-    from routers.process import _SESSIONS
-    session = _SESSIONS.get(session_id)
+    import db as _db
+    session = _db.get_session(session_id)
     if session:
         return session
 
