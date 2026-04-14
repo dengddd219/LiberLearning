@@ -162,46 +162,6 @@ export default function SessionPage() {
     <div
       className="relative bg-stone-50 w-full min-h-screen flex flex-col"
     >
-      {/* Top Navigation Bar - absolute positioned */}
-      <div
-        className="absolute flex justify-between items-center"
-        style={{ top: 0, left: 0, right: 0, height: '64px', padding: '0 32px', background: 'rgba(250,249,247,0.8)', backdropFilter: 'blur(24px)', borderBottom: '1px solid rgba(175,179,176,0.1)' }}
-      >
-        <div className="flex justify-start items-center gap-8">
-          <div className="flex flex-col justify-start items-start">
-            <div className="justify-center text-zinc-800 text-xl font-bold font-['Inter'] leading-7" style={{ fontFamily: 'Inter, sans-serif' }}>LiberStudy</div>
-          </div>
-          <div className="flex justify-start items-center gap-6">
-            <nav aria-label="主导航" className="flex justify-start items-center gap-6">
-              <div className="flex flex-col justify-start items-start">
-                <div className="justify-center text-slate-600 text-base font-normal font-['Inter'] leading-6" style={{ fontFamily: 'Inter, sans-serif' }}>Dashboard</div>
-              </div>
-              <div className="pb-1 border-b-2 border-zinc-600 flex flex-col justify-start items-start">
-                <div className="justify-center text-zinc-800 text-base font-normal font-['Inter'] leading-6" style={{ fontFamily: 'Inter, sans-serif' }}>Courses</div>
-              </div>
-              <div className="flex flex-col justify-start items-start">
-                <div className="justify-center text-slate-600 text-base font-normal font-['Inter'] leading-6" style={{ fontFamily: 'Inter, sans-serif' }}>Detailed Note</div>
-              </div>
-            </nav>
-          </div>
-        </div>
-        <div className="flex justify-start items-center gap-4">
-          <div className="flex flex-col justify-center items-center">
-            <svg width="14" height="16" viewBox="0 0 18 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15 20C14.1667 20 13.4583 19.7083 12.875 19.125C12.2917 18.5417 12 17.8333 12 17C12 16.9 12.025 16.6667 12.075 16.3L5.05 12.2C4.78333 12.45 4.475 12.6458 4.125 12.7875C3.775 12.9292 3.4 13 3 13C2.16667 13 1.45833 12.7083 0.875 12.125C0.291667 11.5417 0 10.8333 0 10C0 9.16667 0.291667 8.45833 0.875 7.875C1.45833 7.29167 2.16667 7 3 7C3.4 7 3.775 7.07083 4.125 7.2125C4.475 7.35417 4.78333 7.55 5.05 7.8L12.075 3.7C12.0417 3.58333 12.0208 3.47083 12.0125 3.3625C12.0042 3.25417 12 3.13333 12 3C12 2.16667 12.2917 1.45833 12.875 0.875C13.4583 0.291667 14.1667 0 15 0C15.8333 0 16.5417 0.291667 17.125 0.875C17.7083 1.45833 18 2.16667 18 3C18 3.83333 17.7083 4.54167 17.125 5.125C16.5417 5.70833 15.8333 6 15 6C14.6 6 14.225 5.92917 13.875 5.7875C13.525 5.64583 13.2167 5.45 12.95 5.2L5.925 9.3C5.95833 9.41667 5.97917 9.52917 5.9875 9.6375C5.99583 9.74583 6 9.86667 6 10C6 10.1333 5.99583 10.2542 5.9875 10.3625C5.97917 10.4708 5.95833 10.5833 5.925 10.7L12.95 14.8C13.2167 14.55 13.525 14.3542 13.875 14.2125C14.225 14.0708 14.6 14 15 14C15.8333 14 16.5417 14.2917 17.125 14.875C17.7083 15.4583 18 16.1667 18 17C18 17.8333 17.7083 18.5417 17.125 19.125C16.5417 19.7083 15.8333 20 15 20ZM15 18C15.2833 18 15.5208 17.9042 15.7125 17.7125C15.9042 17.5208 16 17.2833 16 17C16 16.7167 15.9042 16.4792 15.7125 16.2875C15.5208 16.0958 15.2833 16 15 16C14.7167 16 14.4792 16.0958 14.2875 16.2875C14.0958 16.4792 14 16.7167 14 17C14 17.2833 14.0958 17.5208 14.2875 17.7125C14.4792 17.9042 14.7167 18 15 18ZM3 11C3.28333 11 3.52083 10.9042 3.7125 10.7125C3.90417 10.5208 4 10.2833 4 10C4 9.71667 3.90417 9.47917 3.7125 9.2875C3.52083 9.09583 3.28333 9 3 9C2.71667 9 2.47917 9.09583 2.2875 9.2875C2.09583 9.47917 2 9.71667 2 10C2 10.2833 2.09583 10.5208 2.2875 10.7125C2.47917 10.9042 2.71667 11 3 11ZM15 4C15.2833 4 15.5208 3.90417 15.7125 3.7125C15.9042 3.52083 16 3.28333 16 3C16 2.71667 15.9042 2.47917 15.7125 2.2875C15.5208 2.09583 15.2833 2 15 2C14.7167 2 14.4792 2.09583 14.2875 2.2875C14.0958 2.47917 14 2.71667 14 3C14 3.28333 14.0958 3.52083 14.2875 3.7125C14.4792 3.90417 14.7167 4 15 4Z" fill="#556071"/>
-            </svg>
-          </div>
-          <div className="flex flex-col justify-center items-center">
-            <svg width="14" height="12" viewBox="0 0 14 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 12L0 6L6 0L7.4 1.4L2.825 6L7.4 10.6L6 12ZM12.6 12L6.6 6L12.6 0L14 1.4L9.425 6L14 10.6L12.6 12Z" fill="#556071"/>
-            </svg>
-          </div>
-          <div className="w-8 h-8 bg-neutral-200 rounded-full inline-flex flex-col justify-start items-start overflow-hidden cursor-pointer">
-            <img className="w-8 h-8 max-w-8 relative" src="https://placehold.co/32x32" />
-          </div>
-        </div>
-      </div>
-
       {/* Main Content - centered with top padding for nav bar */}
       <div
         className="self-stretch flex justify-start items-start overflow-hidden"
