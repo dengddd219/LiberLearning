@@ -158,26 +158,25 @@ const THUMB_COLORS = ['#4A6FA5', '#6B8E6B', '#8B7355', '#7B6B8B', '#5E8B8B', '#8
 
 function ProcessingCard() {
   return (
-    <div className="self-stretch p-6 relative bg-white rounded-[32px] shadow-[0px_40px_40px_-15px_rgba(47,51,49,0.04)] flex flex-col justify-start items-start gap-4">
-      <div className="self-stretch py-7 bg-stone-100 rounded-md flex justify-center items-center overflow-hidden">
-        <div className="flex flex-col gap-3 w-[60%]">
-          <div className="h-3 rounded-full bg-[#AFB3B0]/40 w-full animate-pulse" />
-          <div className="h-3 rounded-full bg-[#AFB3B0]/40 w-4/5 animate-pulse" />
-          <div className="h-3 rounded-full bg-[#AFB3B0]/40 w-3/5 animate-pulse" />
+    <div className="p-6 relative bg-white rounded-[32px] flex flex-col justify-start items-start gap-4" style={{ width: '224px', minHeight: '288px' }}>
+      <div className="w-56 h-72 left-0 top-0 absolute bg-white/0 rounded-[32px] shadow-[0px_40px_40px_-15px_rgba(47,51,49,0.04)]" />
+      <div className="self-stretch py-7 bg-stone-100 rounded-md inline-flex justify-center items-center overflow-hidden">
+        <div className="inline-flex flex-col justify-start items-start">
+          <div className="w-8 h-6 bg-zinc-400 animate-pulse rounded" />
         </div>
       </div>
-      <div className="self-stretch flex flex-col gap-3">
+      <div className="self-stretch flex flex-col justify-start items-start gap-3">
         <div className="w-32 h-4 bg-stone-100 rounded-2xl animate-pulse" />
         <div className="w-20 h-3 bg-stone-100 rounded-2xl animate-pulse" />
       </div>
-      <div className="self-stretch pt-4 border-t border-zinc-400/10 flex justify-between items-center mt-3">
-        <div className="flex justify-start items-start gap-1">
-          <div className="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-pulse" />
-          <div className="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-pulse" />
-          <div className="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-pulse" />
-        </div>
-        <div className="text-zinc-600 text-[10.40px] font-bold font-['Inter'] uppercase leading-4 tracking-wide">
-          PROCESSING
+      <div className="self-stretch h-20 min-h-8 pt-12 flex flex-col justify-end items-start">
+        <div className="self-stretch pt-4 border-t border-zinc-400/10 inline-flex justify-between items-center">
+          <div className="flex justify-start items-start gap-1">
+            <div className="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-pulse" />
+            <div className="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-pulse" />
+            <div className="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-pulse" />
+          </div>
+          <div className="text-zinc-600 text-[10.40px] font-bold font-['Inter'] uppercase leading-4 tracking-wide">PROCESSING</div>
         </div>
       </div>
     </div>
@@ -190,24 +189,31 @@ function DoneCard({ card, onClick }: { card: CourseCard; onClick: () => void }) 
       type="button"
       onClick={onClick}
       aria-label={`打开课程：${card.course}`}
-      className="self-stretch text-left relative bg-white rounded-[32px] shadow-[0px_40px_40px_-15px_rgba(47,51,49,0.04)] outline outline-1 outline-offset-[-1px] outline-black/0 overflow-hidden cursor-pointer transition-all duration-150 hover:-translate-y-0.5 hover:shadow-[0px_40px_56px_-15px_rgba(47,51,49,0.10)]"
+      className="relative bg-white rounded-[32px] outline outline-1 outline-offset-[-1px] outline-black/0 cursor-pointer transition-all duration-150 hover:-translate-y-0.5 hover:shadow-[0px_40px_56px_-15px_rgba(47,51,49,0.10)] text-left flex-shrink-0"
+      style={{ width: '224px', height: '288px' }}
     >
+      <div className="w-56 h-72 left-0 top-0 absolute bg-white/0 rounded-[32px] shadow-[0px_40px_40px_-15px_rgba(47,51,49,0.04)]" />
       {/* Thumbnail */}
-      <div className="w-full relative" style={{ aspectRatio: '16/9', backgroundColor: card.thumbColor, opacity: 0.85 }}>
-        <div className="px-2 py-1 absolute bottom-3 right-3 bg-zinc-800/90 rounded-2xl">
+      <div className="w-44 left-[25px] top-[25px] absolute bg-stone-100 rounded-md inline-flex flex-col justify-center items-start overflow-hidden">
+        <div className="self-stretch h-24 relative" style={{ backgroundColor: card.thumbColor, opacity: 0.85 }} />
+        <div className="px-2 py-1 absolute bg-zinc-800/90 rounded-2xl" style={{ right: '8px', bottom: '8px' }}>
           <div className="text-white text-[10.40px] font-normal font-['Liberation_Mono'] leading-4">{card.duration}</div>
         </div>
       </div>
       {/* Info */}
-      <div className="px-6 pt-4 pb-0 flex flex-col gap-1">
-        <div className="text-zinc-800 text-base font-bold font-['Inter'] leading-6 truncate">{card.course}</div>
-        <div className="text-slate-600 text-xs font-medium font-['Inter'] leading-4 truncate">{card.lecture}</div>
+      <div className="w-44 left-[25px] top-[136.65px] absolute inline-flex flex-col justify-start items-start gap-1">
+        <div className="self-stretch pb-[0.69px] flex flex-col justify-start items-start">
+          <div className="self-stretch text-zinc-800 text-base font-bold font-['Inter'] leading-6 truncate">{card.course}</div>
+        </div>
+        <div className="self-stretch flex flex-col justify-start items-start">
+          <div className="self-stretch text-slate-600 text-xs font-medium font-['Inter'] leading-4 truncate">{card.lecture}</div>
+        </div>
       </div>
       {/* Footer */}
-      <div className="mx-6 pt-4 pb-5 mt-3 border-t border-zinc-400/10 flex justify-between items-center">
-        <div className="flex items-center gap-1 text-slate-600">
-          <IconNotes />
-          <span className="text-slate-600 text-xs font-normal font-['Inter'] leading-4">{card.notes} notes</span>
+      <div className="w-44 pt-4 left-[25px] top-[239.14px] absolute border-t border-zinc-400/10 inline-flex justify-between items-center">
+        <div className="flex justify-start items-center gap-1">
+          <div className="w-3.5 h-3.5 relative text-slate-600"><IconNotes /></div>
+          <div className="text-slate-600 text-xs font-normal font-['Inter'] leading-4">{card.notes} notes</div>
         </div>
         <div className="text-neutral-500 text-[10.40px] font-bold font-['Inter'] uppercase leading-4 tracking-wide">{card.time}</div>
       </div>
@@ -508,7 +514,7 @@ function NewClassModal({ onClose, navigate }: { onClose: () => void; navigate: R
 export default function LobbyPage() {
   const navigate = useNavigate()
   const { openTab } = useTabs()
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [activeNav, setActiveNav] = useState<'courses' | 'settings'>('courses')
   const [showModal, setShowModal] = useState(false)
   const [sessions, setSessions] = useState<CourseCard[]>(FALLBACK_SESSIONS)
@@ -535,7 +541,7 @@ export default function LobbyPage() {
   }, [])
 
   return (
-    <div className="w-full min-h-screen bg-stone-50 flex font-['Inter']">
+    <div className="w-full min-h-screen bg-stone-50 flex font-['Inter'] pt-16">
 
       {/* ── Sidebar ── */}
       <aside aria-label="侧边导航" className="w-48 flex-shrink-0 px-4 py-8 bg-stone-100 flex flex-col justify-between items-start min-h-screen">
@@ -555,31 +561,31 @@ export default function LobbyPage() {
         <div className="self-stretch px-2 pb-8 flex flex-col justify-start items-start">
           <button
             onClick={() => setShowModal(true)}
-            className="self-stretch px-4 py-3 bg-zinc-600 rounded-full shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] flex justify-center items-center gap-2 cursor-pointer hover:opacity-85 transition-opacity border-none"
+            className="self-stretch px-4 py-3 bg-zinc-600 rounded-full shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] inline-flex justify-center items-center gap-2 cursor-pointer hover:opacity-85 transition-opacity border-none"
           >
             <IconMic />
-            <span className="text-stone-50 text-xs font-semibold font-['Inter'] leading-5 tracking-tight">Upload the record</span>
+            <span className="text-center text-stone-50 text-xs font-semibold font-['Inter'] leading-5 tracking-tight">Upload the<br />record</span>
           </button>
         </div>
 
         {/* Nav */}
         <div className="self-stretch flex-1 flex flex-col justify-start items-start gap-4">
           {/* Search */}
-          <div className="self-stretch px-4 py-2 bg-neutral-200/20 rounded-md flex justify-between items-center cursor-pointer hover:bg-neutral-200/40 transition-colors">
+          <div className="self-stretch px-4 py-2 bg-neutral-200/20 rounded-md inline-flex justify-between items-center cursor-pointer hover:bg-neutral-200/40 transition-colors">
             <div className="flex justify-start items-center gap-3 text-slate-600">
               <IconSearch />
               <span className="text-slate-600 text-xs font-medium font-['Inter'] leading-5">Search</span>
             </div>
-            <div className="px-1.5 pt-px pb-[2.39px] bg-neutral-200 rounded-2xl">
+            <div className="px-1.5 pt-px pb-[2.39px] bg-neutral-200 rounded-2xl inline-flex flex-col justify-start items-start">
               <span className="text-neutral-500 text-[9.60px] font-bold font-['IPAGothic'] leading-4">⌘K</span>
             </div>
           </div>
 
           {/* Nav links */}
-          <div className="self-stretch flex flex-col gap-1">
+          <div className="self-stretch flex flex-col justify-start items-start gap-1">
             <button
               onClick={() => setActiveNav('courses')}
-              className="self-stretch px-4 py-3 flex justify-start items-center gap-3 cursor-pointer border-none bg-transparent transition-all"
+              className="self-stretch px-4 py-3 inline-flex justify-start items-center gap-3 cursor-pointer border-none bg-transparent transition-all"
               style={{ borderRight: activeNav === 'courses' ? '2px solid #5F5E5E' : '2px solid transparent' }}
             >
               <span style={{ color: activeNav === 'courses' ? '#2F3331' : '#556071' }}><IconCourse /></span>
@@ -587,7 +593,7 @@ export default function LobbyPage() {
             </button>
             <button
               onClick={() => setActiveNav('settings')}
-              className="self-stretch px-4 py-3 flex justify-start items-center gap-3 cursor-pointer border-none bg-transparent transition-all"
+              className="self-stretch px-4 py-3 inline-flex justify-start items-center gap-3 cursor-pointer border-none bg-transparent transition-all"
               style={{ borderRight: activeNav === 'settings' ? '2px solid #5F5E5E' : '2px solid transparent' }}
             >
               <span style={{ color: activeNav === 'settings' ? '#2F3331' : '#556071' }}><IconSettings /></span>
@@ -597,13 +603,17 @@ export default function LobbyPage() {
         </div>
 
         {/* User anchor */}
-        <div className="self-stretch px-4 flex justify-start items-center gap-3">
+        <div className="self-stretch px-4 inline-flex justify-start items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-[#C8C9C0] flex-shrink-0 flex items-center justify-center">
             <span className="text-xs font-bold text-zinc-600">A</span>
           </div>
-          <div className="flex flex-col overflow-hidden">
-            <div className="text-zinc-800 text-xs font-bold font-['Inter'] leading-4">Alex Chen</div>
-            <div className="text-slate-600 text-[9.60px] font-normal font-['Inter'] leading-4">Graduate Student</div>
+          <div className="inline-flex flex-col justify-start items-start overflow-hidden">
+            <div className="self-stretch flex flex-col justify-start items-start overflow-hidden">
+              <div className="text-zinc-800 text-xs font-bold font-['Inter'] leading-4">Alex Chen</div>
+            </div>
+            <div className="self-stretch h-3.5 relative overflow-hidden">
+              <div className="left-0 top-[-1px] absolute text-slate-600 text-[9.60px] font-normal font-['Inter'] leading-4">Graduate Student</div>
+            </div>
           </div>
         </div>
       </aside>
@@ -612,11 +622,13 @@ export default function LobbyPage() {
       <div className="flex-1 min-w-0 min-h-screen bg-stone-50 flex flex-col justify-start items-start">
 
         {/* Header */}
-        <div className="self-stretch px-12 py-6 bg-stone-50/80 backdrop-blur-md flex justify-between items-center sticky top-0 z-10">
-          <div className="flex flex-col justify-start items-start gap-0.5">
-            <div className="text-zinc-800 text-2xl font-black font-['Inter'] leading-8">Scholarly Workspace</div>
-            <div className="text-slate-600 text-[10.40px] font-normal font-['Inter'] uppercase leading-4 tracking-wide">
-              WELCOME BACK, YOUR RECORDINGS ARE UP TO DATE.
+        <div className="self-stretch px-12 py-6 bg-stone-50/80 backdrop-blur-md inline-flex justify-between items-center sticky top-16 z-10">
+          <div className="inline-flex flex-col justify-start items-start gap-0.5">
+            <div className="self-stretch flex flex-col justify-start items-start">
+              <div className="text-zinc-800 text-2xl font-black font-['Inter'] leading-8">Scholarly Workspace</div>
+            </div>
+            <div className="self-stretch flex flex-col justify-start items-start">
+              <div className="text-slate-600 text-[10.40px] font-normal font-['Inter'] uppercase leading-4 tracking-wide">WELCOME BACK, YOUR RECORDINGS ARE UP TO DATE.</div>
             </div>
           </div>
           <div className="flex justify-start items-center gap-6">
@@ -624,7 +636,7 @@ export default function LobbyPage() {
             <div className="p-1 bg-stone-100 rounded-full flex justify-start items-start gap-1">
               <button
                 onClick={() => setViewMode('grid')}
-                className="px-4 py-1.5 rounded-full flex justify-start items-center gap-2 cursor-pointer border-none transition-all"
+                className="px-4 py-1.5 rounded-full inline-flex justify-start items-center gap-2 cursor-pointer border-none transition-all"
                 style={{ backgroundColor: viewMode === 'grid' ? '#FFFFFF' : 'transparent', boxShadow: viewMode === 'grid' ? '0px 1px 2px 0px rgba(0,0,0,0.05)' : 'none' }}
               >
                 <span style={{ color: viewMode === 'grid' ? '#2F3331' : '#556071' }}><IconGrid /></span>
@@ -632,7 +644,7 @@ export default function LobbyPage() {
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className="px-4 py-1.5 rounded-full flex justify-start items-center gap-2 cursor-pointer border-none transition-all"
+                className="px-4 py-1.5 rounded-full inline-flex justify-start items-center gap-2 cursor-pointer border-none transition-all"
                 style={{ backgroundColor: viewMode === 'list' ? '#FFFFFF' : 'transparent', boxShadow: viewMode === 'list' ? '0px 1px 2px 0px rgba(0,0,0,0.05)' : 'none' }}
               >
                 <span style={{ color: viewMode === 'list' ? '#2F3331' : '#556071' }}><IconList /></span>
@@ -641,43 +653,53 @@ export default function LobbyPage() {
             </div>
             {/* Bell + Avatar */}
             <div className="flex justify-start items-center gap-4">
-              <button type="button" aria-label="通知" className="w-11 h-11 flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity border-none bg-transparent text-slate-600">
-                <IconBell aria-hidden="true" />
-              </button>
-              <button type="button" aria-label="用户设置" className="w-11 h-11 flex items-center justify-center cursor-pointer border-none bg-transparent p-0">
-                <div className="w-8 h-8 rounded-full bg-[#C8C9C0] flex items-center justify-center">
-                  <span className="text-xs font-bold text-zinc-600">A</span>
+              <div className="inline-flex flex-col justify-center items-center">
+                <div className="inline-flex justify-center items-start">
+                  <button type="button" aria-label="通知" className="w-3 h-4 flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity border-none bg-transparent text-slate-600">
+                    <IconBell aria-hidden="true" />
+                  </button>
                 </div>
-              </button>
+              </div>
+              <div className="inline-flex flex-col justify-center items-center">
+                <div className="inline-flex justify-center items-start">
+                  <button type="button" aria-label="用户设置" className="w-4 h-4 flex items-center justify-center cursor-pointer border-none bg-transparent p-0">
+                    <div className="w-8 h-8 rounded-full bg-[#C8C9C0] flex items-center justify-center">
+                      <span className="text-xs font-bold text-zinc-600">A</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Content */}
-        <div className="w-full px-12 pt-24 pb-12 flex flex-col justify-start items-start gap-10">
+        <div className="w-full max-w-[1400px] px-12 py-8 flex flex-col justify-start items-start gap-24">
 
           {/* Session cards */}
           {viewMode === 'grid' ? (
-            <div className="self-stretch grid grid-cols-4 gap-6">
-              {sessions.map((s) =>
-                s.status === 'processing'
-                  ? <ProcessingCard key={s.id} />
-                  : <DoneCard key={s.id} card={s} onClick={() => {
-                      openTab({ sessionId: s.id, label: s.course })
-                      navigate(`/notes/${s.id}`)
-                    }} />
-              )}
-              {sessions.length === 0 && (
-                <div className="col-span-4 flex flex-col items-center justify-center py-16">
-                  <p className="text-sm text-zinc-400 mb-4">还没有任何课程记录</p>
-                  <button
-                    onClick={() => setShowModal(true)}
-                    className="px-4 py-2 bg-zinc-600 text-white text-sm rounded-full cursor-pointer hover:opacity-85"
-                  >
-                    开始第一次录音
-                  </button>
-                </div>
-              )}
+            <div className="self-stretch inline-flex flex-col justify-start items-start">
+              <div className="self-stretch flex flex-wrap gap-6">
+                {sessions.map((s) =>
+                  s.status === 'processing'
+                    ? <ProcessingCard key={s.id} />
+                    : <DoneCard key={s.id} card={s} onClick={() => {
+                        openTab({ sessionId: s.id, label: s.course })
+                        navigate(`/notes/${s.id}`)
+                      }} />
+                )}
+                {sessions.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-16 w-full">
+                    <p className="text-sm text-zinc-400 mb-4">还没有任何课程记录</p>
+                    <button
+                      onClick={() => setShowModal(true)}
+                      className="px-4 py-2 bg-zinc-600 text-white text-sm rounded-full cursor-pointer hover:opacity-85 border-none"
+                    >
+                      开始第一次录音
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <ListTable sessions={sessions} onRowClick={(id) => {
@@ -688,38 +710,38 @@ export default function LobbyPage() {
           )}
 
           {/* Insight cards */}
-          <div className="self-stretch flex justify-between items-start">
+          <div className="self-stretch h-48 pt-2 inline-flex justify-between items-start">
             <div className="flex justify-start items-start gap-4">
-              <div className="w-64 self-stretch p-8 bg-stone-100 rounded-[32px] flex flex-col justify-start items-start gap-1">
+              <div className="w-64 self-stretch p-8 bg-stone-100 rounded-[32px] inline-flex flex-col justify-start items-start gap-1">
                 <IconVelocity />
-                <div className="self-stretch pt-3">
-                  <div className="text-zinc-800 text-sm font-bold font-['Inter'] leading-5">Study Velocity</div>
+                <div className="self-stretch pt-3 flex flex-col justify-start items-start">
+                  <div className="self-stretch text-zinc-800 text-sm font-bold font-['Inter'] leading-5">Study Velocity</div>
                 </div>
-                <div className="text-slate-600 text-xs font-normal font-['Inter'] leading-4">
-                  You've averaged 4.2 hours of recording this week. Consistency is key.
+                <div className="self-stretch flex flex-col justify-start items-start">
+                  <div className="self-stretch text-slate-600 text-xs font-normal font-['Inter'] leading-4">You've averaged 4.2 hours of<br />recording this week. Consistency<br />is key.</div>
                 </div>
               </div>
-              <div className="w-64 self-stretch p-8 bg-stone-100 rounded-[32px] flex flex-col justify-start items-start gap-1">
+              <div className="w-64 self-stretch p-8 bg-stone-100 rounded-[32px] inline-flex flex-col justify-start items-start gap-1">
                 <IconAI />
-                <div className="self-stretch pt-3">
-                  <div className="text-zinc-800 text-sm font-bold font-['Inter'] leading-5">AI Insights</div>
+                <div className="self-stretch pt-3 flex flex-col justify-start items-start">
+                  <div className="self-stretch text-zinc-800 text-sm font-bold font-['Inter'] leading-5">AI Insights</div>
                 </div>
-                <div className="text-slate-600 text-xs font-normal font-['Inter'] leading-4">
-                  3 summaries are ready for review from your recent Predictive Analytics lecture.
+                <div className="self-stretch flex flex-col justify-start items-start">
+                  <div className="self-stretch text-slate-600 text-xs font-normal font-['Inter'] leading-4">3 summaries are ready for review<br />from your recent Predictive<br />Analytics lecture.</div>
                 </div>
               </div>
               <button
                 type="button"
-                className="w-96 self-stretch text-left p-8 bg-stone-100 rounded-[32px] flex flex-col justify-start items-start gap-1 cursor-pointer hover:bg-stone-200 transition-colors focus-visible:ring-2 focus-visible:ring-zinc-600 focus-visible:outline-none border-none"
+                className="w-96 self-stretch text-left p-8 bg-stone-100 rounded-[32px] inline-flex flex-col justify-start items-start gap-1 cursor-pointer hover:bg-stone-200 transition-colors focus-visible:ring-2 focus-visible:ring-zinc-600 focus-visible:outline-none border-none"
                 onClick={() => navigate('/session/live')}
                 aria-label="进入 LIVE AI Courses"
               >
                 <IconLive />
-                <div className="self-stretch pt-3">
-                  <div className="text-zinc-800 text-sm font-bold font-['Inter'] leading-5">LIVE AI Courses</div>
+                <div className="self-stretch pt-3 flex flex-col justify-start items-start">
+                  <div className="self-stretch text-zinc-800 text-sm font-bold font-['Inter'] leading-5">LIVE AI Courses</div>
                 </div>
-                <div className="text-slate-600 text-xs font-normal font-['Inter'] leading-4">
-                  AI with your class
+                <div className="self-stretch flex flex-col justify-start items-start">
+                  <div className="self-stretch text-slate-600 text-xs font-normal font-['Inter'] leading-4">AI with your class</div>
                 </div>
               </button>
             </div>

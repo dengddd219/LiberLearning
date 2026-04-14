@@ -36,6 +36,7 @@ class SessionRow(SQLModel, table=True):
     pages_json: str = Field(default="[]")
     progress_json: Optional[str] = None
     error: Optional[str] = None
+    created_at: float = Field(default_factory=time.time)
 
 
 class RateLimitRow(SQLModel, table=True):
@@ -64,6 +65,7 @@ def _row_to_dict(row: SessionRow) -> dict:
         "pages": json.loads(row.pages_json),
         "progress": json.loads(row.progress_json) if row.progress_json else None,
         "error": row.error,
+        "created_at": row.created_at,
     }
 
 
@@ -91,6 +93,24 @@ def get_session(session_id: str) -> Optional[dict]:
         if row is None:
             return None
         return _row_to_dict(row)
+
+
+def list_sessions() -> list[dict]:
+    """Return all sessions as summary dicts (no pages), newest first."""
+    with Session(engine) as s:
+        rows = s.exec(
+            select(SessionRow).order_by(SessionRow.created_at.desc())  # type: ignore[attr-defined]
+        ).all()
+    return [
+        {
+            "session_id": r.session_id,
+            "status": r.status,
+            "ppt_filename": r.ppt_filename,
+            "total_duration": r.total_duration,
+            "created_at": r.created_at,
+        }
+        for r in rows
+    ]
 
 
 def update_session(session_id: str, updates: dict) -> None:

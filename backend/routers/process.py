@@ -7,6 +7,7 @@ Process router.
 """
 
 import json as _json
+import shutil
 import tempfile
 import uuid
 from pathlib import Path
@@ -171,17 +172,28 @@ async def _run_pipeline(
 
         db.update_session(session_id, {"total_duration": int(duration)})
 
+        # Copy WAV to static/audio/{session_id}/ for frontend playback
+        audio_static_dir = Path("static") / "audio" / session_id
+        audio_static_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(wav_path, str(audio_static_dir / "audio.wav"))
+
         # Step 2: PPT 解析
         db.update_session(session_id, {"progress": {"step": "parsing_ppt", "percent": 30}})
         slides_dir = str(Path("static") / "slides" / session_id)
         ppt_pages: list[dict] = []
         if ppt_path:
             ppt_pages = parse_ppt(ppt_path, slides_dir, pdf_name=f"slides_{session_id}.pdf")
+            # Fix pdf_url: parse_ppt returns "/slides/{pdf_name}" but files are in
+            # "static/slides/{session_id}/{pdf_name}", so prepend session_id subdirectory
+            for page in ppt_pages:
+                if page.get("pdf_url"):
+                    pdf_name = page["pdf_url"].split("/")[-1]
+                    page["pdf_url"] = f"/slides/{session_id}/{pdf_name}"
 
         # Step 3: ASR 转录
         db.update_session(session_id, {"progress": {"step": "transcribing", "percent": 55}})
         asr_prompt = extract_domain_terms(ppt_pages) if ppt_pages else None
-        segments = transcribe(wav_path, language=language, prompt=asr_prompt)
+        segments, _raw = transcribe(wav_path, language=language, prompt=asr_prompt)
 
         # Step 4: 语义对齐
         db.update_session(session_id, {"progress": {"step": "aligning", "percent": 70}})

@@ -24,7 +24,7 @@ const STEP_MAP: Record<string, number> = {
   done: 4,
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
 
 export default function ProcessingPage() {
   const navigate = useNavigate()

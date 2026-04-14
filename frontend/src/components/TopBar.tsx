@@ -111,21 +111,7 @@ export default function TopBar() {
         </div>
       </div>
 
-      {/* Right: Bell + Avatar */}
-      <div className="flex items-center gap-3 flex-shrink-0">
-        <button aria-label="通知" className="cursor-pointer transition-all duration-150 p-1.5 rounded-lg hover:bg-black/5">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-          </svg>
-        </button>
-        <div
-          className="rounded-full flex items-center justify-center cursor-pointer"
-          style={{ width: '32px', height: '32px', background: C.dark, color: C.white, fontSize: '13px', fontWeight: '600' }}
-        >
-          U
-        </div>
-      </div>
+      <div />
     </header>
   )
 }

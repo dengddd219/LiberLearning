@@ -17,12 +17,20 @@ export async function apiPost<T>(path: string, body?: FormData | object): Promis
   return res.json()
 }
 
-export async function uploadFiles(pptFile?: File, audioFile?: File): Promise<{ session_id: string }> {
+export async function uploadFiles(
+  pptFile?: File,
+  audioFile?: File,
+  language: string = 'en',
+  userAnchors?: { page_num: number; timestamp: number }[],
+): Promise<{ session_id: string }> {
   const form = new FormData()
   if (pptFile) form.append('ppt', pptFile)
   if (audioFile) form.append('audio', audioFile)
-  // TODO: change to '/api/process' when connecting to real pipeline
-  return apiPost('/api/process-mock', form)
+  form.append('language', language)
+  if (userAnchors && userAnchors.length > 0) {
+    form.append('user_anchors', JSON.stringify(userAnchors))
+  }
+  return apiPost('/api/process', form)
 }
 
 export async function getSession(sessionId: string) {
@@ -31,4 +39,16 @@ export async function getSession(sessionId: string) {
 
 export async function retryPage(sessionId: string, pageNum: number) {
   return apiPost(`/api/sessions/${sessionId}/page/${pageNum}/retry`)
+}
+
+export async function listSessions(): Promise<
+  {
+    session_id: string
+    status: string
+    ppt_filename: string | null
+    total_duration: number
+    created_at: string | null
+  }[]
+> {
+  return apiGet('/api/sessions')
 }

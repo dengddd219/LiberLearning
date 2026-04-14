@@ -1,11 +1,12 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTabs } from '../context/TabsContext'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { getSession } from '../lib/api'
+import { getSession, retryPage } from '../lib/api'
 
 interface Bullet { text: string; ai_comment: string; timestamp_start: number; timestamp_end: number }
 interface PageData {
   page_num: number
+  status?: string
   pdf_url: string
   pdf_page_num: number
   ppt_text: string
@@ -13,7 +14,7 @@ interface PageData {
   page_end_time: number
   alignment_confidence: number
   active_notes: { user_note: string; ai_expansion: string } | null
-  passive_notes: { bullets: Bullet[] } | null
+  passive_notes: { bullets: Bullet[]; error?: string } | null
   page_supplement: { content: string; timestamp_start: number; timestamp_end: number } | null
 }
 interface SessionData {
@@ -25,10 +26,9 @@ interface SessionData {
   pages: PageData[]
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
 
 const FONT_SERIF = "'Lora', Georgia, serif"
-const FONT_SANS  = "'Inter', system-ui, sans-serif"
 const C = {
   bg: '#F0EFEA',
   sidebar: '#E8E7E2',
@@ -56,9 +56,9 @@ export default function NotesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [scrollToPage, setScrollToPage] = useState<number | null>(null)
   const [noteMode, setNoteMode] = useState<'my' | 'ai'>('ai')
-  const [template, setTemplate] = useState<'讲解笔记' | '问答笔记' | '大纲摘要' | '主动学习'>('讲解笔记')
-  const [granularity, setGranularity] = useState<'简略' | '详细'>('详细')
   const [copyToast, setCopyToast] = useState(false)
+  const [retrying, setRetrying] = useState<number | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map())
   const audioRef = useRef<HTMLAudioElement>(null)
 
@@ -145,6 +145,21 @@ export default function NotesPage() {
     URL.revokeObjectURL(url)
   }, [session])
 
+  const handleRetryPage = useCallback(async (pageNum: number) => {
+    if (!sessionId || retrying !== null) return
+    setRetrying(pageNum)
+    try {
+      await retryPage(sessionId, pageNum)
+      // Reload session data
+      const data = await getSession(sessionId)
+      setSession(data as SessionData)
+    } catch {
+      // keep current state
+    } finally {
+      setRetrying(null)
+    }
+  }, [sessionId, retrying])
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: C.bg }}>
@@ -177,13 +192,6 @@ export default function NotesPage() {
   const currentPageData = session.pages.find((p) => p.page_num === currentPage)
   const totalPages = session.pages.length
 
-  // Build mock slides for sidebar (use real data)
-  const slides = session.pages.map((p) => ({
-    pageNum: p.page_num,
-    pdfUrl: `${API_BASE}${p.pdf_url}`,
-    pdfPageNum: p.pdf_page_num,
-  }))
-
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ background: C.bg, fontFamily: FONT_SERIF }}>
 
@@ -191,74 +199,77 @@ export default function NotesPage() {
       <div className="flex flex-1 overflow-hidden" style={{ marginTop: '64px' }}>
 
         {/* Left sidebar: Lecture Slides */}
-        <aside
-          className="flex-shrink-0 flex flex-col overflow-hidden"
-          style={{ width: '200px', background: C.sidebar, borderRight: '1px solid rgba(175,179,176,0.1)' }}
-        >
-          {/* Sidebar header */}
-          <div
-            className="flex items-center justify-between flex-shrink-0 px-4"
-            style={{ height: '48px', borderBottom: '1px solid rgba(175,179,176,0.1)' }}
+        {sidebarOpen && (
+          <aside
+            className="flex-shrink-0 flex flex-col overflow-hidden"
+            style={{ width: '200px', background: C.sidebar, borderRight: '1px solid rgba(175,179,176,0.1)' }}
           >
-            <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.secondary }}>
-              LECTURE SLIDES
-            </span>
-            <button
-              type="button"
-              aria-label="收起侧边栏"
-              className="cursor-pointer transition-all duration-150 opacity-60 hover:opacity-100 min-w-[44px] min-h-[44px] flex items-center justify-center border-none bg-transparent p-0"
+            {/* Sidebar header */}
+            <div
+              className="flex items-center justify-between flex-shrink-0 px-4"
+              style={{ height: '48px', borderBottom: '1px solid rgba(175,179,176,0.1)' }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </button>
-          </div>
+              <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.secondary }}>
+                LECTURE SLIDES
+              </span>
+              <button
+                type="button"
+                aria-label="收起侧边栏"
+                onClick={() => setSidebarOpen(false)}
+                className="cursor-pointer transition-all duration-150 opacity-60 hover:opacity-100 min-w-[44px] min-h-[44px] flex items-center justify-center border-none bg-transparent p-0"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+            </div>
 
-          {/* Slide thumbnails */}
-          <div className="flex-1 overflow-y-auto p-3" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {slides.map((slide) => {
-              const isActive = slide.pageNum === currentPage
-              return (
-                <button
-                  type="button"
-                  key={slide.pageNum}
-                  onClick={() => setScrollToPage(slide.pageNum)}
-                  aria-label={`跳转到第 ${slide.pageNum} 张幻灯片`}
-                  aria-current={isActive ? 'true' : undefined}
-                  className="relative cursor-pointer transition-all duration-150 rounded-md overflow-hidden flex-shrink-0 flex items-center justify-center w-full border-none p-0"
-                  style={{
-                    height: '96px',
-                    borderRadius: '6px',
-                    background: C.divider,
-                    boxShadow: isActive
-                      ? '0px 0px 0px 2px rgba(95,94,94,1)'
-                      : '0 1px 3px rgba(0,0,0,0.08)',
-                    opacity: isActive ? 1 : 0.7,
-                  }}
-                >
-                  <span style={{ fontSize: '22px', fontWeight: '700', color: '#AFB3B0' }}>
-                    {slide.pageNum}
-                  </span>
-                  {/* Page badge */}
-                  <span
-                    className="absolute top-1.5 left-1.5 flex items-center justify-center"
+            {/* Slide thumbnails */}
+            <div className="flex-1 overflow-y-auto p-3" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {session.pages.map((page) => {
+                const isActive = page.page_num === currentPage
+                return (
+                  <button
+                    type="button"
+                    key={page.page_num}
+                    onClick={() => setScrollToPage(page.page_num)}
+                    aria-label={`跳转到第 ${page.page_num} 张幻灯片`}
+                    aria-current={isActive ? 'true' : undefined}
+                    className="relative cursor-pointer transition-all duration-150 rounded-md overflow-hidden flex-shrink-0 flex items-center justify-center w-full border-none p-0"
                     style={{
-                      background: C.fg,
-                      color: C.white,
-                      fontSize: '9px',
-                      fontWeight: '700',
-                      borderRadius: '3px',
-                      padding: '1px 5px',
-                      minWidth: '18px',
+                      height: '96px',
+                      borderRadius: '6px',
+                      background: C.divider,
+                      boxShadow: isActive
+                        ? '0px 0px 0px 2px rgba(95,94,94,1)'
+                        : '0 1px 3px rgba(0,0,0,0.08)',
+                      opacity: isActive ? 1 : 0.7,
                     }}
                   >
-                    {slide.pageNum}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </aside>
+                    <span style={{ fontSize: '22px', fontWeight: '700', color: '#AFB3B0' }}>
+                      {page.page_num}
+                    </span>
+                    {/* Page badge */}
+                    <span
+                      className="absolute top-1.5 left-1.5 flex items-center justify-center"
+                      style={{
+                        background: C.fg,
+                        color: C.white,
+                        fontSize: '9px',
+                        fontWeight: '700',
+                        borderRadius: '3px',
+                        padding: '1px 5px',
+                        minWidth: '18px',
+                      }}
+                    >
+                      {page.page_num}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </aside>
+        )}
 
         {/* Center: PPT Canvas */}
         <main className="flex-1 flex flex-col overflow-hidden" style={{ background: C.bg }}>
@@ -275,6 +286,18 @@ export default function NotesPage() {
           >
             {/* Left: Navigation */}
             <div className="flex items-center gap-2">
+              {!sidebarOpen && (
+                <button
+                  type="button"
+                  aria-label="展开侧边栏"
+                  onClick={() => setSidebarOpen(true)}
+                  className="cursor-pointer transition-all duration-150 min-w-[44px] min-h-[44px] flex items-center justify-center rounded hover:bg-black/5 border-none bg-transparent"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </button>
+              )}
               <button
                 type="button"
                 aria-label="上一页"
@@ -300,13 +323,6 @@ export default function NotesPage() {
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
               </button>
-            </div>
-
-            {/* Center: Zoom */}
-            <div className="flex items-center gap-2">
-              <button className="cursor-pointer transition-all duration-150 w-6 h-6 flex items-center justify-center rounded hover:bg-black/5" style={{ color: C.secondary, fontSize: '16px' }}>−</button>
-              <span className="text-xs" style={{ color: C.fg, minWidth: '36px', textAlign: 'center' }}>125%</span>
-              <button className="cursor-pointer transition-all duration-150 w-6 h-6 flex items-center justify-center rounded hover:bg-black/5" style={{ color: C.secondary, fontSize: '16px' }}>+</button>
             </div>
 
             {/* Right: Download */}
@@ -450,77 +466,23 @@ export default function NotesPage() {
                   </svg>
                 )}
                 AI Notes
-                {noteMode === 'ai' && (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
-                )}
               </button>
             </div>
-
-            {/* Template + Granularity selector — shown only in AI Notes mode */}
-            {noteMode === 'ai' && (
-              <div
-                className="flex items-center gap-3 flex-wrap"
-                style={{ padding: '0 4px' }}
-              >
-                {/* Template pills */}
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {(['讲解笔记', '问答笔记', '大纲摘要', '主动学习'] as const).map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setTemplate(t)}
-                      className="text-xs cursor-pointer transition-all duration-150 px-2.5 py-1"
-                      style={{
-                        borderRadius: '9999px',
-                        fontWeight: template === t ? '600' : '400',
-                        background: template === t ? C.fg : 'transparent',
-                        color: template === t ? C.white : C.secondary,
-                        border: `1px solid ${template === t ? C.fg : 'rgba(175,179,176,0.3)'}`,
-                      }}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
-                <div style={{ width: '1px', height: '16px', background: 'rgba(175,179,176,0.3)' }} />
-                {/* Granularity pills */}
-                <div className="flex items-center gap-1.5">
-                  {(['简略', '详细'] as const).map((g) => (
-                    <button
-                      key={g}
-                      onClick={() => setGranularity(g)}
-                      className="text-xs cursor-pointer transition-all duration-150 px-2.5 py-1"
-                      style={{
-                        borderRadius: '9999px',
-                        fontWeight: granularity === g ? '600' : '400',
-                        background: granularity === g ? C.fg : 'transparent',
-                        color: granularity === g ? C.white : C.secondary,
-                        border: `1px solid ${granularity === g ? C.fg : 'rgba(175,179,176,0.3)'}`,
-                      }}
-                    >
-                      {g}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Notes content area */}
           <div className="flex-1 overflow-y-auto px-6 pb-4">
-            {/* Section label */}
-            <div className="mb-4">
-              <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.muted }}>
-                ACTIVE ANNOTATION
-              </span>
-            </div>
 
             {noteMode === 'my' ? (
               /* My Notes mode */
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {currentPageData?.active_notes ? (
                   <div>
+                    <div className="mb-3">
+                      <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.muted }}>
+                        ACTIVE ANNOTATION
+                      </span>
+                    </div>
                     {/* Timestamp row */}
                     <div className="flex items-center gap-2 mb-2">
                       <span style={{ fontSize: '11px', color: '#AFB3B0', fontWeight: '500' }}>
@@ -541,8 +503,14 @@ export default function NotesPage() {
             ) : (
               /* AI Notes mode */
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {/* Active notes (user note + AI expansion) */}
                 {currentPageData?.active_notes ? (
                   <div>
+                    <div className="mb-3">
+                      <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.muted }}>
+                        ACTIVE ANNOTATION
+                      </span>
+                    </div>
                     <div className="flex items-center gap-2 mb-2">
                       <span style={{ fontSize: '11px', color: '#AFB3B0', fontWeight: '500' }}>
                         {formatTime(currentPageData.page_start_time)}
@@ -569,27 +537,106 @@ export default function NotesPage() {
                   </div>
                 ) : null}
 
+                {/* Passive notes — error state */}
+                {currentPageData?.passive_notes?.error && (
+                  <div
+                    className="rounded-lg p-4"
+                    style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      <span style={{ fontSize: '12px', fontWeight: '600', color: '#B45309' }}>
+                        笔记生成失败
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '12px', color: '#92400E', lineHeight: '1.5', marginBottom: '8px' }}>
+                      {currentPageData.passive_notes.error}
+                    </p>
+                    <button
+                      onClick={() => handleRetryPage(currentPageData.page_num)}
+                      disabled={retrying === currentPageData.page_num}
+                      className="text-xs px-3 py-1.5 rounded cursor-pointer transition-all duration-150 disabled:opacity-50"
+                      style={{
+                        background: '#F59E0B',
+                        color: C.white,
+                        border: 'none',
+                        fontWeight: '500',
+                      }}
+                    >
+                      {retrying === currentPageData.page_num ? '重新生成中…' : '重新生成'}
+                    </button>
+                  </div>
+                )}
+
                 {/* Passive notes bullets */}
-                {currentPageData?.passive_notes && (
+                {currentPageData?.passive_notes && currentPageData.passive_notes.bullets.length > 0 && (
                   <div>
                     <div className="mb-3">
                       <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.muted }}>
                         AI NOTES
                       </span>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {currentPageData.passive_notes.bullets.map((bullet, i) => (
-                        <div key={i} className="flex items-start gap-2">
-                          <span style={{ color: '#AFB3B0', marginTop: '2px', flexShrink: 0 }}>•</span>
-                          <button
-                            onClick={() => handleTimestampClick(bullet.timestamp_start)}
-                            className="text-left cursor-pointer transition-all duration-150"
-                            style={{ fontSize: '14px', color: C.fg, lineHeight: '1.6' }}
-                          >
-                            {bullet.text}
-                          </button>
+                        <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div className="flex items-start gap-2">
+                            <span style={{ color: '#AFB3B0', marginTop: '2px', flexShrink: 0 }}>•</span>
+                            <button
+                              onClick={() => handleTimestampClick(bullet.timestamp_start)}
+                              className="text-left cursor-pointer transition-all duration-150 hover:opacity-70"
+                              style={{ fontSize: '14px', color: C.fg, lineHeight: '1.6', background: 'none', border: 'none', padding: 0 }}
+                            >
+                              {bullet.text}
+                            </button>
+                          </div>
+                          {bullet.ai_comment && (
+                            <div style={{ marginLeft: '18px', paddingLeft: '10px', borderLeft: '2px solid rgba(175,179,176,0.2)' }}>
+                              <p style={{ fontSize: '12px', color: C.secondary, lineHeight: '1.5' }}>
+                                {bullet.ai_comment}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* No data at all */}
+                {!currentPageData?.active_notes && !currentPageData?.passive_notes?.error && (!currentPageData?.passive_notes || currentPageData.passive_notes.bullets.length === 0) && (
+                  <div className="flex items-center justify-center py-8">
+                    <p style={{ fontSize: '13px', color: C.muted }}>该页暂无 AI 笔记</p>
+                  </div>
+                )}
+
+                {/* Page supplement (off-slide content) */}
+                {currentPageData?.page_supplement && (
+                  <div>
+                    <div className="mb-3">
+                      <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.muted }}>
+                        OFF-SLIDE CONTENT
+                      </span>
+                    </div>
+                    <div
+                      className="rounded-lg p-3"
+                      style={{ background: 'rgba(85,96,113,0.05)', border: '1px solid rgba(85,96,113,0.1)' }}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <button
+                          onClick={() => handleTimestampClick(currentPageData.page_supplement!.timestamp_start)}
+                          className="text-xs cursor-pointer transition-all duration-150 hover:opacity-70"
+                          style={{ color: '#AFB3B0', background: 'none', border: 'none', padding: 0 }}
+                        >
+                          {formatTime(currentPageData.page_supplement.timestamp_start)} - {formatTime(currentPageData.page_supplement.timestamp_end)}
+                        </button>
+                      </div>
+                      <p style={{ fontSize: '13px', color: C.fg, lineHeight: '1.6' }}>
+                        {currentPageData.page_supplement.content}
+                      </p>
                     </div>
                   </div>
                 )}
@@ -597,44 +644,29 @@ export default function NotesPage() {
             )}
           </div>
 
-          {/* Bottom input area */}
+          {/* Bottom: copy button */}
           <div
             className="flex-shrink-0 p-4"
             style={{ borderTop: '1px solid rgba(175,179,176,0.15)' }}
           >
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="添加笔记…"
-                className="w-full outline-none text-sm"
-                style={{
-                  borderRadius: '9999px',
-                  padding: '12px 52px 12px 16px',
-                  background: C.sidebar,
-                  color: C.fg,
-                  border: 'none',
-                }}
-              />
-              <button
-                type="button"
-                aria-label="复制当前页笔记"
-                title="复制当前页笔记到剪贴板"
-                onClick={handleCopyPage}
-                className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center cursor-pointer transition-all duration-150"
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '9999px',
-                  background: C.fg,
-                  border: 'none',
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="22" y1="2" x2="11" y2="13" />
-                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                </svg>
-              </button>
-            </div>
+            <button
+              type="button"
+              aria-label="复制当前页笔记"
+              title="复制当前页笔记到剪贴板"
+              onClick={handleCopyPage}
+              className="w-full flex items-center justify-center gap-2 text-sm cursor-pointer transition-all duration-150 py-2.5 rounded-full"
+              style={{
+                background: C.sidebar,
+                color: C.secondary,
+                border: 'none',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+              复制当前页笔记
+            </button>
           </div>
         </aside>
       </div>

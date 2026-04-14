@@ -1,17 +1,14 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import SlideCanvas from '../components/SlideCanvas'
-import RecordingControl from '../components/RecordingControl'
-import FileUpload from '../components/FileUpload'
 import { getIncompleteSession, saveSession, clearSession } from '../lib/idb'
 import { uploadFiles } from '../lib/api'
 
 interface Annotation {
   id: string
   pageNum: number
+  title: string
   text: string
-  yPosition: number
-  timestamp: number
+  timestamp: number // seconds elapsed
 }
 
 interface SlideInfo {
@@ -22,10 +19,13 @@ interface SlideInfo {
 const SESSION_ID = `session-${Date.now()}`
 
 const MOCK_SLIDES: SlideInfo[] = [
-  { pageNum: 1, slideImageUrl: '/slides/slide_001.png' },
-  { pageNum: 2, slideImageUrl: '/slides/slide_002.png' },
-  { pageNum: 3, slideImageUrl: '/slides/slide_003.png' },
+  { pageNum: 1, slideImageUrl: 'https://placehold.co/175x96' },
+  { pageNum: 2, slideImageUrl: '' },
+  { pageNum: 3, slideImageUrl: '' },
 ]
+
+// Waveform bar heights (mock)
+const WAVEFORM_BARS = [24, 40, 20, 48, 36, 28, 56, 24, 40, 20, 44, 32]
 
 function useRecordingTimer(isRecording: boolean) {
   const [elapsed, setElapsed] = useState(0)
@@ -36,13 +36,18 @@ function useRecordingTimer(isRecording: boolean) {
       intervalRef.current = setInterval(() => setElapsed((e) => e + 1), 1000)
     } else {
       if (intervalRef.current) clearInterval(intervalRef.current)
-      setElapsed(0)
     }
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [isRecording])
 
   const mm = String(Math.floor(elapsed / 60)).padStart(2, '0')
   const ss = String(elapsed % 60).padStart(2, '0')
+  return { display: `${mm}:${ss}`, elapsed }
+}
+
+function formatTimestamp(seconds: number) {
+  const mm = String(Math.floor(seconds / 60)).padStart(2, '0')
+  const ss = String(seconds % 60).padStart(2, '0')
   return `${mm}:${ss}`
 }
 
@@ -51,18 +56,16 @@ export default function SessionPage() {
   const [slides] = useState<SlideInfo[]>(MOCK_SLIDES)
   const [currentPage, setCurrentPage] = useState(1)
   const [annotations, setAnnotations] = useState<Annotation[]>([])
-  const [scrollToPage, setScrollToPage] = useState<number | null>(null)
-  const [pptFile, setPptFile] = useState<File | null>(null)
+  const [pptFile, _setPptFile] = useState<File | null>(null)
   const [audioChunks, setAudioChunks] = useState<Blob[]>([])
-  const [hasPpt, setHasPpt] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [recoveryModal, setRecoveryModal] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
-  const [noteMode, setNoteMode] = useState<'my' | 'ai'>('my')
   const [noteInput, setNoteInput] = useState('')
+  const [noteMode, setNoteMode] = useState<'my' | 'ai'>('my')
   const recoverySessionRef = useRef<string | null>(null)
-  const recTimer = useRecordingTimer(isRecording)
-  const totalPages = slides.length
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const { display: recTimer, elapsed } = useRecordingTimer(isRecording)
 
   useEffect(() => {
     getIncompleteSession().then((session) => {
@@ -87,28 +90,43 @@ export default function SessionPage() {
     return () => window.removeEventListener('beforeunload', handler)
   }, [pptFile])
 
-  const handleAnnotationAdd = useCallback((ann: Annotation) => {
+  const handleStartRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mr = new MediaRecorder(stream)
+      mediaRecorderRef.current = mr
+      const chunks: Blob[] = []
+      mr.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
+      mr.onstop = () => {
+        setAudioChunks(chunks)
+        stream.getTracks().forEach((t) => t.stop())
+      }
+      mr.start(1000)
+      setIsRecording(true)
+    } catch {
+      alert('无法访问麦克风，请检查权限设置')
+    }
+  }, [])
+
+  const handleEndSession = useCallback(() => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop()
+      setIsRecording(false)
+    }
+  }, [isRecording])
+
+  const handleAddNote = useCallback(() => {
+    if (!noteInput.trim()) return
+    const ann: Annotation = {
+      id: `ann-${Date.now()}`,
+      pageNum: currentPage,
+      title: noteInput.trim().slice(0, 30),
+      text: noteInput.trim(),
+      timestamp: elapsed,
+    }
     setAnnotations((prev) => [...prev, ann])
-  }, [])
-
-  const handleAnnotationDelete = useCallback((id: string) => {
-    setAnnotations((prev) => prev.filter((a) => a.id !== id))
-  }, [])
-
-  const handleNavClick = useCallback((pageNum: number) => {
-    setScrollToPage(pageNum)
-    setTimeout(() => setScrollToPage(null), 100)
-  }, [])
-
-  const handlePptUpload = useCallback((file: File) => {
-    setPptFile(file)
-    setHasPpt(true)
-  }, [])
-
-  const handleRecordingStop = useCallback((chunks: Blob[]) => {
-    setAudioChunks(chunks)
-    setIsRecording(false)
-  }, [])
+    setNoteInput('')
+  }, [noteInput, currentPage, elapsed])
 
   const handleGenerateNotes = useCallback(async () => {
     setSubmitting(true)
@@ -123,94 +141,55 @@ export default function SessionPage() {
     }
   }, [pptFile, audioChunks, navigate])
 
-  if (!hasPpt) {
-    return (
-      <div className="flex h-screen overflow-hidden" style={{ background: '#FAF9F7', fontFamily: 'Inter, sans-serif' }}>
-        <div className="flex-1 p-8 overflow-y-auto">
-          <div className="max-w-xl mx-auto">
-            <h2 className="text-xl font-bold mb-2" style={{ color: '#2F3331' }}>无 PPT 模式</h2>
-            <p className="text-sm mb-6" style={{ color: '#777C79' }}>仅录音 + 自由文本笔记，生成按段落整理的结构化笔记</p>
-            <FileUpload label="上传 PPT（可选）" hint=".ppt / .pptx / .pdf" onFile={handlePptUpload} />
-          </div>
-        </div>
-        <div className="w-80 flex flex-col" style={{ background: '#FFFFFF', borderLeft: '1px solid rgba(175,179,176,0.1)' }}>
-          <RecordingControl sessionId={SESSION_ID} onStop={handleRecordingStop} />
-          <div className="flex-1 p-4">
-            <p className="text-sm mb-2" style={{ color: '#777C79' }}>自由笔记</p>
-            <textarea
-              className="w-full h-64 text-sm rounded-lg p-3 outline-none resize-none"
-              style={{ border: '1px solid rgba(175,179,176,0.3)', color: '#2F3331', background: '#FAF9F7' }}
-              placeholder="在此记录笔记…"
-            />
-          </div>
-          <div className="p-4" style={{ borderTop: '1px solid rgba(175,179,176,0.1)' }}>
-            <button
-              onClick={handleGenerateNotes}
-              disabled={submitting}
-              className="w-full py-3 rounded-xl font-medium text-sm cursor-pointer transition-all duration-150"
-              style={{ background: '#5F5E5E', color: '#FFFFFF', opacity: submitting ? 0.6 : 1 }}
-            >
-              {submitting ? '提交中…' : '生成课堂笔记 →'}
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div
-      className="relative bg-stone-50 w-full min-h-screen flex flex-col"
-    >
-      {/* Main Content - centered with top padding for nav bar */}
-      <div
-        className="self-stretch flex justify-start items-start overflow-hidden"
-        style={{ paddingTop: '64px', height: 'calc(100vh - 4rem)' }}
-      >
+    <div className="w-full pb-24 relative bg-stone-50 inline-flex flex-col justify-start items-start" style={{ fontFamily: 'Inter, sans-serif', minHeight: '100vh' }}>
+      {/* Main content area below topbar */}
+      <div className="self-stretch inline-flex justify-start items-start overflow-hidden" style={{ paddingTop: '64px', height: 'calc(100vh - 64px)' }}>
+
         {/* Left Sidebar - Lecture Slides */}
-        <div
-          className="self-stretch flex flex-col justify-start items-start overflow-hidden"
-          style={{ width: '192px', background: '#F3F4F1', borderRight: '1px solid rgba(175,179,176,0.1)' }}
-        >
-          <div
-            className="self-stretch p-4 flex justify-between items-center"
-            style={{ borderBottom: '1px solid rgba(175,179,176,0.1)' }}
-          >
-            <div className="flex flex-col justify-start items-start">
-              <div className="justify-center text-slate-600 text-[10px] font-bold font-['Inter'] uppercase leading-4 tracking-wide" style={{ fontFamily: 'Inter, sans-serif' }}>LECTURE SLIDES</div>
+        <div className="w-48 self-stretch bg-stone-100 border-r border-zinc-400/10 inline-flex flex-col justify-start items-start">
+          {/* Header */}
+          <div className="self-stretch p-4 border-b border-zinc-400/10 inline-flex justify-between items-center">
+            <div className="inline-flex flex-col justify-start items-start">
+              <div className="justify-center text-slate-600 text-[10px] font-bold uppercase leading-4 tracking-wide">LECTURE SLIDES</div>
             </div>
-            <button className="cursor-pointer transition-all duration-150 p-1.5 rounded-2xl hover:bg-black/5">
-              <svg width="7" height="5" viewBox="0 0 7 5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M3.5 4.31667L0 0.816667L0.816667 0L3.5 2.68333L6.18333 0L7 0.816667L3.5 4.31667Z" fill="#556071"/>
+            <button className="p-1 rounded-2xl hover:bg-black/5 cursor-pointer" aria-label="收起幻灯片列表">
+              <svg width="14" height="8" viewBox="0 0 14 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M7 7.31667L0 0.816667L0.816667 0L7 6.18333L13.1833 0L14 0.816667L7 7.31667Z" fill="#556071"/>
               </svg>
             </button>
           </div>
-          <div className="self-stretch flex-1 p-3 flex flex-col justify-start items-start gap-4 overflow-hidden">
+          {/* Slide Thumbnails */}
+          <div className="self-stretch flex-1 p-3 flex flex-col justify-start items-start gap-4 overflow-y-auto overflow-x-hidden">
             {slides.map((slide, index) => {
               const isActive = slide.pageNum === currentPage
               return (
                 <button
-                  type="button"
                   key={slide.pageNum}
-                  onClick={() => handleNavClick(slide.pageNum)}
+                  type="button"
+                  onClick={() => setCurrentPage(slide.pageNum)}
                   aria-label={`跳转到第 ${slide.pageNum} 张幻灯片`}
                   aria-current={isActive ? 'true' : undefined}
-                  className="w-full text-left self-stretch relative cursor-pointer transition-all duration-150 overflow-hidden flex flex-col justify-start items-start border-none bg-transparent p-0"
+                  className="self-stretch relative flex flex-col justify-start items-start overflow-hidden border-none p-0 cursor-pointer"
                   style={{
                     borderRadius: '6px',
-                    background: isActive ? '#FFFFFF' : 'rgba(0,0,0,0)',
+                    opacity: isActive ? 1 : 0.7,
+                    background: isActive ? 'rgba(255,255,255,0)' : '#E5E7EB',
                     boxShadow: isActive
                       ? '0px 1px 2px 0px rgba(0,0,0,0.05), 0px 0px 0px 2px rgba(95,94,94,1)'
-                      : '0px 1px 2px 0px rgba(0,0,0,0.05)',
-                    opacity: isActive ? 1 : 0.7,
+                      : undefined,
                   }}
                 >
-                  <img className="self-stretch h-24 relative" src={slide.slideImageUrl || 'https://placehold.co/175x96'} alt={`Slide ${slide.pageNum}`} />
+                  {isActive ? (
+                    <img className="self-stretch h-24 relative object-cover" src={slide.slideImageUrl || 'https://placehold.co/175x96'} alt={`Slide ${slide.pageNum}`} />
+                  ) : (
+                    <div className="self-stretch h-24 relative bg-white" style={{ background: 'rgba(255,255,255,0.5)' }} />
+                  )}
                   <div
                     className="px-1.5 absolute"
-                    style={{ left: '4px', top: '4px', background: isActive ? '#2F3331' : '#556071', borderRadius: '3px' }}
+                    style={{ left: '4px', top: '4px', background: isActive ? '#556071' : '#556071', borderRadius: '3px' }}
                   >
-                    <div className="justify-center text-white text-[10px] font-normal font-['Inter'] leading-4" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    <div className="justify-center text-white text-[10px] font-normal leading-4">
                       {String(slide.pageNum).padStart(2, '0')}
                     </div>
                   </div>
@@ -221,222 +200,311 @@ export default function SessionPage() {
         </div>
 
         {/* Center - PPT Canvas */}
-        <div
-          className="flex-1 self-stretch flex flex-col justify-start items-start overflow-hidden"
-          style={{ background: '#FAF9F7' }}
-        >
+        <div className="flex-1 self-stretch bg-stone-50 inline-flex flex-col justify-start items-start overflow-hidden">
           {/* Toolbar */}
-          <div
-            className="self-stretch h-12 px-6 flex justify-between items-center"
-            style={{ background: '#FFFFFF', boxShadow: '0px 1px 2px 0px rgba(0,0,0,0.05)', borderBottom: '1px solid rgba(175,179,176,0.1)' }}
-          >
+          <div className="self-stretch h-12 px-6 bg-white shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] border-b border-zinc-400/20 inline-flex justify-between items-center">
             <div className="flex justify-start items-center gap-4">
               <div className="flex justify-start items-center gap-2">
-                <button type="button" aria-label="下载幻灯片" className="p-2.5 rounded-2xl flex flex-col justify-center items-center cursor-pointer transition-all duration-150 hover:bg-black/5">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path d="M8 12L3 7L4.4 5.55L7 8.15V0H9V8.15L11.6 5.55L13 7L8 12ZM2 16C1.45 16 0.979167 15.8042 0.5875 15.4125C0.195833 15.0208 0 14.55 0 14V11H2V14H14V11H16V14C16 14.55 15.8042 15.0208 15.4125 15.4125C15.0208 15.8042 14.55 16 14 16H2Z" fill="#556071"/>
+                <button type="button" aria-label="下载" className="p-1 rounded-2xl hover:bg-black/5 cursor-pointer">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8 12L3 7L4.4 5.55L7 8.15V0H9V8.15L11.6 5.55L13 7L8 12ZM2 16C1.45 16 0.979 15.804 0.588 15.413C0.196 15.021 0 14.55 0 14V11H2V14H14V11H16V14C16 14.55 15.804 15.021 15.413 15.413C15.021 15.804 14.55 16 14 16H2Z" fill="#556071"/>
                   </svg>
                 </button>
-                <button type="button" aria-label="添加批注" className="p-2.5 rounded-2xl flex flex-col justify-center items-center cursor-pointer transition-all duration-150 hover:bg-black/5">
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <button type="button" aria-label="添加批注" className="p-1 rounded-2xl hover:bg-black/5 cursor-pointer">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M6 8H0V6H6V0H8V6H14V8H8V14H6V8Z" fill="#556071"/>
                   </svg>
                 </button>
               </div>
               <div className="w-px h-6 bg-zinc-400/20" />
               <div className="flex justify-start items-center gap-2">
-                <button type="button" aria-label="上一页" className="p-2.5 rounded-2xl flex flex-col justify-center items-center cursor-pointer transition-all duration-150 hover:bg-black/5">
-                  <svg width="15" height="12" viewBox="0 0 15 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path d="M0 12V0L14.25 6L0 12ZM1.5 9.75L10.3875 6L1.5 2.25V4.875L6 6L1.5 7.125V9.75ZM1.5 9.75V6V2.25V4.875V7.125V9.75Z" fill="white"/>
+                <button type="button" aria-label="上一页" className="p-1 rounded-2xl hover:bg-black/5 cursor-pointer">
+                  <svg width="20" height="16" viewBox="0 0 20 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M0 8L8 0V16L0 8ZM9 8L17 0V16L9 8Z" fill="#556071"/>
                   </svg>
                 </button>
-                <button type="button" aria-label="下一页" className="p-2.5 rounded-2xl flex flex-col justify-center items-center cursor-pointer transition-all duration-150 hover:bg-black/5">
-                  <svg width="15" height="12" viewBox="0 0 15 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path d="M0 12V0L14.25 6L0 12ZM1.5 9.75L10.3875 6L1.5 2.25V4.875L6 6L1.5 7.125V9.75ZM1.5 9.75V6V2.25V4.875V7.125V9.75Z" fill="white"/>
+                <button type="button" aria-label="下一页" className="p-1 rounded-2xl hover:bg-black/5 cursor-pointer">
+                  <svg width="20" height="16" viewBox="0 0 20 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M20 8L12 16V0L20 8ZM11 8L3 16V0L11 8Z" fill="#556071"/>
                   </svg>
                 </button>
-                <button type="button" aria-label="全屏" className="p-2.5 rounded-2xl flex flex-col justify-center items-center cursor-pointer transition-all duration-150 hover:bg-black/5">
-                  <svg width="15" height="12" viewBox="0 0 15 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path d="M0 12V0L14.25 6L0 12ZM1.5 9.75L10.3875 6L1.5 2.25V4.875L6 6L1.5 7.125V9.75ZM1.5 9.75V6V2.25V4.875V7.125V9.75Z" fill="white"/>
+                <button type="button" aria-label="全屏" className="p-1 rounded-2xl hover:bg-black/5 cursor-pointer">
+                  <svg width="14" height="16" viewBox="0 0 14 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M0 16V0H2V7H12V0H14V16H12V9H2V16H0Z" fill="#556071"/>
                   </svg>
                 </button>
               </div>
             </div>
+            {/* Zoom */}
             <div className="flex justify-start items-center gap-3">
-              <button type="button" aria-label="缩小" className="p-2.5 rounded-2xl flex flex-col justify-center items-center cursor-pointer transition-all duration-150 hover:bg-black/5">
-                <svg width="14" height="2" viewBox="0 0 14 2" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <button type="button" aria-label="缩小" className="p-1 rounded-2xl hover:bg-black/5 cursor-pointer">
+                <svg width="14" height="2" viewBox="0 0 14 2" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M0 2V0H14V2H0Z" fill="#556071"/>
                 </svg>
               </button>
-              <div className="flex flex-col justify-start items-start">
-                <div className="justify-center text-zinc-800 text-xs font-medium font-['Inter'] leading-4" style={{ fontFamily: 'Inter, sans-serif' }}>125%</div>
-              </div>
-              <button type="button" aria-label="放大" className="p-2.5 rounded-2xl flex flex-col justify-center items-center cursor-pointer transition-all duration-150 hover:bg-black/5">
-                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M10.5 4.66667L9.77083 3.0625L8.16667 2.33333L9.77083 1.60417L10.5 0L11.2292 1.60417L12.8333 2.33333L11.2292 3.0625L10.5 4.66667ZM10.5 12.8333L9.77083 11.2292L8.16667 10.5L9.77083 9.77083L10.5 8.16667L11.2292 9.77083L12.8333 10.5L11.2292 11.2292L10.5 12.8333ZM4.66667 11.0833L3.20833 7.875L0 6.41667L3.20833 4.95833L4.66667 1.75L6.125 4.95833L9.33333 6.41667L6.125 7.875L4.66667 11.0833ZM4.66667 8.25417L5.25 7L6.50417 6.41667L5.25 5.83333L4.66667 4.57917L4.08333 5.83333L2.82917 6.41667L4.08333 7L4.66667 8.25417Z" fill="#2F3331"/>
+              <div className="justify-center text-zinc-800 text-xs font-medium leading-4">125%</div>
+              <button type="button" aria-label="放大" className="p-1 rounded-2xl hover:bg-black/5 cursor-pointer">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M6 8H0V6H6V0H8V6H14V8H8V14H6V8Z" fill="#556071"/>
                 </svg>
               </button>
             </div>
+            {/* Right tools */}
             <div className="flex justify-start items-center gap-2">
-              <button type="button" aria-label="笔迹工具" className="p-2.5 rounded-2xl flex flex-col justify-center items-center cursor-pointer transition-all duration-150 hover:bg-black/5">
-                <svg width="21" height="18" viewBox="0 0 21 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12.1 11L9.5 8.4L4.5 13.4L7.1 16L12.1 11ZM10.925 6.975L13.525 9.575L18.5 4.6L15.9 2L10.925 6.975ZM8.825 6.275L14.225 11.675L8.5 17.4C8.1 17.8 7.63333 18 7.1 18C6.56667 18 6.1 17.8 5.7 17.4L5.65 17.35L5 18H0L3.15 14.85L3.1 14.8C2.7 14.4 2.5 13.9333 2.5 13.4C2.5 12.8667 2.7 12.4 3.1 12L8.825 6.275ZM8.825 6.275L14.5 0.6C14.9 0.2 15.3667 0 15.9 0C16.4333 0 16.9 0.2 17.3 0.6L19.9 3.2C20.3 3.6 20.5 4.06667 20.5 4.6C20.5 5.13333 20.3 5.6 19.9 6L14.225 11.675L8.825 6.275Z" fill="#556071"/>
+              <button type="button" aria-label="书签" className="p-1 rounded-2xl hover:bg-black/5 cursor-pointer">
+                <svg width="16" height="20" viewBox="0 0 16 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M0 20V2C0 1.45 0.196 0.979 0.588 0.588C0.979 0.196 1.45 0 2 0H14C14.55 0 15.021 0.196 15.413 0.588C15.804 0.979 16 1.45 16 2V20L8 17L0 20Z" fill="#556071"/>
                 </svg>
               </button>
-              <button type="button" aria-label="设置" className="p-2.5 rounded-2xl flex flex-col justify-center items-center cursor-pointer transition-all duration-150 hover:bg-black/5">
-                <svg width="21" height="20" viewBox="0 0 21 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                  <path d="M7.3 20L6.9 16.8C6.68333 16.7167 6.47917 16.6167 6.2875 16.5C6.09583 16.3833 5.90833 16.2583 5.725 16.125L2.75 17.375L0 12.625L2.575 10.675C2.55833 10.5583 2.55 10.4458 2.55 10.3375C2.55 10.2292 2.55 10.1167 2.55 10C2.55 9.88333 2.55 9.77083 2.55 9.6625C2.55 9.55417 2.55833 9.44167 2.575 9.325L0 7.375L2.75 2.625L5.725 3.875C5.90833 3.74167 6.1 3.61667 6.3 3.5C6.5 3.38333 6.7 3.28333 6.9 3.2L7.3 0H12.8L13.2 3.2C13.4167 3.28333 13.6208 3.38333 13.8125 3.5C14.0042 3.61667 14.1917 3.74167 14.375 3.875L17.35 2.625L20.1 7.375L17.525 9.325C17.5417 9.44167 17.55 9.55417 17.55 9.6625C17.55 9.77083 17.55 9.88333 17.55 10C17.55 10.1167 17.55 10.2292 17.55 10.3375C17.55 10.4458 17.5333 10.5583 17.5 10.675L20.075 12.625L17.325 17.375L14.375 16.125C14.1917 16.2583 14 16.3833 13.8 16.5C13.6 16.6167 13.4 16.7167 13.2 16.8L12.8 20H7.3ZM9.05 18H11.025L11.375 15.35C11.8917 15.2167 12.3708 15.0208 12.8125 14.7625C13.2542 14.5042 13.6583 14.1917 14.025 13.825L16.5 14.85L17.475 13.15L15.325 11.525C15.4083 11.2917 15.4667 11.0458 15.5 10.7875C15.5333 10.5292 15.55 10.2667 15.55 10C15.55 9.73333 15.5333 9.47083 15.5 9.2125C15.4667 8.95417 15.4083 8.70833 15.325 8.475L17.475 6.85L16.5 5.15L14.025 6.2C13.6583 5.81667 13.2542 5.49583 12.8125 5.2375C12.3708 4.97917 11.8917 4.78333 11.375 4.65L11.05 2H9.075L8.725 4.65C8.20833 4.78333 7.72917 4.97917 7.2875 5.2375C6.84583 5.49583 6.44167 5.80833 6.075 6.175L3.6 5.15L2.625 6.85L4.775 8.45C4.69167 8.7 4.63333 8.95 4.6 9.2C4.56667 9.45 4.55 9.71667 4.55 10C4.55 10.2667 4.56667 10.525 4.6 10.775C4.63333 11.025 4.69167 11.275 4.775 11.525L2.625 13.15L3.6 14.85L6.075 13.8C6.44167 14.1833 6.84583 14.5042 7.2875 14.7625C7.72917 15.0208 8.20833 15.2167 8.725 15.35L9.05 18ZM10.1 13.5C11.0667 13.5 11.8917 13.1583 12.575 12.475C13.2583 11.7917 13.6 10.9667 13.6 10C13.6 9.03333 13.2583 8.20833 12.575 7.525C11.8917 6.84167 11.0667 6.5 10.1 6.5C9.11667 6.5 8.2875 6.84167 7.6125 7.525C6.9375 8.20833 6.6 9.03333 6.6 10C6.6 10.9667 6.9375 11.7917 7.6125 12.475C8.2875 13.1583 9.11667 13.5 10.1 13.5Z" fill="#556071"/>
+              <button type="button" aria-label="笔记工具" className="p-1 rounded-2xl hover:bg-black/5 cursor-pointer">
+                <svg width="20" height="16" viewBox="0 0 20 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M0 16V14H20V16H0ZM0 9V7H12V9H0ZM0 2V0H20V2H0Z" fill="#556071"/>
                 </svg>
               </button>
-              <button type="button" aria-label="铅笔工具" className="p-2.5 rounded-2xl flex flex-col justify-center items-center cursor-pointer transition-all duration-150 hover:bg-black/5">
-                <svg width="19" height="18" viewBox="0 0 19 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                  <path d="M1 18V13.75L14.175 0.6C14.375 0.4 14.6 0.25 14.85 0.15C15.1 0.05 15.35 0 15.6 0C15.8667 0 16.1208 0.05 16.3625 0.15C16.6042 0.25 16.8167 0.4 17 0.6L18.4 2C18.6 2.18333 18.75 2.39583 18.85 2.6375C18.95 2.87917 19 3.13333 19 3.4C19 3.65 18.95 3.9 18.85 4.15C18.75 4.4 18.6 4.625 18.4 4.825L5.25 18H1ZM3 16H4.4L14.225 6.2L13.525 5.475L12.8 4.775L3 14.6V16ZM17 3.425L15.575 2L17 3.425ZM13.525 5.475L12.8 4.775L14.225 6.2L13.525 5.475ZM11 18C12.2333 18 13.375 17.6917 14.425 17.075C15.475 16.4583 16 15.6 16 14.5C16 13.9 15.8417 13.3833 15.525 12.95C15.2083 12.5167 14.7833 12.1417 14.25 11.825L12.775 13.3C13.1583 13.4667 13.4583 13.65 13.675 13.85C13.8917 14.05 14 14.2667 14 14.5C14 14.8833 13.6958 15.2292 13.0875 15.5375C12.4792 15.8458 11.7833 16 11 16C10.7167 16 10.4792 16.0958 10.2875 16.2875C10.0958 16.4792 10 16.7167 10 17C10 17.2833 10.0958 17.5208 10.2875 17.7125C10.4792 17.9042 10.7167 18 11 18ZM1.575 10.35L3.075 8.85C2.74167 8.71667 2.47917 8.57917 2.2875 8.4375C2.09583 8.29583 2 8.15 2 8C2 7.8 2.15 7.6 2.45 7.4C2.75 7.2 3.38333 6.89167 4.35 6.475C5.81667 5.84167 6.79167 5.26667 7.275 4.75C7.75833 4.23333 8 3.65 8 3C8 2.08333 7.63333 1.35417 6.9 0.8125C6.16667 0.270833 5.2 0 4 0C3.25 0 2.57917 0.133333 1.9875 0.4C1.39583 0.666667 0.941667 0.991667 0.625 1.375C0.441667 1.59167 0.366667 1.83333 0.4 2.1C0.433333 2.36667 0.558333 2.58333 0.775 2.75C0.991667 2.93333 1.23333 3.00833 1.5 2.975C1.76667 2.94167 1.99167 2.83333 2.175 2.65C2.40833 2.41667 2.66667 2.25 2.95 2.15C3.23333 2.05 3.58333 2 4 2C4.68333 2 5.1875 2.1 5.5125 2.3C5.8375 2.5 6 2.73333 6 3C6 3.23333 5.85417 3.44583 5.5625 3.6375C5.27083 3.82917 4.6 4.16667 3.55 4.65C2.21667 5.23333 1.29167 5.7625 0.775 6.2375C0.258333 6.7125 0 7.3 0 8C0 8.53333 0.141667 8.9875 0.425 9.3625C0.708333 9.7375 1.09167 10.0667 1.575 10.35Z" fill="#556071"/>
+              <button type="button" aria-label="更多" className="p-1 rounded-2xl hover:bg-black/5 cursor-pointer">
+                <svg width="16" height="20" viewBox="0 0 16 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M8 16C8.55 16 9.021 15.804 9.413 15.413C9.804 15.021 10 14.55 10 14C10 13.45 9.804 12.979 9.413 12.588C9.021 12.196 8.55 12 8 12C7.45 12 6.979 12.196 6.588 12.588C6.196 12.979 6 13.45 6 14C6 14.55 6.196 15.021 6.588 15.413C6.979 15.804 7.45 16 8 16ZM8 10C8.55 10 9.021 9.804 9.413 9.413C9.804 9.021 10 8.55 10 8C10 7.45 9.804 6.979 9.413 6.588C9.021 6.196 8.55 6 8 6C7.45 6 6.979 6.196 6.588 6.588C6.196 6.979 6 7.45 6 8C6 8.55 6.196 9.021 6.588 9.413C6.979 9.804 7.45 10 8 10ZM8 4C8.55 4 9.021 3.804 9.413 3.413C9.804 3.021 10 2.55 10 2C10 1.45 9.804 0.979 9.413 0.588C9.021 0.196 8.55 0 8 0C7.45 0 6.979 0.196 6.588 0.588C6.196 0.979 6 1.45 6 2C6 2.55 6.196 3.021 6.588 3.413C6.979 3.804 7.45 4 8 4Z" fill="#556071"/>
                 </svg>
               </button>
             </div>
           </div>
 
           {/* Slide Canvas Area */}
-          <div
-            className="self-stretch flex-1 p-12 flex justify-center items-center overflow-hidden"
-            style={{ background: 'rgba(243,244,241,0.5)' }}
-          >
-            <div
-              className="px-16 py-36 relative bg-white rounded-sm outline outline-1 outline-offset-[-1px] outline-zinc-400/5 inline-flex flex-col justify-center items-start w-full max-w-4xl mx-auto"
-            >
-              <div
-                className="self-stretch absolute rounded-sm"
-                style={{
-                  left: 0,
-                  top: 0,
-                  right: 0,
-                  height: '506px',
-                  background: 'rgba(0,0,0,0)',
-                  boxShadow: '0px 8px 10px -6px rgba(0,0,0,0.10), 0 20px 25px -5px rgba(0,0,0,0.10)',
-                }}
-              />
+          <div className="self-stretch flex-1 p-12 bg-stone-100/50 inline-flex justify-center items-center overflow-hidden">
+            <div className="w-[896px] max-w-[896px] px-16 py-36 relative bg-white rounded-sm outline outline-1 outline-offset-[-1px] outline-zinc-400/5 inline-flex flex-col justify-center items-start">
+              <div className="w-full h-[506px] left-0 top-0 absolute bg-white/0 rounded-sm shadow-[0px_8px_10px_-6px_rgba(0,0,0,0.10),0px_20px_25px_-5px_rgba(0,0,0,0.10)]" />
               <div className="self-stretch pb-8 flex flex-col justify-start items-start">
                 <div className="self-stretch flex flex-col justify-start items-start">
-                  <div className="self-stretch justify-center text-zinc-800 text-4xl font-bold font-['Inter'] leading-10" style={{ fontFamily: 'Inter, sans-serif' }}>
-                    Advanced Cognitive Architectures
-                  </div>
+                  <div className="self-stretch justify-center text-zinc-800 text-4xl font-bold leading-10">Advanced Cognitive Architectures</div>
                 </div>
               </div>
               <div className="self-stretch flex flex-col justify-start items-start gap-6">
-                <div className="self-stretch inline-flex justify-start items-start gap-4">
-                  <div className="w-1.5 h-4 pt-2.5 inline-flex flex-col justify-start items-start">
-                    <div className="w-1.5 h-1.5 bg-zinc-600 rounded-full" />
-                  </div>
-                  <div className="self-stretch inline-flex flex-col justify-start items-start">
-                    <div className="justify-center text-zinc-600 text-lg font-normal font-['Inter'] leading-7" style={{ fontFamily: 'Inter, sans-serif' }}>
-                      Synthesis of symbolic and sub-symbolic processing frameworks.
+                {[
+                  'Synthesis of symbolic and sub-symbolic processing frameworks.',
+                  'Integration of long-term memory structures (Declarative & Procedural).',
+                  'Real-time meta-cognition and attention filtering mechanisms.',
+                ].map((text, i) => (
+                  <div key={i} className="self-stretch inline-flex justify-start items-start gap-4">
+                    <div className="w-1.5 h-4 pt-2.5 inline-flex flex-col justify-start items-start">
+                      <div className="w-1.5 h-1.5 bg-zinc-600 rounded-full" />
+                    </div>
+                    <div className="self-stretch inline-flex flex-col justify-start items-start">
+                      <div className="justify-center text-zinc-600 text-lg font-normal leading-7">{text}</div>
                     </div>
                   </div>
-                </div>
-                <div className="self-stretch inline-flex justify-start items-start gap-4">
-                  <div className="w-1.5 h-4 pt-2.5 inline-flex flex-col justify-start items-start">
-                    <div className="w-1.5 h-1.5 bg-zinc-600 rounded-full" />
-                  </div>
-                  <div className="self-stretch inline-flex flex-col justify-start items-start">
-                    <div className="justify-center text-zinc-600 text-lg font-normal font-['Inter'] leading-7" style={{ fontFamily: 'Inter, sans-serif' }}>
-                      Integration of long-term memory structures (Declarative &amp; Procedural).
-                    </div>
-                  </div>
-                </div>
-                <div className="self-stretch inline-flex justify-start items-start gap-4">
-                  <div className="w-1.5 h-4 pt-2.5 inline-flex flex-col justify-start items-start">
-                    <div className="w-1.5 h-1.5 bg-zinc-600 rounded-full" />
-                  </div>
-                  <div className="self-stretch inline-flex flex-col justify-start items-start">
-                    <div className="justify-center text-zinc-600 text-lg font-normal font-['Inter'] leading-7" style={{ fontFamily: 'Inter, sans-serif' }}>
-                      Real-time meta-cognition and attention filtering mechanisms.
-                    </div>
-                  </div>
-                </div>
+                ))}
               </div>
-              <div
-                className="absolute flex flex-col justify-start items-start"
-                style={{ right: '112px', top: '33px' }}
-              >
-                <div className="justify-center text-zinc-400 text-[10px] font-bold font-['Inter'] leading-4 tracking-wide" style={{ fontFamily: 'Inter, sans-serif' }}>
-                  SLIDE 04 / 24
-                </div>
+              <div className="absolute flex flex-col justify-start items-start" style={{ right: '112px', top: '33px' }}>
+                <div className="justify-center text-zinc-400 text-[10px] font-bold leading-4 tracking-wide">SLIDE 04 / 24</div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Panel - Notes */}
-        <div
-          className="self-stretch flex flex-col justify-between items-start"
-          style={{ width: '320px', background: '#FFFFFF', borderLeft: '1px solid rgba(175,179,176,0.1)' }}
-        >
+        {/* Right Panel */}
+        <div className="w-80 self-stretch bg-white border-l border-zinc-400/10 inline-flex flex-col justify-between items-start">
+          {/* Top: Pill Toggle */}
           <div className="self-stretch p-6 flex flex-col justify-start items-start gap-6">
-            {/* Pill Toggle */}
             <div className="self-stretch p-1 bg-stone-100 rounded-full inline-flex justify-center items-start">
               <button
                 onClick={() => setNoteMode('my')}
-                className="flex-1 py-1.5 rounded-full flex justify-center items-center"
+                className="flex-1 py-1.5 rounded-full flex justify-center items-center cursor-pointer border-none"
                 style={{
                   background: noteMode === 'my' ? '#FFFFFF' : 'transparent',
                   boxShadow: noteMode === 'my' ? '0px 1px 2px 0px rgba(0,0,0,0.05)' : 'none',
                 }}
               >
-                <div className="text-center justify-center text-slate-600 text-xs font-medium font-['Inter'] leading-4" style={{ fontFamily: 'Inter, sans-serif' }}>
-                  My Notes
-                </div>
+                <div className="text-center text-slate-600 text-xs font-medium leading-4">My Notes</div>
               </button>
               <button
                 onClick={() => setNoteMode('ai')}
-                className="flex-1 py-1.5 rounded-full flex justify-center items-center gap-1.5"
+                className="flex-1 py-1.5 rounded-full flex justify-center items-center gap-1.5 cursor-pointer border-none"
                 style={{
                   background: noteMode === 'ai' ? '#FFFFFF' : 'transparent',
                   boxShadow: noteMode === 'ai' ? '0px 1px 2px 0px rgba(0,0,0,0.05)' : 'none',
                 }}
               >
-                <svg width="14" height="16" viewBox="0 0 14 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M5.5 16V3H0V0H14V3H8.5V16H5.5Z" fill="#2F3331"/>
-                </svg>
-                <div className="text-center justify-center text-zinc-800 text-xs font-semibold font-['Inter'] leading-4" style={{ fontFamily: 'Inter, sans-serif' }}>
-                  AI Notes
-                </div>
-                <svg width="14" height="2" viewBox="0 0 14 2" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M0 2V0H14V2H0Z" fill="#2F3331"/>
-                </svg>
+                <div className="w-3 h-3 bg-zinc-800" />
+                <div className="text-center text-zinc-800 text-xs font-semibold leading-4">AI Notes</div>
+                <div className="w-1.5 h-1 bg-zinc-800" />
               </button>
             </div>
+          </div>
 
-            {/* Notes Content */}
-            <div className="self-stretch pr-2 flex flex-col justify-start items-start overflow-hidden">
-              <div className="self-stretch flex flex-col justify-start items-start gap-4">
-                <div className="self-stretch flex flex-col justify-start items-start">
-                  <div className="self-stretch justify-center text-neutral-500 text-[10px] font-extrabold font-['Inter'] uppercase leading-4 tracking-wide" style={{ fontFamily: 'Inter, sans-serif' }}>
-                    ACTIVE ANNOTATION
+          {/* Main Notes Panel */}
+          <div className="w-80 flex-1 bg-white border-l border-zinc-400/10 flex flex-col justify-start items-start overflow-hidden">
+            {/* Recording Control Block */}
+            <div className="self-stretch p-6 bg-gray-200 border-b border-zinc-400/10 flex flex-col justify-start items-start gap-6">
+              {/* Status Row */}
+              <div className="self-stretch inline-flex justify-between items-center">
+                <div className="flex justify-start items-center gap-2">
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{ background: isRecording ? '#9F403D' : '#AFB3B0' }}
+                  />
+                  <div className="inline-flex flex-col justify-start items-start">
+                    <div className="justify-center text-zinc-800 text-sm font-bold leading-5">
+                      {isRecording ? 'LIVE RECORDING' : 'NOT RECORDING'}
+                    </div>
                   </div>
                 </div>
-                <div className="self-stretch flex flex-col justify-start items-start gap-2">
-                  <div className="self-stretch inline-flex justify-start items-center gap-2">
-                    <div className="flex flex-col justify-start items-start">
-                      <div className="justify-center text-zinc-600 text-[10px] font-bold font-['Inter'] leading-4" style={{ fontFamily: 'Inter, sans-serif' }}>09:42</div>
+                <div className="inline-flex flex-col justify-start items-start">
+                  <div className="justify-center text-zinc-600 text-xl font-medium leading-7" style={{ fontFamily: 'Liberation Mono, monospace' }}>
+                    {recTimer}
+                  </div>
+                </div>
+              </div>
+              {/* Waveform */}
+              <div className="self-stretch h-16 px-2 inline-flex justify-center items-end gap-1">
+                {WAVEFORM_BARS.map((h, i) => (
+                  <div
+                    key={i}
+                    className="flex-1 rounded-full"
+                    style={{
+                      height: `${isRecording ? h : 8}px`,
+                      background: i % 3 === 0 ? '#3F3F46' : i % 3 === 1 ? '#52525B' : '#475569',
+                      opacity: isRecording ? (i % 4 === 0 ? 0.6 : i % 4 === 1 ? 1 : i % 4 === 2 ? 0.4 : 0.8) : 0.3,
+                      transition: 'height 0.3s ease',
+                    }}
+                  />
+                ))}
+              </div>
+              {/* Action Button */}
+              {!isRecording ? (
+                <button
+                  onClick={handleStartRecording}
+                  className="self-stretch py-3 bg-zinc-800 rounded-full inline-flex justify-center items-center gap-2 cursor-pointer border-none"
+                >
+                  <div className="w-3 h-3 rounded-full bg-stone-50" />
+                  <div className="text-center text-stone-50 text-sm font-medium leading-5">Start Recording</div>
+                </button>
+              ) : (
+                <button
+                  onClick={handleEndSession}
+                  className="self-stretch py-3 bg-zinc-800 rounded-full inline-flex justify-center items-center gap-2 cursor-pointer border-none"
+                >
+                  <div className="w-3.5 h-3.5 bg-stone-50" style={{ borderRadius: '2px' }} />
+                  <div className="text-center text-stone-50 text-sm font-medium leading-5">End Session</div>
+                </button>
+              )}
+            </div>
+
+            {/* My Notes Section */}
+            <div className="self-stretch flex-1 p-6 flex flex-col justify-start items-start overflow-hidden">
+              {/* Section header */}
+              <div className="self-stretch pb-4 flex flex-col justify-start items-start">
+                <div className="self-stretch inline-flex justify-between items-center">
+                  <div className="justify-center text-zinc-800 text-base font-bold leading-6">My Notes</div>
+                  <button type="button" aria-label="添加笔记" className="w-3 h-3 cursor-pointer border-none bg-transparent p-0">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M5 7H0V5H5V0H7V5H12V7H7V12H5V7Z" fill="#475569"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Notes List */}
+              <div className="self-stretch flex-1 pr-2 flex flex-col justify-start items-start gap-6 overflow-y-auto">
+                {/* Existing annotations */}
+                {annotations.map((ann) => (
+                  <div key={ann.id} className="self-stretch pl-4 relative flex flex-col justify-start items-start gap-[3.13px]">
+                    <div className="self-stretch inline-flex justify-start items-center gap-2">
+                      <div className="p-1 bg-gray-200 rounded-2xl inline-flex flex-col justify-start items-start">
+                        <div className="justify-center text-slate-600 text-[10px] font-normal leading-4" style={{ fontFamily: 'Liberation Mono, monospace' }}>
+                          {formatTimestamp(ann.timestamp)}
+                        </div>
+                      </div>
+                      <div className="justify-center text-zinc-800 text-xs font-semibold leading-4">{ann.title}</div>
                     </div>
-                    <div className="flex-1 h-px bg-zinc-400/10" />
+                    <div className="self-stretch pb-px flex flex-col justify-start items-start">
+                      <div className="self-stretch justify-center text-zinc-600 text-sm font-normal leading-6">{ann.text}</div>
+                    </div>
+                    <div className="w-0.5 h-full left-0 top-0 absolute bg-zinc-600/20 rounded-full" />
+                  </div>
+                ))}
+
+                {/* Demo note 1 */}
+                <div className="self-stretch pl-4 relative flex flex-col justify-start items-start gap-[3.13px]">
+                  <div className="self-stretch inline-flex justify-start items-center gap-2">
+                    <div className="p-1 bg-gray-200 rounded-2xl inline-flex flex-col justify-start items-start">
+                      <div className="justify-center text-slate-600 text-[10px] font-normal leading-4" style={{ fontFamily: 'Liberation Mono, monospace' }}>00:45</div>
+                    </div>
+                    <div className="justify-center text-zinc-800 text-xs font-semibold leading-4">Contextual Anchors</div>
                   </div>
                   <div className="self-stretch pb-px flex flex-col justify-start items-start">
-                    <div className="self-stretch justify-center text-black text-sm font-medium font-['Inter'] leading-6" style={{ fontFamily: 'Inter, sans-serif' }}>
-                      Need to cross-reference the LTM<br />structures with Anderson&apos;s ACT-R<br />model from the previous lecture. The<br />synthesis approach seems novel here.
+                    <div className="self-stretch justify-center text-zinc-600 text-sm font-normal leading-6">
+                      Discussing how neural networks<br/>bridge the gap between abstract<br/>symbolic reasoning and raw data<br/>input.
                     </div>
                   </div>
+                  <div className="w-0.5 h-28 left-0 top-0 absolute bg-zinc-600/20 rounded-full" />
                 </div>
-                <div className="self-stretch pt-4 flex flex-col justify-start items-start gap-1.5">
+
+                {/* Demo note 2 - active/current */}
+                <div className="self-stretch pl-4 relative flex flex-col justify-start items-start gap-1">
                   <div className="self-stretch inline-flex justify-start items-center gap-2">
-                    <div className="flex flex-col justify-start items-start">
-                      <div className="justify-center text-zinc-600 text-[10px] font-bold font-['Inter'] leading-4" style={{ fontFamily: 'Inter, sans-serif' }}>11:15</div>
+                    <div className="p-1 bg-zinc-600 rounded-2xl inline-flex flex-col justify-start items-start">
+                      <div className="justify-center text-stone-50 text-[10px] font-normal leading-4" style={{ fontFamily: 'Liberation Mono, monospace' }}>03:52</div>
                     </div>
-                    <div className="flex-1 h-px bg-zinc-400/10" />
+                    <div className="justify-center text-zinc-800 text-xs font-semibold leading-4">Latency vs Throughput</div>
                   </div>
-                  <div className="self-stretch flex flex-col justify-start items-start">
-                    <div className="self-stretch justify-center text-black text-sm font-medium font-['Inter'] leading-6" style={{ fontFamily: 'Inter, sans-serif' }}>
-                      Key takeaway: Meta-cognition acts as<br />the &apos;governor&apos; for attention filtering in<br />high-load cognitive environments.
+                  <div className="self-stretch flex flex-col justify-start items-start gap-2">
+                    <div className="self-stretch relative" style={{ minHeight: '40px' }}>
+                      <div className="text-zinc-600 text-sm font-normal leading-5">Critical bottleneck identified in the pre-processing layer.</div>
+                    </div>
+                    <div className="self-stretch relative" style={{ minHeight: '40px' }}>
+                      <div className="text-zinc-600 text-sm font-normal leading-5">Real-time capture requires 4ms response time.</div>
+                    </div>
+                    <div className="self-stretch relative" style={{ minHeight: '40px' }}>
+                      <div className="text-zinc-600 text-sm font-normal leading-5">Possible solution: Distributed nodes.</div>
+                    </div>
+                  </div>
+                  <div className="w-0.5 h-40 left-0 top-0 absolute bg-zinc-600 rounded-full" />
+                </div>
+
+                {/* AI Transcription loading indicator */}
+                <div className="self-stretch p-4 bg-stone-100 rounded-[48px] outline outline-1 outline-offset-[-1px] outline-zinc-400/10 flex flex-col justify-start items-start gap-2">
+                  <div className="self-stretch inline-flex justify-start items-center gap-2">
+                    <div className="w-3 h-3 bg-zinc-600" />
+                    <div className="justify-center text-slate-600 text-[10px] font-bold uppercase leading-4 tracking-wide">AI TRANSCRIPTION...</div>
+                  </div>
+                  <div className="w-44 h-2 bg-zinc-400/20 rounded-full" />
+                  <div className="w-28 h-2 bg-zinc-400/20 rounded-full" />
+                </div>
+              </div>
+
+              {/* Input area */}
+              <div className="self-stretch pt-4 flex flex-col justify-start items-start">
+                <div className="self-stretch pt-4 border-t border-zinc-400/10 flex flex-col justify-start items-start">
+                  <div className="self-stretch relative flex flex-col justify-start items-start">
+                    <textarea
+                      className="self-stretch h-24 p-4 bg-stone-100 rounded-[48px] text-zinc-800 text-sm font-normal leading-5 resize-none outline-none w-full border-none"
+                      placeholder="Type a note (Alt + N)..."
+                      style={{ color: noteInput ? '#27272A' : '#A1A1AA' }}
+                      value={noteInput}
+                      onChange={(e) => setNoteInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          handleAddNote()
+                        }
+                      }}
+                    />
+                    <div className="absolute inline-flex justify-start items-start gap-2" style={{ right: '12px', bottom: '12px' }}>
+                      <button type="button" className="p-1.5 rounded-md hover:bg-black/5 cursor-pointer border-none bg-transparent" aria-label="清除">
+                        <svg width="14" height="10" viewBox="0 0 14 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M8 0L14 10H2L8 0Z" fill="#3F3F46" opacity="0.4"/>
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAddNote}
+                        className="p-1.5 bg-zinc-600 rounded-md inline-flex flex-col justify-center items-center cursor-pointer border-none"
+                        aria-label="提交笔记"
+                      >
+                        <svg width="14" height="12" viewBox="0 0 14 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M0 12V0L14 6L0 12ZM1.5 9.75L10.3875 6L1.5 2.25V4.875L6 6L1.5 7.125V9.75Z" fill="#FAFAF9"/>
+                        </svg>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -444,72 +512,89 @@ export default function SessionPage() {
             </div>
           </div>
 
-          {/* Bottom - Recording Control + Submit */}
-          <div className="self-stretch flex-1 min-h-32 flex flex-col justify-end items-start">
-            <div
-              className="self-stretch p-4 flex flex-col justify-start items-start gap-3"
-              style={{ background: 'rgba(243,244,241,0.3)', borderTop: '1px solid rgba(175,179,176,0.1)' }}
-            >
-              <RecordingControl sessionId={SESSION_ID} onStop={handleRecordingStop} />
-              {audioChunks.length > 0 && (
-                <button
-                  onClick={handleGenerateNotes}
-                  disabled={submitting}
-                  className="self-stretch py-3 rounded-xl font-medium text-sm cursor-pointer transition-all duration-150"
-                  style={{ background: '#2F3331', color: '#FFFFFF', opacity: submitting ? 0.6 : 1 }}
-                >
-                  {submitting ? '提交中…' : '生成课堂笔记 →'}
-                </button>
-              )}
+          {/* Generate Notes button if audio available */}
+          {audioChunks.length > 0 && (
+            <div className="self-stretch p-4 border-t border-zinc-400/10">
+              <button
+                onClick={handleGenerateNotes}
+                disabled={submitting}
+                className="self-stretch py-3 rounded-xl text-sm font-medium cursor-pointer border-none"
+                style={{ background: '#2F3331', color: '#FFFFFF', opacity: submitting ? 0.6 : 1, width: '100%' }}
+              >
+                {submitting ? '提交中…' : '生成课堂笔记 →'}
+              </button>
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Top Nav Bar - absolute positioned */}
+      <div
+        className="absolute left-0 top-0 bg-stone-50/80 backdrop-blur-md inline-flex justify-between items-center"
+        style={{ width: '100%', height: '64px', padding: '0 32px' }}
+      >
+        <div className="flex justify-start items-center gap-8">
+          <div className="justify-center text-zinc-800 text-xl font-bold leading-7">LiberStudy</div>
+          <div className="flex justify-start items-center gap-6">
+            <button className="text-slate-600 text-base font-normal leading-6 cursor-pointer border-none bg-transparent hover:text-zinc-800">Dashboard</button>
+            <div className="pb-1 border-b-2 border-zinc-600 inline-flex flex-col justify-start items-start">
+              <div className="text-zinc-800 text-base font-normal leading-6">Courses</div>
+            </div>
+            <button className="text-slate-600 text-base font-normal leading-6 cursor-pointer border-none bg-transparent hover:text-zinc-800">Detailed Note</button>
+          </div>
+        </div>
+        <div className="flex justify-start items-center gap-4">
+          <button type="button" aria-label="通知" className="border-none bg-transparent cursor-pointer p-1">
+            <svg width="16" height="20" viewBox="0 0 16 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M0 17V15H2V8C2 6.617 2.417 5.387 3.25 4.313C4.083 3.238 5.167 2.533 6.5 2.2V1.5C6.5 1.083 6.646 0.729 6.938 0.438C7.229 0.146 7.583 0 8 0C8.417 0 8.771 0.146 9.063 0.438C9.354 0.729 9.5 1.083 9.5 1.5V2.2C10.833 2.533 11.917 3.238 12.75 4.313C13.583 5.387 14 6.617 14 8V15H16V17H0ZM8 20C7.45 20 6.979 19.804 6.588 19.413C6.196 19.021 6 18.55 6 18H10C10 18.55 9.804 19.021 9.413 19.413C9.021 19.804 8.55 20 8 20Z" fill="#475569"/>
+            </svg>
+          </button>
+          <button type="button" aria-label="搜索" className="border-none bg-transparent cursor-pointer p-1">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M19 19L13 13M15 8C15 11.866 11.866 15 8 15C4.134 15 1 11.866 1 8C1 4.134 4.134 1 8 1C11.866 1 15 4.134 15 8Z" stroke="#475569" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+          </button>
+          <div className="w-8 h-8 bg-neutral-200 rounded-full overflow-hidden">
+            <img className="w-8 h-8 object-cover" src="https://placehold.co/32x32" alt="用户头像" />
           </div>
         </div>
       </div>
 
-      {/* Bottom Footer - absolute positioned */}
+      {/* Footer */}
       <div
-        className="absolute flex justify-between items-center"
-        style={{ bottom: 0, left: 0, right: 0, height: '40px', padding: '0 32px', background: '#FAF9F7', borderTop: '1px solid rgba(175,179,176,0.1)' }}
+        className="absolute left-0 inline-flex justify-between items-center"
+        style={{ bottom: 0, width: '100%', height: '40px', padding: '0 32px', background: '#FAF9F7', borderTop: '1px solid rgba(175,179,176,0.2)' }}
       >
-        <div className="flex flex-col justify-start items-start">
-          <div className="justify-center text-slate-600 text-[10px] font-normal font-['Inter'] uppercase leading-4 tracking-wide" style={{ fontFamily: 'Inter, sans-serif' }}>
-            © {new Date().getFullYear()} LIBERSTUDY EDITORIAL. CRAFTED FOR CLARITY.
-          </div>
+        <div className="justify-center text-slate-600 text-[10px] font-normal uppercase leading-4 tracking-wide">
+          © 2024 LIBERSTUDY EDITORIAL. CRAFTED FOR CLARITY.
         </div>
         <div className="flex justify-start items-start gap-6">
-          <div className="self-stretch flex flex-col justify-start items-start">
-            <div className="justify-center text-slate-600 text-[10px] font-normal font-['Inter'] uppercase leading-4 tracking-wide" style={{ fontFamily: 'Inter, sans-serif' }}>SUPPORT</div>
-          </div>
-          <div className="self-stretch flex flex-col justify-start items-start">
-            <div className="justify-center text-slate-600 text-[10px] font-normal font-['Inter'] uppercase leading-4 tracking-wide" style={{ fontFamily: 'Inter, sans-serif' }}>PRIVACY</div>
-          </div>
-          <div className="self-stretch flex flex-col justify-start items-start">
-            <div className="justify-center text-slate-600 text-[10px] font-normal font-['Inter'] uppercase leading-4 tracking-wide" style={{ fontFamily: 'Inter, sans-serif' }}>TERMS</div>
-          </div>
+          {['SUPPORT', 'PRIVACY', 'TERMS'].map((label) => (
+            <button key={label} className="text-slate-600 text-[10px] font-normal uppercase leading-4 tracking-wide cursor-pointer border-none bg-transparent hover:text-zinc-800">
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Recovery modal */}
+      {/* Recovery Modal */}
       {recoveryModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.4)' }}>
-          <div
-            className="w-96 max-w-full p-8 rounded-2xl"
-            style={{ background: '#FFFFFF', boxShadow: '0 24px 64px rgba(0,0,0,0.15)' }}
-          >
+          <div className="w-96 max-w-full p-8 rounded-2xl" style={{ background: '#FFFFFF', boxShadow: '0 24px 64px rgba(0,0,0,0.15)' }}>
             <h2 className="text-lg font-bold mb-2" style={{ color: '#2F3331' }}>发现未完成的录音</h2>
             <p className="text-sm mb-6" style={{ color: '#777C79' }}>上次录音未完成，是否要恢复？</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button
                 onClick={() => setRecoveryModal(false)}
-                className="w-full py-2.5 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150"
+                className="w-full py-2.5 rounded-lg text-sm font-medium cursor-pointer border-none"
                 style={{ background: '#2F3331', color: '#FFFFFF' }}
               >
                 继续录音
               </button>
               <button
                 onClick={() => navigate(`/processing?session_id=${recoverySessionRef.current}`)}
-                className="w-full py-2.5 rounded-lg text-sm cursor-pointer transition-all duration-150"
-                style={{ border: '1px solid rgba(175,179,176,0.3)', color: '#2F3331', background: 'transparent' }}
+                className="w-full py-2.5 rounded-lg text-sm cursor-pointer bg-transparent"
+                style={{ border: '1px solid rgba(175,179,176,0.3)', color: '#2F3331' }}
               >
                 用现有录音生成笔记
               </button>
@@ -518,7 +603,7 @@ export default function SessionPage() {
                   if (recoverySessionRef.current) await clearSession(recoverySessionRef.current)
                   setRecoveryModal(false)
                 }}
-                className="w-full py-2.5 text-sm cursor-pointer transition-all duration-150"
+                className="w-full py-2.5 text-sm cursor-pointer border-none bg-transparent"
                 style={{ color: '#EF4444' }}
               >
                 放弃录音（清除数据）

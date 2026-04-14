@@ -127,6 +127,12 @@ def sessions_health():
     return {"status": "ok", "router": "sessions"}
 
 
+@router.get("/sessions")
+def list_sessions():
+    import db as _db
+    return _db.list_sessions()
+
+
 @router.get("/sessions/{session_id}")
 def get_session(session_id: str):
     if session_id == "mock-session-001":
