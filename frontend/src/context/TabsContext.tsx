@@ -31,16 +31,14 @@ export function TabsProvider({ children }: { children: ReactNode }) {
   const closeTab = useCallback((sessionId: string) => {
     setTabs((prev) => {
       const next = prev.filter((t) => t.sessionId !== sessionId)
+      setActiveTabId((currentActive) => {
+        if (currentActive !== sessionId) return currentActive
+        const idx = prev.findIndex((t) => t.sessionId === sessionId)
+        return next[Math.max(0, idx - 1)]?.sessionId ?? null
+      })
       return next
     })
-    setActiveTabId((prev) => {
-      if (prev !== sessionId) return prev
-      // 激活相邻 tab
-      const idx = tabs.findIndex((t) => t.sessionId === sessionId)
-      const next = tabs.filter((t) => t.sessionId !== sessionId)
-      return next[Math.max(0, idx - 1)]?.sessionId ?? null
-    })
-  }, [tabs])
+  }, [])
 
   const activateTab = useCallback((sessionId: string) => {
     setActiveTabId(sessionId)
