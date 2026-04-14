@@ -2,6 +2,15 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useTabs } from '../context/TabsContext'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getSession, retryPage } from '../lib/api'
+import { Document, Page, pdfjs } from 'react-pdf'
+import 'react-pdf/dist/Page/AnnotationLayer.css'
+import 'react-pdf/dist/Page/TextLayer.css'
+import { useTypewriter } from '../hooks/useTypewriter'
+
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url,
+).toString()
 
 interface Bullet { text: string; ai_comment: string; timestamp_start: number; timestamp_end: number }
 interface PageData {
@@ -9,6 +18,7 @@ interface PageData {
   status?: string
   pdf_url: string
   pdf_page_num: number
+  thumbnail_url?: string
   ppt_text: string
   page_start_time: number
   page_end_time: number
@@ -28,7 +38,7 @@ interface SessionData {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
 
-const FONT_SERIF = "'Lora', Georgia, serif"
+const FONT_SERIF = "Inter, 'PingFang SC', 'Microsoft YaHei', sans-serif"
 const C = {
   bg: '#F0EFEA',
   sidebar: '#E8E7E2',
@@ -46,6 +56,154 @@ function formatTime(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
+/** 单行：PPT 原文 + 点击展开 AI 解释（打字机） */
+function AiBulletRow({
+  pptLine,
+  aiBullet,
+  onTimestampClick,
+}: {
+  pptLine: string
+  aiBullet?: { text: string; ai_comment: string; timestamp_start: number; timestamp_end: number }
+  onTimestampClick: (t: number) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const { displayed, done, start, reset } = useTypewriter(aiBullet?.text ?? '', 15)
+
+  function toggle() {
+    if (!aiBullet) return
+    if (expanded) {
+      setExpanded(false)
+      reset()
+    } else {
+      setExpanded(true)
+      start()
+    }
+  }
+
+  // Strip leading bullet markers (•, -, *)
+  const cleanLine = pptLine.replace(/^[\u2022\-\*]\s*/, '').trim()
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      {/* PPT 原文行 */}
+      <button
+        type="button"
+        onClick={toggle}
+        className="text-left w-full transition-all duration-150"
+        style={{
+          background: 'none',
+          border: 'none',
+          padding: '4px 0',
+          cursor: aiBullet ? 'pointer' : 'default',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '8px',
+        }}
+      >
+        <span style={{ color: '#AFB3B0', flexShrink: 0, marginTop: '2px', fontSize: '14px' }}>•</span>
+        <span
+          style={{
+            fontSize: '14px',
+            color: '#1A1916',
+            lineHeight: '1.625',
+            fontWeight: '500',
+            opacity: aiBullet ? 1 : 0.5,
+          }}
+        >
+          {cleanLine}
+        </span>
+        {/* Expand indicator */}
+        {aiBullet && (
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+            style={{
+              flexShrink: 0,
+              marginTop: '4px',
+              color: '#9B9A94',
+              transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.15s',
+            }}
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        )}
+      </button>
+
+      {/* AI 解释（展开时显示，打字机效果） */}
+      {expanded && aiBullet && (
+        <div
+          style={{
+            marginLeft: '18px',
+            paddingLeft: '14px',
+            borderLeft: '2px solid rgba(85,96,113,0.2)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+          }}
+        >
+          {/* AI CLARIFICATION header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M12 2L14.09 8.26L21 9.27L16 13.97L17.18 21L12 17.77L6.82 21L8 13.97L3 9.27L9.91 8.26L12 2Z"
+                fill="#556071"
+              />
+            </svg>
+            <span
+              style={{
+                fontSize: '9px',
+                fontWeight: '700',
+                letterSpacing: '0.08em',
+                color: '#556071',
+                textTransform: 'uppercase',
+              }}
+            >
+              AI Clarification
+            </span>
+            {/* Timestamp */}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onTimestampClick(aiBullet.timestamp_start) }}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '9px',
+                color: '#AFB3B0',
+                fontWeight: '700',
+                padding: 0,
+                marginLeft: '4px',
+              }}
+            >
+              {String(Math.floor(aiBullet.timestamp_start / 60)).padStart(2, '0')}:
+              {String(Math.floor(aiBullet.timestamp_start % 60)).padStart(2, '0')}
+            </button>
+          </div>
+          {/* 打字机正文 */}
+          <p
+            style={{
+              fontSize: '14px',
+              color: '#374151',
+              lineHeight: '1.625',
+              fontWeight: '400',
+              margin: 0,
+            }}
+          >
+            {displayed}
+            {!done && <span style={{ opacity: 0.4 }}>▍</span>}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function NotesPage() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
@@ -61,6 +219,52 @@ export default function NotesPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map())
   const audioRef = useRef<HTMLAudioElement>(null)
+
+  // Resizable panel state
+  const [notesPanelWidth, setNotesPanelWidth] = useState(320)
+  const isResizingRef = useRef(false)
+  const resizeStartXRef = useRef(0)
+  const resizeStartWidthRef = useRef(320)
+
+  // Canvas width for react-pdf
+  const canvasAreaRef = useRef<HTMLDivElement>(null)
+  const [canvasWidth, setCanvasWidth] = useState(800)
+
+  useEffect(() => {
+    if (!canvasAreaRef.current) return
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setCanvasWidth(Math.max(400, entry.contentRect.width - 192))
+      }
+    })
+    ro.observe(canvasAreaRef.current)
+    return () => ro.disconnect()
+  }, [])
+
+  const handleResizerMouseDown = useCallback((e: React.MouseEvent) => {
+    isResizingRef.current = true
+    resizeStartXRef.current = e.clientX
+    resizeStartWidthRef.current = notesPanelWidth
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!isResizingRef.current) return
+      const delta = resizeStartXRef.current - ev.clientX
+      setNotesPanelWidth(Math.max(100, resizeStartWidthRef.current + delta))
+    }
+
+    const onMouseUp = () => {
+      isResizingRef.current = false
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+    }
+
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+  }, [notesPanelWidth])
 
   useEffect(() => {
     if (!sessionId) return
@@ -150,7 +354,6 @@ export default function NotesPage() {
     setRetrying(pageNum)
     try {
       await retryPage(sessionId, pageNum)
-      // Reload session data
       const data = await getSession(sessionId)
       setSession(data as SessionData)
     } catch {
@@ -246,9 +449,14 @@ export default function NotesPage() {
                       opacity: isActive ? 1 : 0.7,
                     }}
                   >
-                    <span style={{ fontSize: '22px', fontWeight: '700', color: '#AFB3B0' }}>
-                      {page.page_num}
-                    </span>
+                    <img
+                      src={page.thumbnail_url
+                        ? `${API_BASE}${page.thumbnail_url}`
+                        : `${API_BASE}/api/sessions/${sessionId}/slide/${page.pdf_page_num}.png`}
+                      alt={`第${page.page_num}页`}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      loading="lazy"
+                    />
                     {/* Page badge */}
                     <span
                       className="absolute top-1.5 left-1.5 flex items-center justify-center"
@@ -341,69 +549,103 @@ export default function NotesPage() {
             </div>
           </div>
 
-          {/* Canvas area */}
-          <div className="flex-1 overflow-y-auto p-12" style={{ background: 'rgba(232,231,226,0.6)' }}>
-            <div className="flex flex-col items-center gap-8 max-w-4xl mx-auto">
-              {session.pages.map((page) => (
-                <div
-                  key={page.page_num}
-                  data-page={page.page_num}
-                  ref={(el) => {
-                    if (el) pageRefs.current.set(page.page_num, el)
-                    else pageRefs.current.delete(page.page_num)
-                  }}
-                  className="relative w-full"
-                  style={{ maxWidth: '896px' }}
-                >
-                  {/* Slide card */}
+          {/* Canvas area — react-pdf */}
+          <div
+            ref={canvasAreaRef}
+            className="flex-1 overflow-y-auto p-12"
+            style={{ background: 'rgba(232,231,226,0.6)' }}
+          >
+            <div className="flex flex-col items-center gap-8 mx-auto" style={{ maxWidth: '896px' }}>
+              {session.pages.map((page) => {
+                const pdfUrl = page.pdf_url ? `${API_BASE}${page.pdf_url}` : null
+                return (
                   <div
-                    className="relative w-full rounded-lg overflow-hidden"
-                    style={{
-                      background: C.white,
-                      boxShadow: '0 4px 24px rgba(0,0,0,0.10)',
+                    key={page.page_num}
+                    data-page={page.page_num}
+                    ref={(el) => {
+                      if (el) pageRefs.current.set(page.page_num, el)
+                      else pageRefs.current.delete(page.page_num)
                     }}
+                    className="relative w-full"
                   >
-                    <embed
-                      src={`${API_BASE}${page.pdf_url}#page=${page.pdf_page_num}`}
-                      type="application/pdf"
-                      style={{ width: '100%', minHeight: '500px', display: 'block' }}
-                      title={`第${page.page_num}页`}
-                    />
-                    {/* Confidence warning */}
-                    {page.alignment_confidence < 0.6 && (
-                      <div
-                        className="absolute top-3 right-3 text-xs px-2 py-0.5 rounded-full"
-                        style={{ background: '#F59E0B', color: C.white }}
-                      >
-                        对齐置信度低
-                      </div>
-                    )}
-                    {/* Play button */}
-                    <button
-                      onClick={() => handleTimestampClick(page.page_start_time)}
-                      className="absolute top-3 left-3 text-xs px-2 py-0.5 rounded cursor-pointer transition-all duration-150"
-                      style={{ background: 'rgba(47,51,49,0.7)', color: C.white }}
-                    >
-                      ▶ {formatTime(page.page_start_time)}
-                    </button>
-                    {/* Slide label bottom-right */}
+                    {/* Slide card */}
                     <div
-                      className="absolute bottom-3 right-3 text-xs px-2 py-0.5 rounded"
-                      style={{ background: 'rgba(47,51,49,0.5)', color: C.white, letterSpacing: '0.05em' }}
+                      className="relative rounded-lg overflow-hidden"
+                      style={{
+                        background: C.white,
+                        boxShadow: '0 4px 24px rgba(0,0,0,0.10)',
+                        width: '100%',
+                      }}
                     >
-                      SLIDE {String(page.page_num).padStart(2, '0')} / {String(totalPages).padStart(2, '0')}
+                      {pdfUrl ? (
+                        <Document
+                          file={pdfUrl}
+                          loading={
+                            <div style={{ height: '500px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin"
+                                style={{ borderColor: C.secondary, borderTopColor: 'transparent' }} />
+                            </div>
+                          }
+                        >
+                          <Page
+                            pageNumber={page.pdf_page_num}
+                            width={canvasWidth}
+                            renderTextLayer={false}
+                            renderAnnotationLayer={false}
+                          />
+                        </Document>
+                      ) : (
+                        <img
+                          src={`${API_BASE}/api/sessions/${sessionId}/slide/${page.pdf_page_num}.png`}
+                          alt={`第${page.page_num}页`}
+                          style={{ width: '100%', display: 'block' }}
+                          loading="lazy"
+                        />
+                      )}
+                      {/* Play button */}
+                      <button
+                        onClick={() => handleTimestampClick(page.page_start_time)}
+                        className="absolute top-3 left-3 text-xs px-2 py-0.5 rounded cursor-pointer transition-all duration-150"
+                        style={{ background: 'rgba(47,51,49,0.7)', color: C.white }}
+                      >
+                        ▶ {formatTime(page.page_start_time)}
+                      </button>
+                      {/* Slide label bottom-right */}
+                      <div
+                        className="absolute bottom-3 right-3 text-xs px-2 py-0.5 rounded"
+                        style={{ background: 'rgba(47,51,49,0.5)', color: C.white, letterSpacing: '0.05em' }}
+                      >
+                        SLIDE {String(page.page_num).padStart(2, '0')} / {String(totalPages).padStart(2, '0')}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </main>
 
+        {/* Resizer */}
+        <div
+          onMouseDown={handleResizerMouseDown}
+          className="flex-shrink-0 flex items-center justify-center"
+          style={{
+            width: '8px',
+            cursor: 'col-resize',
+            background: 'transparent',
+            position: 'relative',
+            zIndex: 10,
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(0,0,0,0.06)' }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
+        >
+          <div style={{ width: '1px', height: '100%', background: 'rgba(175,179,176,0.2)' }} />
+        </div>
+
         {/* Right panel: Notes */}
         <aside
           className="flex-shrink-0 flex flex-col overflow-hidden"
-          style={{ width: '320px', background: C.white, borderLeft: '1px solid rgba(175,179,176,0.1)' }}
+          style={{ width: `${notesPanelWidth}px`, background: C.white }}
         >
           {/* Detailed Note 入口 */}
           <div className="px-4 pt-3 pb-1 flex justify-end">
@@ -419,53 +661,68 @@ export default function NotesPage() {
               Detailed Note →
             </button>
           </div>
-          {/* Top: Pill toggle */}
-          <div className="flex-shrink-0 px-6 pt-6 pb-4" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* Pill */}
+
+          {/* Pill toggle */}
+          <div className="flex-shrink-0 px-6 pt-4 pb-4">
             <div
               role="group"
               aria-label="笔记模式"
               className="flex items-center p-1"
               style={{ background: C.sidebar, borderRadius: '9999px' }}
             >
+              {/* My Notes */}
               <button
                 type="button"
                 role="tab"
                 aria-selected={noteMode === 'my'}
                 onClick={() => setNoteMode('my')}
-                className="flex-1 text-sm cursor-pointer transition-all duration-150 py-1.5 px-3"
+                className="flex-1 flex items-center justify-center cursor-pointer transition-all duration-150 py-1.5 px-3"
                 style={{
                   borderRadius: '9999px',
-                  fontWeight: noteMode === 'my' ? '500' : '400',
+                  fontWeight: '500',
                   background: noteMode === 'my' ? C.white : 'transparent',
                   color: noteMode === 'my' ? C.fg : C.muted,
-                  boxShadow: noteMode === 'my' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  boxShadow: noteMode === 'my' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
                   border: 'none',
+                  fontSize: '12px',
                 }}
               >
                 My Notes
               </button>
+              {/* AI Notes */}
               <button
                 type="button"
                 role="tab"
                 aria-selected={noteMode === 'ai'}
                 onClick={() => setNoteMode('ai')}
-                className="flex-1 flex items-center justify-center gap-1.5 text-sm cursor-pointer transition-all duration-150 py-1.5 px-3"
+                className="flex-1 flex items-center justify-center gap-1.5 cursor-pointer transition-all duration-150 py-1.5 px-3"
                 style={{
                   borderRadius: '9999px',
-                  fontWeight: noteMode === 'ai' ? '500' : '400',
+                  fontWeight: noteMode === 'ai' ? '600' : '500',
                   background: noteMode === 'ai' ? C.white : 'transparent',
                   color: noteMode === 'ai' ? C.fg : C.muted,
-                  boxShadow: noteMode === 'ai' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  boxShadow: noteMode === 'ai' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
                   border: 'none',
+                  fontSize: '12px',
                 }}
               >
+                {/* Left sparkle icon */}
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M12 2L14.09 8.26L21 9.27L16 13.97L17.18 21L12 17.77L6.82 21L8 13.97L3 9.27L9.91 8.26L12 2Z"
+                    fill={noteMode === 'ai' ? C.fg : C.muted}
+                  />
+                </svg>
+                AI Notes
+                {/* Right sparkle icon — only when active */}
                 {noteMode === 'ai' && (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  <svg width="7" height="7" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path
+                      d="M12 2L14.09 8.26L21 9.27L16 13.97L17.18 21L12 17.77L6.82 21L8 13.97L3 9.27L9.91 8.26L12 2Z"
+                      fill={C.fg}
+                    />
                   </svg>
                 )}
-                AI Notes
               </button>
             </div>
           </div>
@@ -523,11 +780,14 @@ export default function NotesPage() {
                     {/* AI clarification block */}
                     <div style={{ borderLeft: '2px solid rgba(85,96,113,0.2)', paddingLeft: '16px' }}>
                       <div className="flex items-center gap-1.5 mb-2">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path
+                            d="M12 2L14.09 8.26L21 9.27L16 13.97L17.18 21L12 17.77L6.82 21L8 13.97L3 9.27L9.91 8.26L12 2Z"
+                            fill="#556071"
+                          />
                         </svg>
-                        <span style={{ fontSize: '9px', fontWeight: '700', letterSpacing: '0.08em', color: C.secondary }}>
-                          AI CLARIFICATION
+                        <span style={{ fontSize: '9px', fontWeight: '700', letterSpacing: '0.08em', color: C.secondary, textTransform: 'uppercase' }}>
+                          AI Clarification
                         </span>
                       </div>
                       <p style={{ fontSize: '14px', color: C.fg, lineHeight: '1.6' }}>
@@ -572,34 +832,49 @@ export default function NotesPage() {
                   </div>
                 )}
 
-                {/* Passive notes bullets */}
-                {currentPageData?.passive_notes && currentPageData.passive_notes.bullets.length > 0 && (
+                {/* PPT bullets + AI 解释（点击展开，打字机） */}
+                {currentPageData?.ppt_text && (
                   <div>
                     <div className="mb-3">
-                      <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.muted }}>
-                        AI NOTES
+                      <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '0.1em', color: '#777C79', textTransform: 'uppercase' }}>
+                        AI Notes
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      {currentPageData.ppt_text
+                        .split('\n')
+                        .filter((line) => line.trim().length > 0)
+                        .map((line, i) => (
+                          <AiBulletRow
+                            key={i}
+                            pptLine={line}
+                            aiBullet={currentPageData.passive_notes?.bullets[i]}
+                            onTimestampClick={handleTimestampClick}
+                          />
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Fallback: 如果没有 ppt_text，退回显示纯 AI bullets */}
+                {!currentPageData?.ppt_text && currentPageData?.passive_notes && currentPageData.passive_notes.bullets.length > 0 && (
+                  <div>
+                    <div className="mb-3">
+                      <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '0.1em', color: '#777C79', textTransform: 'uppercase' }}>
+                        AI Notes
                       </span>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {currentPageData.passive_notes.bullets.map((bullet, i) => (
-                        <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <div className="flex items-start gap-2">
-                            <span style={{ color: '#AFB3B0', marginTop: '2px', flexShrink: 0 }}>•</span>
-                            <button
-                              onClick={() => handleTimestampClick(bullet.timestamp_start)}
-                              className="text-left cursor-pointer transition-all duration-150 hover:opacity-70"
-                              style={{ fontSize: '14px', color: C.fg, lineHeight: '1.6', background: 'none', border: 'none', padding: 0 }}
-                            >
-                              {bullet.text}
-                            </button>
-                          </div>
-                          {bullet.ai_comment && (
-                            <div style={{ marginLeft: '18px', paddingLeft: '10px', borderLeft: '2px solid rgba(175,179,176,0.2)' }}>
-                              <p style={{ fontSize: '12px', color: C.secondary, lineHeight: '1.5' }}>
-                                {bullet.ai_comment}
-                              </p>
-                            </div>
-                          )}
+                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                          <span style={{ color: '#AFB3B0', marginTop: '2px', flexShrink: 0 }}>•</span>
+                          <button
+                            onClick={() => handleTimestampClick(bullet.timestamp_start)}
+                            className="text-left cursor-pointer transition-all duration-150 hover:opacity-70"
+                            style={{ fontSize: '14px', color: C.fg, lineHeight: '1.625', background: 'none', border: 'none', padding: 0 }}
+                          >
+                            {bullet.text}
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -607,7 +882,7 @@ export default function NotesPage() {
                 )}
 
                 {/* No data at all */}
-                {!currentPageData?.active_notes && !currentPageData?.passive_notes?.error && (!currentPageData?.passive_notes || currentPageData.passive_notes.bullets.length === 0) && (
+                {!currentPageData?.active_notes && !currentPageData?.passive_notes?.error && !currentPageData?.ppt_text && (!currentPageData?.passive_notes || currentPageData.passive_notes.bullets.length === 0) && (
                   <div className="flex items-center justify-center py-8">
                     <p style={{ fontSize: '13px', color: C.muted }}>该页暂无 AI 笔记</p>
                   </div>
