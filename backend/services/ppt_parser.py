@@ -15,6 +15,12 @@ import re
 
 import fitz  # PyMuPDF
 
+try:
+    from pptx import Presentation as _Presentation
+    _HAS_PPTX = True
+except ImportError:
+    _HAS_PPTX = False
+
 # Bullet-start patterns: lines beginning with these are standalone bullets
 _BULLET_START = re.compile(
     r"^(\s*[•\-\*\u2022\u2023\u25E6\u2043]\s+"    # bullet chars: •, -, *, etc.
@@ -167,6 +173,42 @@ def extract_domain_terms(pages: list[dict], max_terms: int = 50) -> str:
     return ", ".join(top_terms)
 
 
+def _extract_text_pptx(pptx_path: str) -> list[str]:
+    """
+    Extract text per slide from a .pptx file using python-pptx.
+
+    Each slide's text is structured as one line per paragraph (preserving the
+    original bullet / title structure). Empty slides return an empty string.
+
+    Returns a list of strings, one per slide (0-indexed → slide 1 is index 0).
+    """
+    if not _HAS_PPTX:
+        raise RuntimeError(
+            "python-pptx is required for .pptx text extraction. "
+            "Install it: pip install python-pptx"
+        )
+
+    prs = _Presentation(pptx_path)
+    slide_texts: list[str] = []
+
+    for slide in prs.slides:
+        lines: list[str] = []
+        for shape in slide.shapes:
+            if not shape.has_text_frame:
+                continue
+            for para in shape.text_frame.paragraphs:
+                text = para.text.strip()
+                if not text:
+                    continue
+                # Skip pure page-number lines
+                if text.replace(".", "").isdigit():
+                    continue
+                lines.append(text)
+        slide_texts.append("\n".join(lines))
+
+    return slide_texts
+
+
 def parse_ppt(
     ppt_path: str,
     slides_output_dir: str,
@@ -174,49 +216,89 @@ def parse_ppt(
 ) -> list[dict]:
     """
     Full PPT parsing pipeline:
-      1. Convert PPT/PPTX to PDF via LibreOffice
+      1. Convert PPT/PPTX to PDF via LibreOffice (for rendering)
       2. Copy PDF to slides_output_dir
-      3. For each PDF page: extract text only (no PNG rendering)
+      3. Extract text:
+         - .pptx: use python-pptx (accurate paragraph structure)
+         - .pdf:  use PyMuPDF (fallback)
+         - .ppt:  LibreOffice converts to .pptx first, then python-pptx
+      4. For each PDF page: render PNG thumbnail
 
     Returns a list of dicts:
       {
-        "page_num": int,       # 1-based
-        "ppt_text": str,       # extracted text (for semantic alignment)
-        "pdf_url": str,        # relative URL to the PDF, e.g. /slides/slides.pdf
-        "pdf_page_num": int,   # 1-based page index within the PDF (same as page_num)
+        "page_num": int,           # 1-based
+        "ppt_text": str,           # extracted text (for semantic alignment)
+        "pdf_url": str,            # relative URL to the PDF
+        "pdf_page_num": int,       # 1-based page index within the PDF
+        "thumbnail_url": str,      # relative URL to the PNG thumbnail
       }
-
-    Frontend renders slides via PDF.js using pdf_url + pdf_page_num.
-    No PNG files are produced.
     """
     os.makedirs(slides_output_dir, exist_ok=True)
 
+    suffix = Path(ppt_path).suffix.lower()
+
     with tempfile.TemporaryDirectory() as tmp_dir:
-        # Step 1: PPT → PDF
-        suffix = Path(ppt_path).suffix.lower()
+        # --- Determine text extraction source ---
+        pptx_texts: list[str] | None = None
+
+        if suffix == ".pptx" and _HAS_PPTX:
+            # Direct python-pptx extraction from the original file
+            pptx_texts = _extract_text_pptx(ppt_path)
+
+        elif suffix == ".ppt" and _HAS_PPTX:
+            # Convert .ppt → .pptx via LibreOffice, then extract with python-pptx
+            soffice = _libreoffice_path()
+            result = subprocess.run(
+                [soffice, "--headless", "--convert-to", "pptx",
+                 "--outdir", tmp_dir, ppt_path],
+                capture_output=True, text=True, timeout=120,
+            )
+            if result.returncode == 0:
+                pptx_file = str(Path(tmp_dir) / (Path(ppt_path).stem + ".pptx"))
+                if Path(pptx_file).exists():
+                    pptx_texts = _extract_text_pptx(pptx_file)
+
+        # --- Convert to PDF for rendering ---
         if suffix == ".pdf":
             src_pdf = ppt_path
         else:
             src_pdf = pptx_to_pdf(ppt_path, tmp_dir)
 
-        # Step 2: copy PDF into slides_output_dir for serving
+        # Copy PDF into slides_output_dir for serving
         dest_pdf = Path(slides_output_dir) / pdf_name
         shutil.copy2(src_pdf, dest_pdf)
         pdf_url = f"/slides/{pdf_name}"
 
-        # Step 3: per-page text extraction
+        # --- Per-page: text + PNG thumbnail ---
         doc = fitz.open(src_pdf)
         pages = []
 
-        for i, page in enumerate(doc):
+        for i, pdf_page in enumerate(doc):
             page_num = i + 1
-            ppt_text = _clean_ppt_text(page.get_text("text"))
+
+            # Text: prefer python-pptx extraction, fallback to PyMuPDF
+            if pptx_texts is not None and i < len(pptx_texts):
+                ppt_text = pptx_texts[i]
+            else:
+                ppt_text = _clean_ppt_text(pdf_page.get_text("text"))
+
+            # Render PNG thumbnail at 1.5x scale (suitable for display)
+            mat = fitz.Matrix(1.5, 1.5)
+            pix = pdf_page.get_pixmap(matrix=mat)
+            png_name = f"slide_{page_num:03d}.png"
+            png_path = Path(slides_output_dir) / png_name
+            pix.save(str(png_path))
+            # thumbnail_url: derive from the actual output dir name (= session_id subdir)
+            slides_dir_name = Path(slides_output_dir).name
+            thumbnail_url = f"/slides/{slides_dir_name}/{png_name}"
+
             pages.append(
                 {
                     "page_num": page_num,
                     "ppt_text": ppt_text,
                     "pdf_url": pdf_url,
                     "pdf_page_num": page_num,
+                    "thumbnail_url": thumbnail_url,
                 }
             )
 

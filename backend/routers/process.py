@@ -16,18 +16,18 @@ from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, Request, UploadFile, File
 
 import db
+import settings as _settings
 from db import check_and_record_rate_limit, get_rate_limit_status, RateLimitExceeded
 from services.audio import convert_to_wav, get_audio_duration
 from services.ppt_parser import parse_ppt, extract_domain_terms
 from services.asr import transcribe
-from services.alignment import build_page_timeline
-from services.note_generator import generate_notes_for_all_pages
+from services.note_generator import generate_notes_for_all_pages, PROVIDER_ZHONGZHUAN
 
 router = APIRouter(tags=["process"])
 
-MAX_CALLS_PER_DAY = 2
+MAX_CALLS_PER_DAY = _settings.RATE_LIMIT_MAX_CALLS_PER_DAY
 DAY_SECONDS = 86400.0
-MAX_AUDIO_SECONDS = 120 * 60
+MAX_AUDIO_SECONDS = _settings.MAX_AUDIO_SECONDS
 
 ALLOWED_LANGUAGES = {"zh", "en"}
 
@@ -183,22 +183,26 @@ async def _run_pipeline(
         ppt_pages: list[dict] = []
         if ppt_path:
             ppt_pages = parse_ppt(ppt_path, slides_dir, pdf_name=f"slides_{session_id}.pdf")
-            # Fix pdf_url: parse_ppt returns "/slides/{pdf_name}" but files are in
-            # "static/slides/{session_id}/{pdf_name}", so prepend session_id subdirectory
+            # Fix pdf_url and thumbnail_url: parse_ppt returns paths without session_id subdir
+            # but files are in static/slides/{session_id}/, so prepend session_id
             for page in ppt_pages:
                 if page.get("pdf_url"):
-                    pdf_name = page["pdf_url"].split("/")[-1]
-                    page["pdf_url"] = f"/slides/{session_id}/{pdf_name}"
+                    pdf_name_only = page["pdf_url"].split("/")[-1]
+                    page["pdf_url"] = f"/slides/{session_id}/{pdf_name_only}"
+                if page.get("thumbnail_url"):
+                    png_name = page["thumbnail_url"].split("/")[-1]
+                    page["thumbnail_url"] = f"/slides/{session_id}/{png_name}"
 
         # Step 3: ASR 转录
         db.update_session(session_id, {"progress": {"step": "transcribing", "percent": 55}})
         asr_prompt = extract_domain_terms(ppt_pages) if ppt_pages else None
         segments, _raw = transcribe(wav_path, language=language, prompt=asr_prompt)
 
-        # Step 4: 语义对齐
+        # Step 4: 语义对齐（版本由 settings.ALIGNMENT_VERSION 控制）
         db.update_session(session_id, {"progress": {"step": "aligning", "percent": 70}})
         if ppt_pages:
-            aligned_pages = build_page_timeline(
+            align_module = _settings.get_alignment_module()
+            aligned_pages = align_module.build_page_timeline(
                 ppt_pages=ppt_pages,
                 segments=segments,
                 user_anchors=user_anchors,
@@ -218,9 +222,12 @@ async def _run_pipeline(
                 "active_notes": None,
             }]
 
-        # Step 5: LLM 笔记生成
+        # Step 5: LLM 笔记生成（模板和 provider 由 settings 控制）
         db.update_session(session_id, {"progress": {"step": "generating", "percent": 85}})
-        generated_pages = await generate_notes_for_all_pages(aligned_pages)
+        generated_pages = await generate_notes_for_all_pages(
+            aligned_pages,
+            provider=_settings.NOTE_PROVIDER,
+        )
 
         any_partial = any(p.get("status") == "partial_ready" for p in generated_pages)
         overall_status = "partial_ready" if any_partial else "ready"
@@ -256,7 +263,7 @@ async def retry_page(session_id: str, page_num: int):
     if not target:
         raise HTTPException(status_code=404, detail=f"Page {page_num} not found")
 
-    results = await generate_notes_for_all_pages([target])
+    results = await generate_notes_for_all_pages([target], provider=PROVIDER_ZHONGZHUAN)
     updated = results[0]
 
     for i, p in enumerate(pages):

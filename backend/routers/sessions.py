@@ -1,4 +1,8 @@
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import Response
+from pathlib import Path
+
+import settings as _settings
 
 router = APIRouter(tags=["sessions"])
 
@@ -56,6 +60,12 @@ MOCK_SESSION = {
                     }
                 ]
             },
+            "aligned_segments": [
+                {"start": 45,  "end": 98,  "text": "数据链路层是OSI七层模型的第二层，负责在相邻节点之间以帧为单位传送数据。"},
+                {"start": 120, "end": 210, "text": "成帧就是把数据报文加上帧头帧尾，常见方法有字节计数法和比特填充法。"},
+                {"start": 380, "end": 490, "text": "差错控制用CRC来检测错误，ARQ负责重传，Stop-and-Wait是最基础的ARQ协议。"},
+                {"start": 670, "end": 740, "text": "流量控制用滑动窗口限制发送方速率，窗口大小除以RTT就是吞吐量上限。"}
+            ],
             "page_supplement": None
         },
         {
@@ -96,6 +106,12 @@ MOCK_SESSION = {
                     }
                 ]
             },
+            "aligned_segments": [
+                {"start": 1250, "end": 1360, "text": "停止等待协议最简单，每次只发一帧，等ACK回来才发下一帧。"},
+                {"start": 1580, "end": 1720, "text": "信道利用率公式是 U = T_f 除以 T_f 加 RTT 加 T_a，RTT 越大利用率越低。"},
+                {"start": 1920, "end": 2050, "text": "超时重传：计时器到期还没收到ACK就重发，超时时间的设置是工程难题。"},
+                {"start": 2400, "end": 2480, "text": "停止等待协议序号只需要1位，因为任意时刻最多只有1帧在飞。"}
+            ],
             "page_supplement": None
         },
         {
@@ -112,6 +128,11 @@ MOCK_SESSION = {
                 "error": "LLM generation failed after 3 retries: connection timeout",
                 "bullets": []
             },
+            "aligned_segments": [
+                {"start": 2810, "end": 2950, "text": "Go-Back-N 协议的发送窗口大小最大是 2 的 n 次方减 1。"},
+                {"start": 3050, "end": 3180, "text": "累积确认的意思是，ACK n 表示 n 之前的帧都已经收到了。"},
+                {"start": 3200, "end": 3350, "text": "接收方会丢弃所有失序帧，这是和选择重传协议最大的区别。"}
+            ],
             "page_supplement": {
                 "content": "老师在讲GBN时打开了Wireshark演示TCP重传过程，展示了一个丢包场景：发送方在第3帧丢失后，从第3帧开始重传了第3、4、5帧（回退N帧）。重传率约为18%，老师强调实际网络中GBN的回退重传会造成大量冗余流量，这是SR协议被提出的原因。",
                 "timestamp_start": 3200,
@@ -125,6 +146,12 @@ MOCK_SESSION = {
 @router.get("/sessions/health")
 def sessions_health():
     return {"status": "ok", "router": "sessions"}
+
+
+@router.get("/settings")
+def get_settings():
+    """返回当前后端所有策略配置，供前端展示。"""
+    return _settings.as_dict()
 
 
 @router.get("/sessions")
@@ -144,3 +171,37 @@ def get_session(session_id: str):
         return session
 
     raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+
+
+@router.get("/sessions/{session_id}/slide/{page_num}.png")
+def get_slide_png(session_id: str, page_num: int):
+    """Render a single PDF page to PNG on demand (for sessions that predate thumbnail generation)."""
+    slides_dir = Path("static") / "slides" / session_id
+    png_path = slides_dir / f"slide_{page_num:03d}.png"
+
+    # Serve cached PNG if already rendered
+    if png_path.exists():
+        return Response(content=png_path.read_bytes(), media_type="image/png")
+
+    # Find the PDF for this session
+    pdf_files = list(slides_dir.glob("*.pdf"))
+    if not pdf_files:
+        raise HTTPException(status_code=404, detail="No PDF found for this session")
+
+    import fitz
+    doc = fitz.open(str(pdf_files[0]))
+    if page_num < 1 or page_num > len(doc):
+        doc.close()
+        raise HTTPException(status_code=404, detail=f"Page {page_num} out of range")
+
+    page = doc[page_num - 1]
+    mat = fitz.Matrix(1.5, 1.5)
+    pix = page.get_pixmap(matrix=mat)
+    png_bytes = pix.tobytes("png")
+    doc.close()
+
+    # Cache to disk
+    slides_dir.mkdir(parents=True, exist_ok=True)
+    png_path.write_bytes(png_bytes)
+
+    return Response(content=png_bytes, media_type="image/png")

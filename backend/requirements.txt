@@ -5,6 +5,7 @@ python-dotenv==1.0.1
 
 # PPT parsing
 pymupdf==1.24.14
+python-pptx>=1.0.0
 
 # Numeric (used by alignment service)
 numpy>=1.26,<3.0

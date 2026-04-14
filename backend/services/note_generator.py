@@ -33,11 +33,13 @@ import anthropic
 from anthropic.types import TextBlock
 from pydantic import BaseModel, Field, field_validator
 
+import settings as _settings
+
 logger = logging.getLogger(__name__)
 
-MAX_CONCURRENT = 5
-MAX_RETRIES = 3
-DEFAULT_MODEL = "claude-sonnet-4-6"
+MAX_CONCURRENT = _settings.NOTE_MAX_CONCURRENT
+MAX_RETRIES = _settings.NOTE_MAX_RETRIES
+DEFAULT_MODEL = _settings.NOTE_MODEL
 
 # Supported provider names shown in the UI
 PROVIDER_ZHONGZHUAN = "中转站"
@@ -498,8 +500,8 @@ def _parse_and_merge(
 
 async def generate_notes_for_all_pages(
     pages: list[dict],
-    template: str = "passive_ppt_notes",
-    granularity: str = "simple",
+    template: str = _settings.NOTE_PASSIVE_TEMPLATE,
+    granularity: str = _settings.NOTE_GRANULARITY,
     provider: str = PROVIDER_ZHONGZHUAN,
 ) -> list[dict]:
     """

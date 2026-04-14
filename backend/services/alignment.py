@@ -12,14 +12,13 @@ from typing import Optional
 import numpy as np
 from openai import OpenAI
 
-# Similarity threshold below which a segment is considered "off-slide"
-OFF_SLIDE_THRESHOLD = 0.30
-# Minimum confidence to suppress the warning in the UI
-LOW_CONFIDENCE_THRESHOLD = 0.60
-# Number of consecutive segments required to trigger a page switch
-PAGE_SWITCH_K = 3
-# Cosine similarity threshold for upgrading an off-slide segment
-OFF_SLIDE_UPGRADE_THRESHOLD = 0.60
+import settings
+
+# Pull constants from settings (fallback to hardcoded defaults for safety)
+OFF_SLIDE_THRESHOLD = settings.ALIGNMENT_OFF_SLIDE_THRESHOLD
+LOW_CONFIDENCE_THRESHOLD = settings.ALIGNMENT_LOW_CONFIDENCE_THRESHOLD
+PAGE_SWITCH_K = settings.ALIGNMENT_PAGE_SWITCH_K
+OFF_SLIDE_UPGRADE_THRESHOLD = settings.ALIGNMENT_OFF_SLIDE_UPGRADE_THRESHOLD
 
 
 def _get_client() -> tuple[OpenAI, str]:
@@ -30,7 +29,7 @@ def _get_client() -> tuple[OpenAI, str]:
             "OPENAI_API_KEY not set. Add a real key to backend/.env"
         )
     base_url = os.environ.get("OPENAI_BASE_URL", "").strip() or None
-    model = os.environ.get("OPENAI_EMBEDDING_MODEL", "").strip() or "text-embedding-3-small"
+    model = os.environ.get("OPENAI_EMBEDDING_MODEL", "").strip() or settings.EMBEDDING_MODEL
     client = OpenAI(
         api_key=api_key,
         **({"base_url": base_url} if base_url else {}),

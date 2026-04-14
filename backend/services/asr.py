@@ -16,14 +16,14 @@ from typing import Optional
 
 from openai import OpenAI
 
-# Whisper API max file size is 25 MB.
-# 16kHz mono 16-bit WAV ≈ 1.92 MB/min → 10 min chunks ≈ 19 MB (safe margin).
-CHUNK_DURATION_SEC = 600  # 10 minutes per chunk
+import settings as _settings
+
+CHUNK_DURATION_SEC = _settings.ASR_CHUNK_DURATION_SEC
 MAX_FILE_SIZE_MB = 25
 
 # ── Sentence-ending punctuation ───────────────────────────────────────────────
 _SENTENCE_END = re.compile(r"[.?!。？！]$")
-_MAX_MERGE_CHARS = 200  # force-cut if no sentence-end punctuation found
+_MAX_MERGE_CHARS = _settings.ASR_MAX_MERGE_CHARS  # force-cut if no sentence-end punctuation found
 
 # ── Filler words to strip (English + Chinese) ─────────────────────────────────
 _EN_FILLERS = re.compile(
@@ -153,7 +153,7 @@ def transcribe_openai(
     for chunk_path, time_offset in chunks:
         with open(chunk_path, "rb") as audio_file:
             response = client.audio.transcriptions.create(
-                model="whisper-1",
+                model=_settings.ASR_WHISPER_MODEL,
                 file=audio_file,
                 language=language,
                 response_format="verbose_json",

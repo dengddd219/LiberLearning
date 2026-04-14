@@ -87,7 +87,7 @@ export default function DetailedNotePage() {
               </svg>
               返回
             </button>
-            {session.pages.map((page) => (
+            {(noteMode === 'my' ? session.pages.filter((p) => p.active_notes) : session.pages).map((page) => (
               <button
                 key={page.page_num}
                 onClick={() => document.getElementById(`page-${page.page_num}`)?.scrollIntoView({ behavior: 'smooth' })}

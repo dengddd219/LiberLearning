@@ -12,7 +12,8 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url,
 ).toString()
 
-interface Bullet { text: string; ai_comment: string; timestamp_start: number; timestamp_end: number }
+interface Bullet { text: string; ppt_bullet?: string; ai_comment: string; timestamp_start: number; timestamp_end: number; transcript_excerpt?: string }
+interface AlignedSegment { start: number; end: number; text: string; similarity?: number }
 interface PageData {
   page_num: number
   status?: string
@@ -26,6 +27,7 @@ interface PageData {
   active_notes: { user_note: string; ai_expansion: string } | null
   passive_notes: { bullets: Bullet[]; error?: string } | null
   page_supplement: { content: string; timestamp_start: number; timestamp_end: number } | null
+  aligned_segments?: AlignedSegment[]
 }
 interface SessionData {
   session_id: string
@@ -63,11 +65,11 @@ function AiBulletRow({
   onTimestampClick,
 }: {
   pptLine: string
-  aiBullet?: { text: string; ai_comment: string; timestamp_start: number; timestamp_end: number }
+  aiBullet?: Bullet
   onTimestampClick: (t: number) => void
 }) {
   const [expanded, setExpanded] = useState(false)
-  const { displayed, done, start, reset } = useTypewriter(aiBullet?.text ?? '', 15)
+  const { displayed, done, start, reset } = useTypewriter(aiBullet?.ai_comment ?? '', 15)
 
   function toggle() {
     if (!aiBullet) return
@@ -213,7 +215,7 @@ export default function NotesPage() {
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [scrollToPage, setScrollToPage] = useState<number | null>(null)
-  const [noteMode, setNoteMode] = useState<'my' | 'ai'>('ai')
+  const [noteMode, setNoteMode] = useState<'my' | 'ai' | 'transcript'>('ai')
   const [copyToast, setCopyToast] = useState(false)
   const [retrying, setRetrying] = useState<number | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -590,7 +592,7 @@ export default function NotesPage() {
                           <Page
                             pageNumber={page.pdf_page_num}
                             width={canvasWidth}
-                            renderTextLayer={false}
+                            renderTextLayer={true}
                             renderAnnotationLayer={false}
                           />
                         </Document>
@@ -724,6 +726,25 @@ export default function NotesPage() {
                   </svg>
                 )}
               </button>
+              {/* Transcript */}
+              <button
+                type="button"
+                role="tab"
+                aria-selected={noteMode === 'transcript'}
+                onClick={() => setNoteMode('transcript')}
+                className="flex-1 flex items-center justify-center cursor-pointer transition-all duration-150 py-1.5 px-3"
+                style={{
+                  borderRadius: '9999px',
+                  fontWeight: '500',
+                  background: noteMode === 'transcript' ? C.white : 'transparent',
+                  color: noteMode === 'transcript' ? C.fg : C.muted,
+                  boxShadow: noteMode === 'transcript' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                  border: 'none',
+                  fontSize: '12px',
+                }}
+              >
+                Transcript
+              </button>
             </div>
           </div>
 
@@ -757,7 +778,7 @@ export default function NotesPage() {
                   </div>
                 )}
               </div>
-            ) : (
+            ) : noteMode === 'ai' ? (
               /* AI Notes mode */
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {/* Active notes (user note + AI expansion) */}
@@ -841,17 +862,43 @@ export default function NotesPage() {
                       </span>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      {currentPageData.ppt_text
-                        .split('\n')
-                        .filter((line) => line.trim().length > 0)
-                        .map((line, i) => (
-                          <AiBulletRow
-                            key={i}
-                            pptLine={line}
-                            aiBullet={currentPageData.passive_notes?.bullets[i]}
-                            onTimestampClick={handleTimestampClick}
-                          />
-                        ))}
+                      {(() => {
+                        const lines = currentPageData.ppt_text
+                          .split('\n')
+                          .filter((line) => line.trim().length > 0)
+                        const bullets = currentPageData.passive_notes?.bullets ?? []
+                        const used = new Set<number>()
+
+                        return lines.map((line, i) => {
+                          const cleanLine = line.replace(/^[\u2022\-\*]\s*/, '').trim().toLowerCase()
+                          // Find best matching bullet by ppt_bullet field (not yet used by another line)
+                          let bestIdx = -1
+                          let bestScore = 0
+                          bullets.forEach((b, bi) => {
+                            if (used.has(bi)) return
+                            const ref = (b.ppt_bullet ?? b.text ?? '').replace(/^[\u2022\-\*]\s*/, '').trim().toLowerCase()
+                            if (!ref) return
+                            // Exact match
+                            if (ref === cleanLine) { bestIdx = bi; bestScore = 3; return }
+                            // Containment match
+                            if (ref.includes(cleanLine) || cleanLine.includes(ref)) {
+                              const score = 2
+                              if (score > bestScore) { bestIdx = bi; bestScore = score }
+                            }
+                          })
+                          const matched = bestIdx >= 0 ? bullets[bestIdx] : undefined
+                          if (bestIdx >= 0) used.add(bestIdx)
+
+                          return (
+                            <AiBulletRow
+                              key={i}
+                              pptLine={line}
+                              aiBullet={matched}
+                              onTimestampClick={handleTimestampClick}
+                            />
+                          )
+                        })
+                      })()}
                     </div>
                   </div>
                 )}
@@ -916,7 +963,52 @@ export default function NotesPage() {
                   </div>
                 )}
               </div>
-            )}
+            ) : noteMode === 'transcript' ? (
+              /* Transcript mode */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div className="mb-3">
+                  <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.muted }}>
+                    TRANSCRIPT
+                  </span>
+                </div>
+                {currentPageData?.aligned_segments && currentPageData.aligned_segments.length > 0 ? (
+                  currentPageData.aligned_segments.map((seg, i) => (
+                    <div
+                      key={i}
+                      style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '6px 0', borderBottom: '1px solid rgba(175,179,176,0.1)' }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleTimestampClick(seg.start)}
+                        style={{
+                          flexShrink: 0,
+                          background: 'none',
+                          border: 'none',
+                          padding: 0,
+                          cursor: 'pointer',
+                          fontSize: '11px',
+                          color: '#AFB3B0',
+                          fontWeight: '600',
+                          fontVariantNumeric: 'tabular-nums',
+                          minWidth: '36px',
+                          textAlign: 'left',
+                          marginTop: '2px',
+                        }}
+                      >
+                        {formatTime(seg.start)}
+                      </button>
+                      <p style={{ fontSize: '13px', color: C.fg, lineHeight: '1.6', margin: 0 }}>
+                        {seg.text}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex items-center justify-center py-8">
+                    <p style={{ fontSize: '13px', color: C.muted }}>该页暂无转录文本</p>
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
 
           {/* Bottom: copy button */}
