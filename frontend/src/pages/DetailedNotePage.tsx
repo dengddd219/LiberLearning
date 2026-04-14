@@ -98,18 +98,20 @@ export default function DetailedNotePage() {
           </nav>
         </div>
         <div className="flex items-center gap-3">
-          <button className="cursor-pointer transition-all duration-150 p-1.5 rounded-lg hover:bg-black/5">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#777C79" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <button type="button" aria-label="通知" className="cursor-pointer transition-all duration-150 p-1.5 rounded-lg hover:bg-black/5">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#777C79" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
           </button>
-          <div
+          <button
+            type="button"
+            aria-label="用户菜单"
             className="rounded-full flex items-center justify-center cursor-pointer"
-            style={{ width: '32px', height: '32px', background: '#5F5E5E', color: '#FFFFFF', fontSize: '13px', fontWeight: '600' }}
+            style={{ width: '32px', height: '32px', background: '#5F5E5E', color: '#FFFFFF', fontSize: '13px', fontWeight: '600', border: 'none' }}
           >
             U
-          </div>
+          </button>
         </div>
       </header>
 
@@ -315,9 +317,9 @@ export default function DetailedNotePage() {
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#556071" strokeWidth="2">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                   </svg>
-                  <span style={{ fontSize: '11px', fontWeight: '700', letterSpacing: '0.1em', color: '#556071' }}>
+                  <h2 style={{ fontSize: '11px', fontWeight: '700', letterSpacing: '0.1em', color: '#556071', margin: 0 }}>
                     {MOCK_NOTE.aiSection.heading.toUpperCase()}
-                  </span>
+                  </h2>
                 </div>
                 <p style={{ fontSize: '14px', color: '#374151', lineHeight: '1.8' }}>
                   {MOCK_NOTE.aiSection.content}
