@@ -1,4 +1,5 @@
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
+import { useTabs } from '../context/TabsContext'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getSession } from '../lib/api'
 
@@ -45,36 +46,30 @@ function formatTime(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-// Mock data for UI demonstration
-const MOCK_ACTIVE_ANNOTATIONS = [
-  {
-    time: '12:34',
-    note: '这里老师说的冷启动问题是关键——当物品没有任何历史交互时，协同过滤完全失效。',
-    aiComment: '冷启动（Cold Start）是推荐系统的经典难题。物品冷启动指新物品上线时缺乏用户行为数据，无法通过协同过滤建立相似度矩阵。常见解法包括：基于内容的特征匹配、利用物品属性标签进行初始推荐、以及混合模型（Hybrid Model）在数据积累早期兜底。',
-  },
-  {
-    time: '18:47',
-    note: '用户冷启动和物品冷启动要分开处理策略。',
-    aiComment: '用户冷启动侧重于新用户画像建立，通常通过注册引导（兴趣问卷）、设备/地域信号等显性或隐性信息快速构建初始偏好向量；物品冷启动则侧重于新内容的曝光策略，如流量池机制（小红书的多层审核流量池）。两者在技术上虽有交叉，但产品策略差异显著。',
-  },
-]
-
 export default function NotesPage() {
   const { sessionId } = useParams<{ sessionId: string }>()
+  const navigate = useNavigate()
+  const { openTab } = useTabs()
   const [session, setSession] = useState<SessionData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [scrollToPage, setScrollToPage] = useState<number | null>(null)
   const [noteMode, setNoteMode] = useState<'my' | 'ai'>('ai')
-  const [seekTo, setSeekTo] = useState<number | null>(null)
+  const [template, setTemplate] = useState<'讲解笔记' | '问答笔记' | '大纲摘要' | '主动学习'>('讲解笔记')
+  const [granularity, setGranularity] = useState<'简略' | '详细'>('详细')
   const [copyToast, setCopyToast] = useState(false)
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map())
+  const audioRef = useRef<HTMLAudioElement>(null)
 
   useEffect(() => {
     if (!sessionId) return
     getSession(sessionId)
-      .then((data) => { setSession(data as SessionData); setLoading(false) })
+      .then((data) => {
+        setSession(data as SessionData)
+        openTab({ sessionId: sessionId!, label: (data as SessionData).ppt_filename ?? sessionId! })
+        setLoading(false)
+      })
       .catch(() => { setError('无法加载笔记数据'); setLoading(false) })
   }, [sessionId])
 
@@ -107,8 +102,10 @@ export default function NotesPage() {
   }, [scrollToPage])
 
   const handleTimestampClick = useCallback((seconds: number) => {
-    setSeekTo(seconds)
-    setTimeout(() => setSeekTo(null), 200)
+    if (audioRef.current) {
+      audioRef.current.currentTime = seconds
+      audioRef.current.play()
+    }
   }, [])
 
   const handleCopyPage = useCallback(() => {
@@ -190,57 +187,6 @@ export default function NotesPage() {
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ background: C.bg, fontFamily: FONT_SERIF }}>
 
-      {/* TopAppBar */}
-      <header
-        className="flex items-center justify-between px-6 flex-shrink-0 z-30"
-        style={{
-          height: '64px',
-          background: 'rgba(240,239,234,0.85)',
-          backdropFilter: 'blur(24px)',
-          borderBottom: '1px solid rgba(175,179,176,0.1)',
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-        }}
-      >
-        {/* Left: Logo + Nav */}
-        <div className="flex items-center gap-6">
-          <span className="font-bold" style={{ fontSize: '20px', color: C.fg }}>LiberStudy</span>
-          <nav className="flex items-center gap-1">
-            {['Dashboard', 'Courses', 'Detailed Note'].map((item) => (
-              <button
-                key={item}
-                className="px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-all duration-150"
-                style={{
-                  color: item === 'Courses' ? C.fg : C.muted,
-                  fontWeight: item === 'Courses' ? '500' : '400',
-                  background: item === 'Courses' ? 'rgba(175,179,176,0.1)' : 'transparent',
-                }}
-              >
-                {item}
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        {/* Right: Bell + Avatar */}
-        <div className="flex items-center gap-3">
-          <button className="cursor-pointer transition-all duration-150 p-1.5 rounded-lg hover:bg-black/5">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke=C.muted strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
-          </button>
-          <div
-            className="rounded-full flex items-center justify-center cursor-pointer"
-            style={{ width: '32px', height: '32px', background: C.dark, color: C.white, fontSize: '13px', fontWeight: '600' }}
-          >
-            U
-          </div>
-        </div>
-      </header>
-
       {/* Main body (below TopAppBar) */}
       <div className="flex flex-1 overflow-hidden" style={{ marginTop: '64px' }}>
 
@@ -258,7 +204,7 @@ export default function NotesPage() {
               LECTURE SLIDES
             </span>
             <button className="cursor-pointer transition-all duration-150 opacity-60 hover:opacity-100">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke=C.secondary strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="15 18 9 12 15 6" />
               </svg>
             </button>
@@ -327,7 +273,7 @@ export default function NotesPage() {
                 className="cursor-pointer transition-all duration-150 p-1.5 rounded hover:bg-black/5 disabled:opacity-30"
                 disabled={currentPage <= 1}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke=C.secondary strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
               </button>
@@ -339,7 +285,7 @@ export default function NotesPage() {
                 className="cursor-pointer transition-all duration-150 p-1.5 rounded hover:bg-black/5 disabled:opacity-30"
                 disabled={currentPage >= totalPages}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke=C.secondary strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
               </button>
@@ -359,7 +305,7 @@ export default function NotesPage() {
                 className="cursor-pointer transition-all duration-150 p-1.5 rounded hover:bg-black/5"
                 title="导出 Markdown"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke=C.secondary strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                   <polyline points="7 10 12 15 17 10" />
                   <line x1="12" y1="15" x2="12" y2="3" />
@@ -432,6 +378,20 @@ export default function NotesPage() {
           className="flex-shrink-0 flex flex-col overflow-hidden"
           style={{ width: '320px', background: C.white, borderLeft: '1px solid rgba(175,179,176,0.1)' }}
         >
+          {/* Detailed Note 入口 */}
+          <div className="px-4 pt-3 pb-1 flex justify-end">
+            <button
+              onClick={() => navigate(`/notes/detail/${sessionId}`)}
+              className="text-xs px-3 py-1 rounded-full cursor-pointer transition-all duration-150"
+              style={{
+                background: 'rgba(175,179,176,0.15)',
+                color: '#556071',
+                border: '1px solid rgba(175,179,176,0.2)',
+              }}
+            >
+              Detailed Note →
+            </button>
+          </div>
           {/* Top: Pill toggle */}
           <div className="flex-shrink-0 px-6 pt-6 pb-4" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* Pill */}
@@ -464,18 +424,66 @@ export default function NotesPage() {
                 }}
               >
                 {noteMode === 'ai' && (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke=C.secondary strokeWidth="2">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                   </svg>
                 )}
                 AI Notes
                 {noteMode === 'ai' && (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke=C.muted strokeWidth="2" strokeLinecap="round">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                     <polyline points="6 9 12 15 18 9" />
                   </svg>
                 )}
               </button>
             </div>
+
+            {/* Template + Granularity selector — shown only in AI Notes mode */}
+            {noteMode === 'ai' && (
+              <div
+                className="flex items-center gap-3 flex-wrap"
+                style={{ padding: '0 4px' }}
+              >
+                {/* Template pills */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {(['讲解笔记', '问答笔记', '大纲摘要', '主动学习'] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setTemplate(t)}
+                      className="text-xs cursor-pointer transition-all duration-150 px-2.5 py-1"
+                      style={{
+                        borderRadius: '9999px',
+                        fontWeight: template === t ? '600' : '400',
+                        background: template === t ? C.fg : 'transparent',
+                        color: template === t ? C.white : C.secondary,
+                        border: `1px solid ${template === t ? C.fg : 'rgba(175,179,176,0.3)'}`,
+                      }}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ width: '1px', height: '16px', background: 'rgba(175,179,176,0.3)' }} />
+                {/* Granularity pills */}
+                <div className="flex items-center gap-1.5">
+                  {(['简略', '详细'] as const).map((g) => (
+                    <button
+                      key={g}
+                      onClick={() => setGranularity(g)}
+                      className="text-xs cursor-pointer transition-all duration-150 px-2.5 py-1"
+                      style={{
+                        borderRadius: '9999px',
+                        fontWeight: granularity === g ? '600' : '400',
+                        background: granularity === g ? C.fg : 'transparent',
+                        color: granularity === g ? C.white : C.secondary,
+                        border: `1px solid ${granularity === g ? C.fg : 'rgba(175,179,176,0.3)'}`,
+                      }}
+                    >
+                      {g}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Notes content area */}
@@ -504,17 +512,9 @@ export default function NotesPage() {
                     </p>
                   </div>
                 ) : (
-                  MOCK_ACTIVE_ANNOTATIONS.map((ann, i) => (
-                    <div key={i}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span style={{ fontSize: '11px', color: '#AFB3B0', fontWeight: '500' }}>{ann.time}</span>
-                        <div className="flex-1 h-px" style={{ background: 'rgba(175,179,176,0.3)' }} />
-                      </div>
-                      <p style={{ fontSize: '14px', color: C.fg, fontWeight: '500', lineHeight: '1.6' }}>
-                        {ann.note}
-                      </p>
-                    </div>
-                  ))
+                  <div className="flex items-center justify-center py-8">
+                    <p style={{ fontSize: '13px', color: C.muted }}>该页暂无用户笔记</p>
+                  </div>
                 )}
               </div>
             ) : (
@@ -534,7 +534,7 @@ export default function NotesPage() {
                     {/* AI clarification block */}
                     <div style={{ borderLeft: '2px solid rgba(85,96,113,0.2)', paddingLeft: '16px' }}>
                       <div className="flex items-center gap-1.5 mb-2">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke=C.secondary strokeWidth="2">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                         </svg>
                         <span style={{ fontSize: '9px', fontWeight: '700', letterSpacing: '0.08em', color: C.secondary }}>
@@ -546,33 +546,7 @@ export default function NotesPage() {
                       </p>
                     </div>
                   </div>
-                ) : (
-                  MOCK_ACTIVE_ANNOTATIONS.map((ann, i) => (
-                    <div key={i}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span style={{ fontSize: '11px', color: '#AFB3B0', fontWeight: '500' }}>{ann.time}</span>
-                        <div className="flex-1 h-px" style={{ background: 'rgba(175,179,176,0.3)' }} />
-                      </div>
-                      <p style={{ fontSize: '14px', color: C.fg, fontWeight: '500', lineHeight: '1.6', marginBottom: '12px' }}>
-                        {ann.note}
-                      </p>
-                      {/* AI clarification block */}
-                      <div style={{ borderLeft: '2px solid rgba(85,96,113,0.2)', paddingLeft: '16px' }}>
-                        <div className="flex items-center gap-1.5 mb-2">
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke=C.secondary strokeWidth="2">
-                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                          </svg>
-                          <span style={{ fontSize: '9px', fontWeight: '700', letterSpacing: '0.08em', color: C.secondary }}>
-                            AI CLARIFICATION
-                          </span>
-                        </div>
-                        <p style={{ fontSize: '14px', color: C.fg, lineHeight: '1.6' }}>
-                          {ann.aiComment}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                )}
+                ) : null}
 
                 {/* Passive notes bullets */}
                 {currentPageData?.passive_notes && (
@@ -630,7 +604,7 @@ export default function NotesPage() {
                   background: C.fg,
                 }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke=C.white strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="22" y1="2" x2="11" y2="13" />
                   <polygon points="22 2 15 22 11 13 2 9 22 2" />
                 </svg>
@@ -664,9 +638,9 @@ export default function NotesPage() {
         </div>
       )}
 
-      {/* Hidden audio seek (preserve functionality) */}
-      {seekTo !== null && (
-        <audio style={{ display: 'none' }} />
+      {/* Audio player (hidden, driven by timestamp clicks) */}
+      {session.audio_url && (
+        <audio ref={audioRef} src={`${API_BASE}${session.audio_url}`} preload="metadata" style={{ display: 'none' }} />
       )}
     </div>
   )
