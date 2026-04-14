@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { uploadFiles } from '../lib/api'
 
@@ -96,7 +96,11 @@ function UploadZone({ label, hint, accept, icon, file, error, onFile, onClear }:
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={file ? `已选择：${file.name}，点击替换` : `点击或拖拽上传${label}文件`}
       onClick={() => inputRef.current?.click()}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputRef.current?.click() } }}
       onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
@@ -154,24 +158,28 @@ function UploadZone({ label, hint, accept, icon, file, error, onFile, onClear }:
             color: error ? 'rgba(224,92,64,0.8)' : '#556071',
           }}
         >
-          {error ? error : isSuccess ? 'Click to replace' : hint}
+          {error ? error : isSuccess ? '点击替换' : hint}
         </span>
       </div>
 
       {/* Remove button when file selected */}
       {isSuccess && (
         <button
+          type="button"
+          aria-label="移除已选文件"
           onClick={(e) => { e.stopPropagation(); onClear() }}
           className="absolute top-3 right-3 flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity"
           style={{
-            width: '24px',
-            height: '24px',
+            width: '44px',
+            height: '44px',
             borderRadius: '9999px',
-            backgroundColor: 'rgba(175,179,176,0.15)',
+            backgroundColor: 'transparent',
             color: '#5F5E5E',
+            border: 'none',
+            margin: '-10px',
           }}
         >
-          <IconClose />
+          <IconClose aria-hidden="true" />
         </button>
       )}
     </div>
@@ -365,6 +373,7 @@ export default function UploadPage() {
   const [pptError, setPptError] = useState<string | null>(null)
   const [audioError, setAudioError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const [progress] = useState(68)
 
   const handlePpt = useCallback((file: File) => {
@@ -382,19 +391,33 @@ export default function UploadPage() {
   const handleSubmit = useCallback(async () => {
     if (!audioFile) return
     setUploading(true)
+    setUploadError(null)
     try {
       const result = await uploadFiles(pptFile ?? undefined, audioFile)
       navigate(`/processing?session_id=${result.session_id}`)
-    } catch {
-      navigate('/processing?session_id=mock-session-001')
+    } catch (err) {
+      console.error('Upload failed:', err)
+      setUploadError('上传失败，请检查网络后重试')
+      setUploading(false)
     }
   }, [pptFile, audioFile, navigate])
 
   const canSubmit = !!audioFile && !pptError && !audioError && !uploading
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') navigate(-1)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [navigate])
+
   return (
     /* Full-screen overlay — Figma: layout_4H7FSJ */
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="upload-modal-title"
       className="fixed inset-0 flex items-center justify-center"
       style={{
         backgroundColor: 'rgba(47, 51, 49, 0.2)',
@@ -445,6 +468,7 @@ export default function UploadPage() {
               </span>
               {/* H1 — "New Class" */}
               <h1
+                id="upload-modal-title"
                 style={{
                   fontWeight: 700,
                   fontSize: '36px',
@@ -460,6 +484,8 @@ export default function UploadPage() {
 
             {/* Close button — Figma: layout_LQG0YF, 40×40, borderRadius 9999px */}
             <button
+              type="button"
+              aria-label="关闭，返回上一页"
               onClick={() => navigate(-1)}
               className="flex items-center justify-center flex-shrink-0 cursor-pointer hover:opacity-70 transition-opacity"
               style={{
@@ -471,7 +497,7 @@ export default function UploadPage() {
                 border: 'none',
               }}
             >
-              <IconClose />
+              <IconClose aria-hidden="true" />
             </button>
           </div>
 
@@ -507,9 +533,16 @@ export default function UploadPage() {
           )}
 
           {/* CTA row — Figma: layout_G94R1R (row, justify flex-end, gap 16px) */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+            {uploadError && (
+              <p role="alert" style={{ color: 'var(--color-error)', fontSize: '14px', margin: 0 }}>
+                {uploadError}
+              </p>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px', alignItems: 'center' }}>
             {/* Cancel button */}
             <button
+              type="button"
               onClick={() => navigate(-1)}
               className="cursor-pointer hover:opacity-70 transition-opacity"
               style={{
@@ -548,6 +581,7 @@ export default function UploadPage() {
             >
               {uploading ? 'Processing…' : 'Save Workspace'}
             </button>
+            </div>
           </div>
         </div>
       </div>
