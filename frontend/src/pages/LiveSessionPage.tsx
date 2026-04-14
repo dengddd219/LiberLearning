@@ -81,6 +81,7 @@ export default function LiveSessionPage() {
   }, [])
 
   const handleEndSession = useCallback(() => {
+    if (!window.confirm('确认结束录音？录音将停止并开始生成笔记。')) return
     setIsRecording(false)
     navigate('/notes/mock-session-001')
   }, [navigate])
@@ -105,11 +106,11 @@ export default function LiveSessionPage() {
 
   return (
     <div
-      className="w-[1519px] pb-24 relative bg-stone-50 inline-flex flex-col justify-start items-start"
+      className="w-full min-h-screen pb-24 relative bg-stone-50 flex flex-col"
       style={{ fontFamily: 'Inter, sans-serif' }}
     >
       {/* Main content area */}
-      <div className="self-stretch h-[1024px] pt-16 inline-flex justify-start items-start overflow-hidden">
+      <div className="self-stretch flex-1 pt-16 flex justify-start items-start overflow-hidden" style={{ height: 'calc(100vh - 4rem)' }}>
         {/* Left sidebar - Lecture Slides */}
         <div className="w-48 self-stretch bg-stone-100 border-r border-zinc-400/10 inline-flex flex-col justify-start items-start">
           <div className="self-stretch p-4 border-b border-zinc-400/10 inline-flex justify-between items-center">
@@ -122,35 +123,42 @@ export default function LiveSessionPage() {
           </div>
           <div className="self-stretch flex-1 p-3 flex flex-col justify-start items-start gap-4 overflow-hidden">
             {/* Slide 1 - Active */}
-            <div
-              className="self-stretch relative bg-white/0 rounded-md shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] shadow-[0px_0px_0px_2px_rgba(95,94,94,1.00)] flex flex-col justify-start items-start overflow-hidden"
+            <button
+              type="button"
+              aria-label="跳转到第 1 张幻灯片"
+              aria-current="true"
+              className="self-stretch relative bg-white/0 rounded-md shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] shadow-[0px_0px_0px_2px_rgba(95,94,94,1.00)] flex flex-col justify-start items-start overflow-hidden border-none p-0 w-full"
               onClick={() => handleNavClick(1)}
             >
               <img className="self-stretch h-24 relative" src="https://placehold.co/175x96" alt="Slide 1" />
               <div className="px-1.5 left-[4px] top-[4px] absolute bg-zinc-600 rounded-sm flex flex-col justify-start items-start">
                 <div className="justify-center text-white text-[10px] font-normal font-['Inter'] leading-4">01</div>
               </div>
-            </div>
+            </button>
             {/* Slide 2 - Inactive */}
-            <div
-              className="self-stretch relative opacity-70 bg-gray-200 rounded-md flex flex-col justify-start items-start overflow-hidden"
+            <button
+              type="button"
+              aria-label="跳转到第 2 张幻灯片"
+              className="self-stretch relative opacity-70 bg-gray-200 rounded-md flex flex-col justify-start items-start overflow-hidden border-none p-0 w-full"
               onClick={() => handleNavClick(2)}
             >
               <div className="self-stretch h-24 relative bg-blend-saturation bg-white" />
               <div className="px-1.5 left-[4px] top-[4px] absolute bg-slate-600 rounded-sm flex flex-col justify-start items-start">
                 <div className="justify-center text-white text-[10px] font-normal font-['Inter'] leading-4">02</div>
               </div>
-            </div>
+            </button>
             {/* Slide 3 - Inactive */}
-            <div
-              className="self-stretch relative opacity-70 bg-gray-200 rounded-md flex flex-col justify-start items-start overflow-hidden"
+            <button
+              type="button"
+              aria-label="跳转到第 3 张幻灯片"
+              className="self-stretch relative opacity-70 bg-gray-200 rounded-md flex flex-col justify-start items-start overflow-hidden border-none p-0 w-full"
               onClick={() => handleNavClick(3)}
             >
               <div className="self-stretch h-24 relative bg-blend-saturation bg-white" />
               <div className="px-1.5 left-[4px] top-[4px] absolute bg-slate-600 rounded-sm flex flex-col justify-start items-start">
                 <div className="justify-center text-white text-[10px] font-normal font-['Inter'] leading-4">03</div>
               </div>
-            </div>
+            </button>
           </div>
         </div>
 
@@ -206,7 +214,7 @@ export default function LiveSessionPage() {
 
           {/* PPT Canvas Area */}
           <div className="self-stretch flex-1 p-12 bg-stone-100/50 inline-flex justify-center items-center overflow-hidden">
-            <div className="w-[896px] max-w-[896px] px-16 py-36 relative bg-white rounded-sm outline outline-1 outline-offset-[-1px] outline-zinc-400/5 inline-flex flex-col justify-center items-start">
+            <div className="w-full max-w-4xl mx-auto px-16 py-36 relative bg-white rounded-sm outline outline-1 outline-offset-[-1px] outline-zinc-400/5 inline-flex flex-col justify-center items-start">
               <div className="w-[896px] h-[506px] left-0 top-0 absolute bg-white/0 rounded-sm shadow-[0px_8px_10px_-6px_rgba(0,0,0,0.10)] shadow-xl" />
               <div className="self-stretch pb-8 flex flex-col justify-start items-start">
                 <div className="self-stretch flex flex-col justify-start items-start">
@@ -250,19 +258,31 @@ export default function LiveSessionPage() {
         <div className="w-80 self-stretch bg-white border-l border-zinc-400/10 inline-flex flex-col justify-between items-start">
           {/* Pill toggle */}
           <div className="self-stretch p-6 flex flex-col justify-start items-start gap-6">
-            <div className="self-stretch p-1 bg-stone-100 rounded-full inline-flex justify-center items-start">
-              <div className="flex-1 py-1.5 rounded-full flex justify-center items-center">
-                <div className="text-center justify-center text-slate-600 text-xs font-medium font-['Inter'] leading-4">My Notes</div>
-              </div>
-              <div className="flex-1 py-1.5 bg-white rounded-full shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] flex justify-center items-center gap-1.5">
+            <div role="group" aria-label="笔记模式" className="self-stretch p-1 bg-stone-100 rounded-full inline-flex justify-center items-start">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={noteMode === 'my'}
+                onClick={() => setNoteMode('my')}
+                className={`flex-1 py-1.5 rounded-full flex justify-center items-center border-none cursor-pointer transition-all ${noteMode === 'my' ? 'bg-white shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] text-zinc-800' : 'bg-transparent text-slate-600'}`}
+              >
+                <div className="text-center justify-center text-xs font-medium font-['Inter'] leading-4">My Notes</div>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={noteMode === 'ai'}
+                onClick={() => setNoteMode('ai')}
+                className={`flex-1 py-1.5 rounded-full flex justify-center items-center gap-1.5 border-none cursor-pointer transition-all ${noteMode === 'ai' ? 'bg-white shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] text-zinc-800' : 'bg-transparent text-slate-600'}`}
+              >
                 <div className="inline-flex flex-col justify-start items-center">
-                  <div className="w-3 h-3 bg-zinc-800" />
+                  <div className="w-3 h-3 bg-current" />
                 </div>
-                <div className="text-center justify-center text-zinc-800 text-xs font-semibold font-['Inter'] leading-4">AI Notes</div>
+                <div className="text-center justify-center text-xs font-semibold font-['Inter'] leading-4">AI Notes</div>
                 <div className="inline-flex flex-col justify-start items-center">
-                  <div className="w-1.5 h-1 bg-zinc-800" />
+                  <div className="w-1.5 h-1 bg-current" />
                 </div>
-              </div>
+              </button>
             </div>
           </div>
 
@@ -298,15 +318,17 @@ export default function LiveSessionPage() {
               </div>
 
               {/* End Session button */}
-              <div
-                className="self-stretch py-3 bg-zinc-800 rounded-full inline-flex justify-center items-center gap-2 cursor-pointer"
+              <button
+                type="button"
+                className="self-stretch py-3 bg-zinc-800 rounded-full inline-flex justify-center items-center gap-2 cursor-pointer border-none"
                 onClick={handleEndSession}
+                aria-label="结束录音并生成笔记"
               >
                 <div className="inline-flex flex-col justify-start items-center">
                   <div className="w-3.5 h-3.5 bg-stone-50" />
                 </div>
                 <div className="text-center justify-center text-stone-50 text-sm font-medium font-['Inter'] leading-5">End Session</div>
-              </div>
+              </button>
             </div>
 
             {/* Notes list */}
@@ -389,11 +411,15 @@ export default function LiveSessionPage() {
                 <div className="self-stretch pt-4 border-t border-zinc-400/10 flex flex-col justify-start items-start">
                   <div className="self-stretch relative flex flex-col justify-start items-start">
                     <div className="self-stretch h-24 p-4 bg-stone-100 rounded-[48px] inline-flex justify-center items-start overflow-hidden">
-                      <div className="flex-1 inline-flex flex-col justify-start items-start">
-                        <div className="self-stretch justify-center text-zinc-400 text-sm font-normal font-['Inter'] leading-5">Type a note (Alt + N)...</div>
-                      </div>
+                      <textarea
+                        value={noteInput}
+                        onChange={(e) => setNoteInput(e.target.value)}
+                        aria-label="添加笔记"
+                        placeholder="Type a note (Alt + N)..."
+                        className="flex-1 resize-none bg-transparent border-none outline-none text-zinc-800 text-sm font-normal font-['Inter'] leading-5 placeholder-zinc-400"
+                      />
                     </div>
-                    <div className="left-[197.75px] top-[60px] absolute inline-flex justify-start items-start gap-2">
+                    <div className="right-4 bottom-4 absolute inline-flex justify-start items-start gap-2">
                       <div className="p-1.5 rounded-md inline-flex flex-col justify-center items-center">
                         <div className="inline-flex justify-center items-start">
                           <div className="w-3.5 h-2.5 bg-zinc-800" />
@@ -415,10 +441,10 @@ export default function LiveSessionPage() {
 
       {/* Footer */}
       <div
-        className="w-[1519px] h-10 px-8 left-0 top-[1084px] absolute bg-stone-50 border-t border-zinc-400/20 inline-flex justify-between items-center"
+        className="w-full h-10 px-8 bg-stone-50 border-t border-zinc-400/20 inline-flex justify-between items-center"
       >
         <div className="inline-flex flex-col justify-start items-start">
-          <div className="justify-center text-slate-600 text-[10px] font-normal font-['Inter'] uppercase leading-4 tracking-wide">© 2024 LIBERSTUDY EDITORIAL. CRAFTED FOR CLARITY.</div>
+          <div className="justify-center text-slate-600 text-[10px] font-normal font-['Inter'] uppercase leading-4 tracking-wide">© {new Date().getFullYear()} LIBERSTUDY EDITORIAL. CRAFTED FOR CLARITY.</div>
         </div>
         <div className="flex justify-start items-start gap-6">
           <div className="self-stretch inline-flex flex-col justify-start items-start">
