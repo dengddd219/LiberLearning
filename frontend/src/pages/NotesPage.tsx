@@ -203,7 +203,11 @@ export default function NotesPage() {
             <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.secondary }}>
               LECTURE SLIDES
             </span>
-            <button className="cursor-pointer transition-all duration-150 opacity-60 hover:opacity-100">
+            <button
+              type="button"
+              aria-label="收起侧边栏"
+              className="cursor-pointer transition-all duration-150 opacity-60 hover:opacity-100 min-w-[44px] min-h-[44px] flex items-center justify-center border-none bg-transparent p-0"
+            >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="15 18 9 12 15 6" />
               </svg>
@@ -215,10 +219,13 @@ export default function NotesPage() {
             {slides.map((slide) => {
               const isActive = slide.pageNum === currentPage
               return (
-                <div
+                <button
+                  type="button"
                   key={slide.pageNum}
                   onClick={() => setScrollToPage(slide.pageNum)}
-                  className="relative cursor-pointer transition-all duration-150 rounded-md overflow-hidden flex-shrink-0 flex items-center justify-center"
+                  aria-label={`跳转到第 ${slide.pageNum} 张幻灯片`}
+                  aria-current={isActive ? 'true' : undefined}
+                  className="relative cursor-pointer transition-all duration-150 rounded-md overflow-hidden flex-shrink-0 flex items-center justify-center w-full border-none p-0"
                   style={{
                     height: '96px',
                     borderRadius: '6px',
@@ -247,7 +254,7 @@ export default function NotesPage() {
                   >
                     {slide.pageNum}
                   </span>
-                </div>
+                </button>
               )
             })}
           </div>
@@ -269,11 +276,13 @@ export default function NotesPage() {
             {/* Left: Navigation */}
             <div className="flex items-center gap-2">
               <button
+                type="button"
+                aria-label="上一页"
                 onClick={() => currentPage > 1 && setScrollToPage(currentPage - 1)}
-                className="cursor-pointer transition-all duration-150 p-1.5 rounded hover:bg-black/5 disabled:opacity-30"
+                className="cursor-pointer transition-all duration-150 min-w-[44px] min-h-[44px] flex items-center justify-center rounded hover:bg-black/5 disabled:opacity-30 border-none bg-transparent"
                 disabled={currentPage <= 1}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
               </button>
@@ -281,11 +290,13 @@ export default function NotesPage() {
                 {currentPage} / {totalPages}
               </span>
               <button
+                type="button"
+                aria-label="下一页"
                 onClick={() => currentPage < totalPages && setScrollToPage(currentPage + 1)}
-                className="cursor-pointer transition-all duration-150 p-1.5 rounded hover:bg-black/5 disabled:opacity-30"
+                className="cursor-pointer transition-all duration-150 min-w-[44px] min-h-[44px] flex items-center justify-center rounded hover:bg-black/5 disabled:opacity-30 border-none bg-transparent"
                 disabled={currentPage >= totalPages}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
               </button>
@@ -396,10 +407,15 @@ export default function NotesPage() {
           <div className="flex-shrink-0 px-6 pt-6 pb-4" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* Pill */}
             <div
+              role="group"
+              aria-label="笔记模式"
               className="flex items-center p-1"
               style={{ background: C.sidebar, borderRadius: '9999px' }}
             >
               <button
+                type="button"
+                role="tab"
+                aria-selected={noteMode === 'my'}
                 onClick={() => setNoteMode('my')}
                 className="flex-1 text-sm cursor-pointer transition-all duration-150 py-1.5 px-3"
                 style={{
@@ -408,11 +424,15 @@ export default function NotesPage() {
                   background: noteMode === 'my' ? C.white : 'transparent',
                   color: noteMode === 'my' ? C.fg : C.muted,
                   boxShadow: noteMode === 'my' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  border: 'none',
                 }}
               >
                 My Notes
               </button>
               <button
+                type="button"
+                role="tab"
+                aria-selected={noteMode === 'ai'}
                 onClick={() => setNoteMode('ai')}
                 className="flex-1 flex items-center justify-center gap-1.5 text-sm cursor-pointer transition-all duration-150 py-1.5 px-3"
                 style={{
@@ -421,6 +441,7 @@ export default function NotesPage() {
                   background: noteMode === 'ai' ? C.white : 'transparent',
                   color: noteMode === 'ai' ? C.fg : C.muted,
                   boxShadow: noteMode === 'ai' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  border: 'none',
                 }}
               >
                 {noteMode === 'ai' && (
@@ -595,6 +616,9 @@ export default function NotesPage() {
                 }}
               />
               <button
+                type="button"
+                aria-label="复制当前页笔记"
+                title="复制当前页笔记到剪贴板"
                 onClick={handleCopyPage}
                 className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center cursor-pointer transition-all duration-150"
                 style={{
@@ -602,6 +626,7 @@ export default function NotesPage() {
                   height: '32px',
                   borderRadius: '9999px',
                   background: C.fg,
+                  border: 'none',
                 }}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -631,6 +656,8 @@ export default function NotesPage() {
       {/* Copy toast */}
       {copyToast && (
         <div
+          role="status"
+          aria-live="polite"
           className="fixed bottom-12 left-1/2 -translate-x-1/2 text-sm px-4 py-2 rounded-full shadow-lg z-50"
           style={{ background: C.fg, color: C.white }}
         >
