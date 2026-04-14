@@ -1,9 +1,9 @@
-// ── Replaced by Figma implementation ──
 import { useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTabs } from '../context/TabsContext'
 import { uploadFiles } from '../lib/api'
 
-// ─── Icons (inline SVG) ──────────────────────────────────────────────────────
+// ─── Icons ───────────────────────────────────────────────────────────────────
 
 function IconGrid() {
   return (
@@ -70,26 +70,10 @@ function IconNotes() {
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
       <path
         d="M2.7 0.5C1.5 0.5 1.5 1.7 1.5 1.7v10.6S1.5 13.5 2.7 13.5h8.6s1.2 0 1.2-1.2V4.5L8.5 0.5H2.7Z"
-        stroke="currentColor"
-        strokeWidth="1.1"
-        strokeLinejoin="round"
+        stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"
       />
       <path d="M8.5 0.5L8.5 4.5L12.5 4.5" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
       <path d="M4 7h6M4 9.5h4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function IconArrow() {
-  return (
-    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-      <path
-        d="M2 5h6M5.5 2.5 8 5l-2.5 2.5"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
     </svg>
   )
 }
@@ -99,31 +83,35 @@ function IconBell() {
     <svg width="16" height="20" viewBox="0 0 16 20" fill="none">
       <path
         d="M8 0C8 0 3 3 3 9v4l-2 2v1h14v-1l-2-2V9C13 3 8 0 8 0Z"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinejoin="round"
+        stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"
       />
       <path d="M6 16a2 2 0 0 0 4 0" stroke="currentColor" strokeWidth="1.3" />
     </svg>
   )
 }
 
-function IconUpload() {
+function IconVelocity() {
   return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-      <path
-        d="M7 9V2M7 2L4.5 4.5M7 2l2.5 2.5"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M2 10v1.5A0.5 0.5 0 0 0 2.5 12h9a0.5 0.5 0 0 0 0.5-0.5V10"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-      />
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M2 12 L8 4 L14 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function IconAI() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <circle cx="10" cy="10" r="4" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M10 2v2M10 16v2M2 10h2M16 10h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IconLive() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <circle cx="10" cy="10" r="3" fill="currentColor" />
+      <circle cx="10" cy="10" r="6.5" stroke="currentColor" strokeWidth="1.2" strokeDasharray="2 2" />
     </svg>
   )
 }
@@ -137,194 +125,158 @@ interface CourseCard {
   duration: string
   notes: number
   time: string
+  date: string
   thumbColor: string
+  folder: string
+  folderColor: 'blue' | 'neutral' | 'slate'
   status: 'done' | 'processing'
 }
 
 const SESSIONS: CourseCard[] = [
-  {
-    id: 's-processing',
-    course: '',
-    lecture: '',
-    duration: '',
-    notes: 0,
-    time: '',
-    thumbColor: '#AFB3B0',
-    status: 'processing',
-  },
-  {
-    id: 's1',
-    course: 'MSBA 7028: Predictive Analytics',
-    lecture: 'Lecture 04: Linear Regression Models',
-    duration: '42:15',
-    notes: 12,
-    time: '2H AGO',
-    thumbColor: '#4A6FA5',
-    status: 'done',
-  },
-  {
-    id: 's2',
-    course: 'ECON 8002: Advanced Macro',
-    lecture: 'Week 2: Stochastic Growth Theory',
-    duration: '58:02',
-    notes: 28,
-    time: 'YESTERDAY',
-    thumbColor: '#6B8E6B',
-    status: 'done',
-  },
-  {
-    id: 's3',
-    course: 'MGMT 6010: Digital Strategy',
-    lecture: 'Seminar: Ecosystem Competition',
-    duration: '35:40',
-    notes: 5,
-    time: 'OCT 24',
-    thumbColor: '#8B7355',
-    status: 'done',
-  },
-  {
-    id: 's4',
-    course: 'COMP 9001: Cybersecurity',
-    lecture: 'Module 1: Threat Modeling Patterns',
-    duration: '1:12:30',
-    notes: 19,
-    time: 'OCT 22',
-    thumbColor: '#7B6B8B',
-    status: 'done',
-  },
+  { id: 's-processing', course: '', lecture: '', duration: '', notes: 0, time: '', date: '', thumbColor: '#AFB3B0', folder: '', folderColor: 'neutral', status: 'processing' },
+  { id: 's1', course: 'MSBA 7028: Predictive Analytics', lecture: 'Advanced Modeling & Forecasting', duration: '1h 20m', notes: 12, time: '2H AGO', date: 'Oct 24, 2023', thumbColor: '#4A6FA5', folder: 'Business Analytics', folderColor: 'blue', status: 'done' },
+  { id: 's2', course: 'CS 5010: Software Engineering', lecture: 'Agile Methodologies & Scrum', duration: '55m', notes: 8, time: 'YESTERDAY', date: 'Oct 22, 2023', thumbColor: '#6B8E6B', folder: 'Computer Science', folderColor: 'slate', status: 'done' },
+  { id: 's3', course: 'HUM 202: Media Studies', lecture: 'Digital Ethics in the 21st Century', duration: '1h 45m', notes: 24, time: 'OCT 24', date: 'Oct 19, 2023', thumbColor: '#8B7355', folder: 'Humanities', folderColor: 'neutral', status: 'done' },
+  { id: 's4', course: 'ACCT 410: Auditing Standards', lecture: 'Internal Control Frameworks', duration: '1h 10m', notes: 15, time: 'OCT 22', date: 'Oct 18, 2023', thumbColor: '#7B6B8B', folder: 'Business Analytics', folderColor: 'blue', status: 'done' },
 ]
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
+// ─── Cards ───────────────────────────────────────────────────────────────────
 
 function ProcessingCard() {
   return (
-    <div
-      className="relative rounded-[32px] overflow-hidden"
-      style={{
-        backgroundColor: '#FFFFFF',
-        boxShadow: '0px 40px 40px -15px rgba(47, 51, 49, 0.04)',
-      }}
-    >
-      {/* Skeleton slide thumbnail */}
-      <div
-        className="w-full flex items-center justify-center"
-        style={{ backgroundColor: '#F3F4F1', aspectRatio: '16/9' }}
-      >
+    <div className="self-stretch p-6 relative bg-white rounded-[32px] shadow-[0px_40px_40px_-15px_rgba(47,51,49,0.04)] flex flex-col justify-start items-start gap-4">
+      <div className="self-stretch py-7 bg-stone-100 rounded-md flex justify-center items-center overflow-hidden">
         <div className="flex flex-col gap-3 w-[60%]">
           <div className="h-3 rounded-full bg-[#AFB3B0]/40 w-full animate-pulse" />
           <div className="h-3 rounded-full bg-[#AFB3B0]/40 w-4/5 animate-pulse" />
           <div className="h-3 rounded-full bg-[#AFB3B0]/40 w-3/5 animate-pulse" />
         </div>
       </div>
-
-      {/* Skeleton info */}
-      <div className="px-6 pt-4 pb-0">
-        <div className="h-4 rounded bg-[#AFB3B0]/30 w-3/4 animate-pulse mb-2" />
-        <div className="h-3 rounded bg-[#AFB3B0]/20 w-1/2 animate-pulse" />
+      <div className="self-stretch flex flex-col gap-3">
+        <div className="w-32 h-4 bg-stone-100 rounded-2xl animate-pulse" />
+        <div className="w-20 h-3 bg-stone-100 rounded-2xl animate-pulse" />
       </div>
-
-      {/* Footer */}
-      <div
-        className="flex items-center justify-between mx-6 pt-4 pb-5"
-        style={{ borderTop: '1px solid rgba(175, 179, 176, 0.1)', marginTop: '12px' }}
-      >
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-[#AFB3B0]/50 animate-pulse" />
-          <div className="w-1.5 h-1.5 rounded-full bg-[#AFB3B0]/50 animate-pulse" />
-          <div className="w-1.5 h-1.5 rounded-full bg-[#AFB3B0]/50 animate-pulse" />
+      <div className="self-stretch pt-4 border-t border-zinc-400/10 flex justify-between items-center mt-3">
+        <div className="flex justify-start items-start gap-1">
+          <div className="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-pulse" />
+          <div className="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-pulse" />
+          <div className="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-pulse" />
         </div>
-        <span
-          className="text-[10.4px] font-bold tracking-widest uppercase"
-          style={{ color: '#5F5E5E', letterSpacing: '0.1em' }}
-        >
+        <div className="text-zinc-600 text-[10.40px] font-bold font-['Inter'] uppercase leading-4 tracking-wide">
           PROCESSING
-        </span>
+        </div>
       </div>
     </div>
   )
 }
 
-interface DoneCardProps {
-  card: CourseCard
-  onClick: () => void
-}
-
-function DoneCard({ card, onClick }: DoneCardProps) {
+function DoneCard({ card, onClick }: { card: CourseCard; onClick: () => void }) {
   return (
     <div
       onClick={onClick}
-      className="relative rounded-[32px] overflow-hidden cursor-pointer group"
-      style={{
-        backgroundColor: '#FFFFFF',
-        boxShadow: '0px 40px 40px -15px rgba(47, 51, 49, 0.04)',
-        transition: 'box-shadow 150ms ease, transform 150ms ease',
-      }}
-      onMouseEnter={(e) => {
-        ;(e.currentTarget as HTMLDivElement).style.boxShadow =
-          '0px 40px 56px -15px rgba(47, 51, 49, 0.10)'
-        ;(e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'
-      }}
-      onMouseLeave={(e) => {
-        ;(e.currentTarget as HTMLDivElement).style.boxShadow =
-          '0px 40px 40px -15px rgba(47, 51, 49, 0.04)'
-        ;(e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'
-      }}
+      className="self-stretch relative bg-white rounded-[32px] shadow-[0px_40px_40px_-15px_rgba(47,51,49,0.04)] outline outline-1 outline-offset-[-1px] outline-black/0 overflow-hidden cursor-pointer transition-all duration-150 hover:-translate-y-0.5 hover:shadow-[0px_40px_56px_-15px_rgba(47,51,49,0.10)]"
     >
-      {/* Slide thumbnail */}
-      <div className="relative w-full" style={{ aspectRatio: '16/9', backgroundColor: card.thumbColor, opacity: 0.85 }}>
-        {/* Duration badge */}
-        <div
-          className="absolute bottom-3 right-3 px-2 py-[3px] rounded-2xl"
-          style={{ backgroundColor: 'rgba(47, 51, 49, 0.88)' }}
-        >
-          <span
-            className="text-[10.4px] text-white"
-            style={{ fontFamily: 'ui-monospace, "Liberation Mono", "Courier New", monospace' }}
-          >
-            {card.duration}
-          </span>
+      {/* Thumbnail */}
+      <div className="w-full relative" style={{ aspectRatio: '16/9', backgroundColor: card.thumbColor, opacity: 0.85 }}>
+        <div className="px-2 py-1 absolute bottom-3 right-3 bg-zinc-800/90 rounded-2xl">
+          <div className="text-white text-[10.40px] font-normal font-['Liberation_Mono'] leading-4">{card.duration}</div>
         </div>
       </div>
-
       {/* Info */}
-      <div className="px-6 pt-4 pb-0">
-        <p
-          className="text-[15.2px] font-bold leading-[1.5] mb-1 truncate"
-          style={{ color: '#2F3331' }}
-        >
-          {card.course}
-        </p>
-        <p
-          className="text-[12px] font-medium leading-[1.5] truncate"
-          style={{ color: '#556071' }}
-        >
-          {card.lecture}
-        </p>
+      <div className="px-6 pt-4 pb-0 flex flex-col gap-1">
+        <div className="text-zinc-800 text-base font-bold font-['Inter'] leading-6 truncate">{card.course}</div>
+        <div className="text-slate-600 text-xs font-medium font-['Inter'] leading-4 truncate">{card.lecture}</div>
       </div>
-
       {/* Footer */}
-      <div
-        className="flex items-center justify-between mx-6 pt-4 pb-5"
-        style={{ borderTop: '1px solid rgba(175, 179, 176, 0.1)', marginTop: '12px' }}
-      >
-        <div className="flex items-center gap-1" style={{ color: '#556071' }}>
+      <div className="mx-6 pt-4 pb-5 mt-3 border-t border-zinc-400/10 flex justify-between items-center">
+        <div className="flex items-center gap-1 text-slate-600">
           <IconNotes />
-          <span className="text-[11.2px]" style={{ color: '#556071' }}>
-            {card.notes} notes
-          </span>
+          <span className="text-slate-600 text-xs font-normal font-['Inter'] leading-4">{card.notes} notes</span>
         </div>
-        <span
-          className="text-[10.4px] font-bold uppercase"
-          style={{ color: '#777C79', letterSpacing: '0.1em' }}
-        >
-          {card.time}
-        </span>
+        <div className="text-neutral-500 text-[10.40px] font-bold font-['Inter'] uppercase leading-4 tracking-wide">{card.time}</div>
       </div>
     </div>
   )
 }
 
-// ─── New Class Modal ──────────────────────────────────────────────────────────
+// ─── List View ───────────────────────────────────────────────────────────────
+
+const FOLDER_BADGE: Record<string, { bg: string; text: string }> = {
+  blue:    { bg: '#DBEAFE', text: '#4B5563' },
+  slate:   { bg: '#DBEAFE', text: '#475569' },
+  neutral: { bg: '#E5E5E5', text: '#52525B' },
+}
+
+function ListRow({ card, onClick, isLast }: { card: CourseCard; onClick: () => void; isLast: boolean }) {
+  const badge = FOLDER_BADGE[card.folderColor]
+  return (
+    <div
+      onClick={onClick}
+      className={`flex items-center cursor-pointer hover:bg-stone-50/60 transition-colors${isLast ? '' : ' border-b border-gray-200'}`}
+    >
+      {/* Thumbnail */}
+      <div className="w-40 px-6 py-7 flex-shrink-0">
+        <div className="w-16 h-10 rounded-2xl outline outline-1 outline-offset-[-1px] outline-zinc-400/10 overflow-hidden" style={{ backgroundColor: card.thumbColor, opacity: 0.8 }} />
+      </div>
+
+      {/* Course name & subtitle */}
+      <div className="w-56 pl-6 flex-shrink-0 flex flex-col gap-0.5">
+        <div className="text-zinc-800 text-sm font-semibold font-['Inter'] leading-5">{card.course}</div>
+        <div className="text-slate-600 text-xs font-normal font-['Inter'] leading-4">{card.lecture}</div>
+      </div>
+
+      {/* Folder badge */}
+      <div className="w-48 pl-12 pr-6 py-9 flex-shrink-0">
+        <div
+          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full"
+          style={{ backgroundColor: badge.bg }}
+        >
+          <div className="w-2.5 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: badge.text }} />
+          <span className="text-[10px] font-medium font-['Inter']" style={{ color: badge.text }}>{card.folder}</span>
+        </div>
+      </div>
+
+      {/* Date */}
+      <div className="w-28 px-6 py-7 flex-shrink-0 text-slate-600 text-sm font-normal font-['Inter'] leading-5">
+        {card.date}
+      </div>
+
+      {/* Duration */}
+      <div className="w-28 px-6 py-7 flex-shrink-0 text-slate-600 text-sm font-normal font-['Inter'] leading-5">
+        {card.duration}
+      </div>
+
+      {/* Notes */}
+      <div className="w-32 pl-6 flex-shrink-0 flex items-center gap-2 text-zinc-800 text-sm font-medium font-['Inter'] leading-5">
+        <IconNotes />
+        {card.notes} notes
+      </div>
+    </div>
+  )
+}
+
+function ListTable({ sessions, onRowClick }: { sessions: CourseCard[]; onRowClick: (id: string) => void }) {
+  const done = sessions.filter(s => s.status === 'done')
+  return (
+    <div className="self-stretch bg-white rounded-[32px] shadow-[0px_40px_40px_0px_rgba(47,51,49,0.04)] overflow-hidden">
+      {/* Header */}
+      <div className="flex items-start bg-stone-100/50 pr-24">
+        <div className="w-40 px-6 py-4 flex-shrink-0 text-slate-600 text-[10px] font-medium font-['Inter'] uppercase tracking-wide">COURSE<br/>THUMBNAIL</div>
+        <div className="w-56 px-6 py-5 flex-shrink-0 text-slate-600 text-[10px] font-medium font-['Inter'] uppercase tracking-wide">COURSE NAME &amp; IDENTIFIER</div>
+        <div className="w-48 px-6 py-5 flex-shrink-0 text-slate-600 text-[10px] font-medium font-['Inter'] uppercase tracking-wide">FOLDER</div>
+        <div className="w-28 px-6 py-5 flex-shrink-0 text-slate-600 text-[10px] font-medium font-['Inter'] uppercase tracking-wide">DATE</div>
+        <div className="w-28 px-6 py-5 flex-shrink-0 text-slate-600 text-[10px] font-medium font-['Inter'] uppercase tracking-wide">DURATION</div>
+        <div className="w-32 px-6 py-5 flex-shrink-0 text-slate-600 text-[10px] font-medium font-['Inter'] uppercase tracking-wide">NOTES</div>
+      </div>
+      {/* Rows */}
+      {done.map((card, i) => (
+        <ListRow key={card.id} card={card} onClick={() => onRowClick(card.id)} isLast={i === done.length - 1} />
+      ))}
+    </div>
+  )
+}
+
+// ─── Modal ───────────────────────────────────────────────────────────────────
 
 const MAX_AUDIO_MB = 500
 
@@ -359,8 +311,7 @@ function IconAudioFile() {
     <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
       <rect x="12" y="4" width="12" height="18" rx="6" stroke="#AFB3B0" strokeWidth="1.5" />
       <path d="M6 18c0 6.627 5.373 12 12 12s12-5.373 12-12" stroke="#AFB3B0" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M18 30v4" stroke="#AFB3B0" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M14 34h8" stroke="#AFB3B0" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M18 30v4M14 34h8" stroke="#AFB3B0" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   )
 }
@@ -384,14 +335,8 @@ function IconLoadingCircle() {
 }
 
 interface UploadZoneProps {
-  label: string
-  hint: string
-  accept: string
-  icon: React.ReactNode
-  file: File | null
-  error: string | null
-  onFile: (file: File) => void
-  onClear: () => void
+  label: string; hint: string; accept: string; icon: React.ReactNode
+  file: File | null; error: string | null; onFile: (f: File) => void; onClear: () => void
 }
 
 function UploadZone({ label, hint, accept, icon, file, error, onFile, onClear }: UploadZoneProps) {
@@ -399,48 +344,26 @@ function UploadZone({ label, hint, accept, icon, file, error, onFile, onClear }:
   const [dragging, setDragging] = useState(false)
   const isSuccess = !!file && !error
 
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault()
-    setDragging(false)
-    const dropped = e.dataTransfer.files[0]
-    if (dropped) onFile(dropped)
-  }
-
   return (
     <div
       onClick={() => inputRef.current?.click()}
       onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
       onDragLeave={() => setDragging(false)}
-      onDrop={handleDrop}
-      className="relative flex flex-col items-center justify-center cursor-pointer transition-all duration-150"
+      onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) onFile(f) }}
+      className="relative flex flex-col items-center justify-center cursor-pointer transition-all duration-150 flex-1"
       style={{
         borderRadius: '32px',
-        border: error
-          ? '2px dashed rgba(224, 92, 64, 0.5)'
-          : isSuccess
-          ? '2px dashed rgba(95, 94, 94, 0.4)'
-          : dragging
-          ? '2px dashed rgba(95, 94, 94, 0.5)'
-          : '2px dashed rgba(175, 179, 176, 0.2)',
+        border: error ? '2px dashed rgba(224,92,64,0.5)' : isSuccess ? '2px dashed rgba(95,94,94,0.4)' : dragging ? '2px dashed rgba(95,94,94,0.5)' : '2px dashed rgba(175,179,176,0.2)',
         padding: '32px',
-        flex: 1,
       }}
     >
-      <input
-        ref={inputRef}
-        type="file"
-        accept={accept}
-        className="hidden"
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f) }}
-      />
-      <div style={{ paddingBottom: '16px' }}>{icon}</div>
-      <div style={{ paddingBottom: '4px' }}>
-        <span style={{ fontWeight: 700, fontSize: '14px', color: '#2F3331' }}>
-          {isSuccess ? file!.name : label}
-        </span>
+      <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f) }} />
+      <div className="pb-4">{icon}</div>
+      <div className="pb-1">
+        <span className="font-bold text-sm text-zinc-800">{isSuccess ? file!.name : label}</span>
       </div>
-      <span style={{ fontWeight: 400, fontSize: '11px', letterSpacing: '0.05em', textTransform: 'uppercase', color: error ? 'rgba(224,92,64,0.8)' : '#556071' }}>
-        {error ? error : isSuccess ? 'Click to replace' : hint}
+      <span className="font-normal text-[11px] uppercase tracking-[0.05em]" style={{ color: error ? 'rgba(224,92,64,0.8)' : '#556071' }}>
+        {error ?? (isSuccess ? 'Click to replace' : hint)}
       </span>
       {isSuccess && (
         <button
@@ -455,39 +378,22 @@ function UploadZone({ label, hint, accept, icon, file, error, onFile, onClear }:
   )
 }
 
-interface NewClassModalProps {
-  onClose: () => void
-  navigate: ReturnType<typeof useNavigate>
-}
-
-function NewClassModal({ onClose, navigate }: NewClassModalProps) {
+function NewClassModal({ onClose, navigate }: { onClose: () => void; navigate: ReturnType<typeof useNavigate> }) {
   const [pptFile, setPptFile] = useState<File | null>(null)
   const [audioFile, setAudioFile] = useState<File | null>(null)
   const [pptError, setPptError] = useState<string | null>(null)
   const [audioError, setAudioError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
 
-  const handlePpt = useCallback((file: File) => {
-    const err = validateFile(file, ['.ppt', '.pptx', '.pdf'])
-    setPptError(err)
-    if (!err) setPptFile(file)
-  }, [])
-
-  const handleAudio = useCallback((file: File) => {
-    const err = validateFile(file, ['.mp3', '.wav', '.m4a', '.aac'], MAX_AUDIO_MB)
-    setAudioError(err)
-    if (!err) setAudioFile(file)
-  }, [])
-
+  const handlePpt = useCallback((file: File) => { const err = validateFile(file, ['.ppt', '.pptx', '.pdf']); setPptError(err); if (!err) setPptFile(file) }, [])
+  const handleAudio = useCallback((file: File) => { const err = validateFile(file, ['.mp3', '.wav', '.m4a', '.aac'], MAX_AUDIO_MB); setAudioError(err); if (!err) setAudioFile(file) }, [])
   const handleSubmit = useCallback(async () => {
     if (!audioFile) return
     setUploading(true)
     try {
       const result = await uploadFiles(pptFile ?? undefined, audioFile)
       navigate(`/processing?session_id=${result.session_id}`)
-    } catch {
-      navigate('/processing?session_id=mock-session-001')
-    }
+    } catch { setUploading(false); alert('上传失败，请重试') }
   }, [pptFile, audioFile, navigate])
 
   const canSubmit = !!audioFile && !pptError && !audioError && !uploading
@@ -495,110 +401,71 @@ function NewClassModal({ onClose, navigate }: NewClassModalProps) {
   return (
     <div
       className="fixed inset-0 flex items-center justify-center z-50"
-      style={{ backgroundColor: 'rgba(47, 51, 49, 0.2)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', padding: '24px' }}
+      style={{ backgroundColor: 'rgba(47,51,49,0.2)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', padding: '24px' }}
       onClick={onClose}
     >
       <div
         className="relative w-full flex flex-col"
-        style={{ maxWidth: '768px', backgroundColor: '#FFFFFF', borderRadius: '48px', border: '1px solid rgba(175, 179, 176, 0.1)', boxShadow: '0px 25px 50px -12px rgba(0, 0, 0, 0.25)', fontFamily: 'Inter, system-ui, sans-serif' }}
+        style={{ maxWidth: '768px', backgroundColor: '#FFFFFF', borderRadius: '48px', border: '1px solid rgba(175,179,176,0.1)', boxShadow: '0px 25px 50px -12px rgba(0,0,0,0.25)', fontFamily: 'Inter, system-ui, sans-serif' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '48px', padding: '48px' }}>
+        <div className="flex flex-col gap-12 p-12">
           {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <span style={{ fontWeight: 700, fontSize: '16px', lineHeight: '1.5', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(95, 94, 94, 0.6)' }}>
-                ACTION CENTER
-              </span>
-              <h2 style={{ fontWeight: 700, fontSize: '36px', lineHeight: '1.11', letterSpacing: '-0.025em', color: '#2F3331', margin: 0 }}>
-                New Class
-              </h2>
+          <div className="flex justify-between items-start">
+            <div className="flex flex-col gap-2">
+              <span className="font-bold text-base uppercase tracking-[0.2em]" style={{ color: 'rgba(95,94,94,0.6)' }}>ACTION CENTER</span>
+              <h2 className="font-bold text-[36px] leading-[1.11] tracking-[-0.025em] text-zinc-800 m-0">New Class</h2>
             </div>
-            <button
-              onClick={onClose}
-              className="flex items-center justify-center flex-shrink-0 cursor-pointer hover:opacity-70 transition-opacity"
-              style={{ width: '40px', height: '40px', borderRadius: '9999px', backgroundColor: '#F3F4F1', color: '#5F5E5E', border: 'none' }}
-            >
+            <button onClick={onClose} className="flex items-center justify-center flex-shrink-0 cursor-pointer hover:opacity-70 transition-opacity" style={{ width: '40px', height: '40px', borderRadius: '9999px', backgroundColor: '#F3F4F1', color: '#5F5E5E', border: 'none' }}>
               <IconModalClose />
             </button>
           </div>
 
-          {/* Upload areas */}
+          {/* Upload / Processing */}
           {!uploading ? (
-            <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
-              <UploadZone
-                label="PPT/PDF Materials"
-                hint="Drag or click to upload"
-                accept=".ppt,.pptx,.pdf"
-                icon={<IconPPT />}
-                file={pptFile}
-                error={pptError}
-                onFile={handlePpt}
-                onClear={() => { setPptFile(null); setPptError(null) }}
-              />
-              <UploadZone
-                label="Audio Recording"
-                hint="Upload MP3, WAV or AAC"
-                accept=".mp3,.wav,.m4a,.aac"
-                icon={<IconAudioFile />}
-                file={audioFile}
-                error={audioError}
-                onFile={handleAudio}
-                onClear={() => { setAudioFile(null); setAudioError(null) }}
-              />
+            <div className="flex gap-0 items-stretch">
+              <UploadZone label="PPT/PDF Materials" hint="Drag or click to upload" accept=".ppt,.pptx,.pdf" icon={<IconPPT />} file={pptFile} error={pptError} onFile={handlePpt} onClear={() => { setPptFile(null); setPptError(null) }} />
+              <UploadZone label="Audio Recording" hint="Upload MP3, WAV or AAC" accept=".mp3,.wav,.m4a,.aac" icon={<IconAudioFile />} file={audioFile} error={audioError} onFile={handleAudio} onClear={() => { setAudioFile(null); setAudioError(null) }} />
             </div>
           ) : (
-            /* Processing state */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '12px', height: '12px', borderRadius: '9999px', backgroundColor: '#5F5E5E', flexShrink: 0 }} />
-                    <span style={{ fontWeight: 500, fontSize: '14px', color: '#2F3331' }}>
-                      Synthesis engine is mapping audio to visual anchors...
-                    </span>
+            <div className="flex flex-col gap-8">
+              <div className="flex flex-col gap-4">
+                <div className="flex justify-between items-end">
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full bg-zinc-600 flex-shrink-0" />
+                    <span className="font-medium text-sm text-zinc-800">Synthesis engine is mapping audio to visual anchors...</span>
                   </div>
-                  <span style={{ fontWeight: 900, fontSize: '18px', color: '#2F3331' }}>68%</span>
+                  <span className="font-black text-lg text-zinc-800">68%</span>
                 </div>
-                <div style={{ height: '12px', borderRadius: '9999px', backgroundColor: '#E6E9E6', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: '68%', borderRadius: '9999px', background: 'linear-gradient(90deg, #5F5E5E 0%, #535252 100%)', boxShadow: '0px 0px 20px 0px rgba(95, 94, 94, 0.2)' }} />
+                <div className="h-3 rounded-full bg-[#E6E9E6] overflow-hidden">
+                  <div className="h-full w-[68%] rounded-full" style={{ background: 'linear-gradient(90deg, #5F5E5E 0%, #535252 100%)', boxShadow: '0px 0px 20px 0px rgba(95,94,94,0.2)' }} />
                 </div>
               </div>
-              <div style={{ borderTop: '1px solid rgba(175, 179, 176, 0.1)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <IconCheckCircle />
-                  <span style={{ fontWeight: 500, fontSize: '14px', color: '#2F3331' }}>Transcription complete</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div className="animate-spin"><IconLoadingCircle /></div>
-                  <span style={{ fontWeight: 400, fontSize: '14px', color: '#556071' }}>Alignment in progress...</span>
-                </div>
-                <div style={{ borderRadius: '32px', backgroundColor: '#F3F4F1', padding: '16px 16px 20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontWeight: 700, fontSize: '11px', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#5F5E5E' }}>PAGE 3/18</span>
-                    <span style={{ fontWeight: 700, fontSize: '11px', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#5F5E5E' }}>GENERATING NOTES...</span>
+              <div className="border-t border-zinc-400/10 pt-4 flex flex-col gap-4">
+                <div className="flex items-center gap-3"><IconCheckCircle /><span className="font-medium text-sm text-zinc-800">Transcription complete</span></div>
+                <div className="flex items-center gap-3"><div className="animate-spin"><IconLoadingCircle /></div><span className="font-normal text-sm text-slate-600">Alignment in progress...</span></div>
+                <div className="rounded-[32px] bg-stone-100 p-4 pb-5 flex flex-col gap-2">
+                  <div className="flex justify-between">
+                    <span className="font-bold text-[11px] uppercase tracking-[0.1em] text-zinc-600">PAGE 3/18</span>
+                    <span className="font-bold text-[11px] uppercase tracking-[0.1em] text-zinc-600">GENERATING NOTES...</span>
                   </div>
-                  <div style={{ height: '4px', borderRadius: '9999px', backgroundColor: '#E0E3E0', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: '25%', borderRadius: '9999px', backgroundColor: 'rgba(95,94,94,0.4)' }} />
+                  <div className="h-1 rounded-full bg-[#E0E3E0] overflow-hidden">
+                    <div className="h-full w-1/4 rounded-full bg-zinc-600/40" />
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* CTA row */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px', alignItems: 'center' }}>
-            <button
-              onClick={onClose}
-              className="cursor-pointer hover:opacity-70 transition-opacity"
-              style={{ padding: '13.5px 24px 14.5px', fontWeight: 700, fontSize: '14px', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#556071', background: 'none', border: 'none' }}
-            >
+          {/* CTA */}
+          <div className="flex justify-end gap-4 items-center">
+            <button onClick={onClose} className="cursor-pointer hover:opacity-70 transition-opacity font-bold text-sm uppercase tracking-[0.1em] text-slate-600 bg-transparent border-none" style={{ padding: '13.5px 24px 14.5px' }}>
               CANCEL
             </button>
             <button
-              onClick={handleSubmit}
-              disabled={!canSubmit}
-              style={{ padding: '12px 32px', borderRadius: '9999px', backgroundColor: canSubmit ? '#5F5E5E' : 'rgba(95,94,94,0.35)', color: '#FAF7F6', fontWeight: 700, fontSize: '16px', border: 'none', cursor: canSubmit ? 'pointer' : 'not-allowed', boxShadow: canSubmit ? '0px 4px 6px -4px rgba(0,0,0,0.1), 0px 10px 15px -3px rgba(0,0,0,0.1)' : 'none' }}
+              onClick={handleSubmit} disabled={!canSubmit}
+              className="px-8 py-3 rounded-full font-bold text-base border-none cursor-pointer transition-all"
+              style={{ backgroundColor: canSubmit ? '#5F5E5E' : 'rgba(95,94,94,0.35)', color: '#FAF7F6', cursor: canSubmit ? 'pointer' : 'not-allowed', boxShadow: canSubmit ? '0px 4px 6px -4px rgba(0,0,0,0.1), 0px 10px 15px -3px rgba(0,0,0,0.1)' : 'none' }}
             >
               {uploading ? 'Processing…' : 'Save Workspace'}
             </button>
@@ -613,447 +480,190 @@ function NewClassModal({ onClose, navigate }: NewClassModalProps) {
 
 export default function LobbyPage() {
   const navigate = useNavigate()
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const { openTab } = useTabs()
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
   const [activeNav, setActiveNav] = useState<'courses' | 'settings'>('courses')
   const [showModal, setShowModal] = useState(false)
 
   return (
-    <div
-      className="min-h-screen flex"
-      style={{ backgroundColor: '#FAF9F7', fontFamily: 'Inter, system-ui, sans-serif' }}
-    >
+    <div className="w-[1280px] pl-48 pt-16 relative bg-stone-50 inline-flex flex-col justify-start items-start font-['Inter']">
+
       {/* ── Sidebar ── */}
-      <aside
-        className="fixed top-0 left-0 h-full flex flex-col justify-between z-20"
-        style={{
-          width: '200px',
-          backgroundColor: '#F3F4F1',
-          borderRight: '1px solid rgba(175, 179, 176, 0.15)',
-          padding: '28px 12px 24px',
-        }}
-      >
-        {/* Top section */}
-        <div className="flex flex-col gap-0">
-          {/* Brand */}
-          <div style={{ padding: '4px 12px', paddingBottom: '32px' }}>
-            <h1
-              className="font-bold leading-tight"
-              style={{ fontSize: '20px', color: '#2F3331', letterSpacing: '-0.04em' }}
-            >
-              LiberStudy
-            </h1>
-            <p
-              className="font-normal uppercase mt-1"
-              style={{ fontSize: '10px', color: '#2F3331', opacity: 0.55, letterSpacing: '0.05em' }}
-            >
+      <div className="w-48 h-full px-4 py-8 left-0 top-0 absolute bg-stone-100 flex flex-col justify-between items-start">
+        {/* Brand */}
+        <div className="self-stretch pb-10 flex flex-col justify-start items-start">
+          <div className="self-stretch px-4 flex flex-col justify-start items-start">
+            <div className="self-stretch text-zinc-800 text-lg font-bold font-['Inter'] leading-7">
+              Student<br />Workspace
+            </div>
+            <div className="self-stretch opacity-60 text-zinc-800 text-xs font-normal font-['Inter'] uppercase leading-4 tracking-wide mt-1">
               ACADEMIC YEAR 2026
-            </p>
+            </div>
           </div>
+        </div>
 
-          {/* New session CTA */}
-          <div style={{ paddingBottom: '28px', paddingLeft: '4px', paddingRight: '4px' }}>
-            <button
-              onClick={() => setShowModal(true)}
-              className="w-full flex items-center justify-center gap-2 font-semibold rounded-full cursor-pointer transition-all duration-150 hover:opacity-85"
-              style={{
-                padding: '11px 16px',
-                backgroundColor: '#5F5E5E',
-                color: '#FAF9F7',
-                fontSize: '12px',
-                letterSpacing: '0.02em',
-                boxShadow: '0px 1px 3px rgba(0,0,0,0.08)',
-              }}
-            >
-              <IconMic />
-              <span>New Recording</span>
-            </button>
-          </div>
+        {/* New Recording CTA */}
+        <div className="self-stretch px-2 pb-8 flex flex-col justify-start items-start">
+          <button
+            onClick={() => setShowModal(true)}
+            className="self-stretch px-4 py-3 bg-zinc-600 rounded-full shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] flex justify-center items-center gap-2 cursor-pointer hover:opacity-85 transition-opacity border-none"
+          >
+            <IconMic />
+            <span className="text-stone-50 text-xs font-semibold font-['Inter'] leading-5 tracking-tight">Upload the record</span>
+          </button>
+        </div>
 
+        {/* Nav */}
+        <div className="self-stretch flex-1 flex flex-col justify-start items-start gap-4">
           {/* Search */}
-          <div
-            className="flex items-center justify-between rounded-lg cursor-pointer transition-all duration-150 hover:bg-[#E6E9E6]/60"
-            style={{
-              padding: '8px 12px',
-              marginBottom: '8px',
-              backgroundColor: 'rgba(224, 227, 224, 0.25)',
-            }}
-          >
-            <div className="flex items-center gap-3" style={{ color: '#556071' }}>
+          <div className="self-stretch px-4 py-2 bg-neutral-200/20 rounded-md flex justify-between items-center cursor-pointer hover:bg-neutral-200/40 transition-colors">
+            <div className="flex justify-start items-center gap-3 text-slate-600">
               <IconSearch />
-              <span className="font-medium" style={{ fontSize: '12.8px', color: '#556071' }}>
-                Search
-              </span>
+              <span className="text-slate-600 text-xs font-medium font-['Inter'] leading-5">Search</span>
             </div>
-            <div
-              className="rounded"
-              style={{
-                padding: '1px 5px',
-                backgroundColor: '#E0E3E0',
-              }}
-            >
-              <span style={{ fontSize: '9px', color: '#777C79', fontWeight: 700 }}>⌘K</span>
+            <div className="px-1.5 pt-px pb-[2.39px] bg-neutral-200 rounded-2xl">
+              <span className="text-neutral-500 text-[9.60px] font-bold font-['IPAGothic'] leading-4">⌘K</span>
             </div>
           </div>
-
-          {/* Nav label */}
-          <p
-            className="uppercase font-bold"
-            style={{
-              fontSize: '9.5px',
-              color: '#AFB3B0',
-              letterSpacing: '0.1em',
-              padding: '0 12px',
-              marginBottom: '4px',
-              marginTop: '8px',
-            }}
-          >
-            COURSES
-          </p>
 
           {/* Nav links */}
-          <div className="flex flex-col gap-0.5">
+          <div className="self-stretch flex flex-col gap-1">
             <button
               onClick={() => setActiveNav('courses')}
-              className="flex items-center gap-3 rounded-lg text-left w-full cursor-pointer transition-all duration-150"
-              style={{
-                padding: '9px 12px',
-                backgroundColor: activeNav === 'courses' ? 'rgba(47, 51, 49, 0.06)' : 'transparent',
-                borderBottom: activeNav === 'courses' ? 'none' : 'none',
-              }}
+              className="self-stretch px-4 py-3 flex justify-start items-center gap-3 cursor-pointer border-none bg-transparent transition-all"
+              style={{ borderRight: activeNav === 'courses' ? '2px solid #5F5E5E' : '2px solid transparent' }}
             >
-              <span style={{ color: activeNav === 'courses' ? '#2F3331' : '#777C79' }}>
-                <IconCourse />
-              </span>
-              <span
-                className="font-medium uppercase"
-                style={{
-                  fontSize: '11px',
-                  color: activeNav === 'courses' ? '#2F3331' : '#777C79',
-                  letterSpacing: '0.05em',
-                }}
-              >
-                My Courses
-              </span>
+              <span style={{ color: activeNav === 'courses' ? '#2F3331' : '#556071' }}><IconCourse /></span>
+              <span className="text-zinc-800 text-xs font-normal font-['Inter'] uppercase leading-4 tracking-wide">MY COURSES</span>
             </button>
-
             <button
               onClick={() => setActiveNav('settings')}
-              className="flex items-center gap-3 rounded-lg text-left w-full cursor-pointer transition-all duration-150"
-              style={{
-                padding: '9px 12px',
-                backgroundColor: activeNav === 'settings' ? 'rgba(47, 51, 49, 0.06)' : 'transparent',
-              }}
+              className="self-stretch px-4 py-3 flex justify-start items-center gap-3 cursor-pointer border-none bg-transparent transition-all"
+              style={{ borderRight: activeNav === 'settings' ? '2px solid #5F5E5E' : '2px solid transparent' }}
             >
-              <span style={{ color: activeNav === 'settings' ? '#2F3331' : '#777C79' }}>
-                <IconSettings />
-              </span>
-              <span
-                className="font-medium uppercase"
-                style={{
-                  fontSize: '11px',
-                  color: activeNav === 'settings' ? '#2F3331' : '#777C79',
-                  letterSpacing: '0.05em',
-                }}
-              >
-                Settings
-              </span>
+              <span style={{ color: activeNav === 'settings' ? '#2F3331' : '#556071' }}><IconSettings /></span>
+              <span className="text-zinc-800 text-xs font-normal font-['Inter'] uppercase leading-4 tracking-wide">SETTINGS</span>
             </button>
           </div>
         </div>
 
         {/* User anchor */}
-        <div className="flex items-center gap-3" style={{ padding: '0 12px' }}>
-          <div
-            className="rounded-full flex-shrink-0 flex items-center justify-center"
-            style={{
-              width: '32px',
-              height: '32px',
-              backgroundColor: '#C8C9C0',
-            }}
-          >
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#5F5E5E' }}>A</span>
+        <div className="self-stretch px-4 flex justify-start items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-[#C8C9C0] flex-shrink-0 flex items-center justify-center">
+            <span className="text-xs font-bold text-zinc-600">A</span>
           </div>
-          <div className="min-w-0">
-            <p className="font-bold leading-tight truncate" style={{ fontSize: '12px', color: '#2F3331' }}>
-              Alex Chen
-            </p>
-            <p className="truncate" style={{ fontSize: '9.6px', color: '#556071' }}>Graduate Student</p>
+          <div className="flex flex-col overflow-hidden">
+            <div className="text-zinc-800 text-xs font-bold font-['Inter'] leading-4">Alex Chen</div>
+            <div className="text-slate-600 text-[9.60px] font-normal font-['Inter'] leading-4">Graduate Student</div>
           </div>
         </div>
-      </aside>
+      </div>
 
-      {/* ── Main content (offset by sidebar) ── */}
-      <div className="flex-1 flex flex-col" style={{ marginLeft: '200px' }}>
-        {/* ── Top App Bar ── */}
-        <header
-          className="sticky top-0 z-10 flex items-center justify-between"
-          style={{
-            height: '64px',
-            padding: '0 48px',
-            backgroundColor: 'rgba(250, 249, 247, 0.88)',
-            backdropFilter: 'blur(24px)',
-            WebkitBackdropFilter: 'blur(24px)',
-            borderBottom: '1px solid rgba(175, 179, 176, 0.1)',
-          }}
-        >
-          {/* Left: title + subtitle */}
-          <div>
-            <h2
-              className="font-black leading-tight"
-              style={{ fontSize: '22px', letterSpacing: '-0.025em', color: '#2F3331' }}
-            >
-              Scholarly Workspace
-            </h2>
-            <p
-              className="font-normal uppercase"
-              style={{ fontSize: '10px', color: '#556071', marginTop: '1px', letterSpacing: '0.1em' }}
-            >
+      {/* ── Main Area ── */}
+      <div className="self-stretch min-h-screen bg-stone-50 flex flex-col justify-start items-start">
+
+        {/* Header */}
+        <div className="self-stretch px-12 py-6 bg-stone-50/80 backdrop-blur-md flex justify-between items-center sticky top-0 z-10">
+          <div className="flex flex-col justify-start items-start gap-0.5">
+            <div className="text-zinc-800 text-2xl font-black font-['Inter'] leading-8">Scholarly Workspace</div>
+            <div className="text-slate-600 text-[10.40px] font-normal font-['Inter'] uppercase leading-4 tracking-wide">
               WELCOME BACK, YOUR RECORDINGS ARE UP TO DATE.
-            </p>
+            </div>
           </div>
-
-          {/* Right: nav links + toggle + bell + avatar */}
-          <div className="flex items-center gap-6">
-            {/* Nav links */}
-            <nav className="flex items-center gap-5">
-              <button
-                className="cursor-pointer transition-all duration-150 hover:opacity-70"
-                style={{ fontSize: '12px', color: '#777C79', fontWeight: 500 }}
-              >
-                Dashboard
-              </button>
-              <button
-                className="cursor-pointer"
-                style={{
-                  fontSize: '12px',
-                  color: '#2F3331',
-                  fontWeight: 700,
-                  borderBottom: '1.5px solid #2F3331',
-                  paddingBottom: '1px',
-                }}
-              >
-                Courses
-              </button>
-              <button
-                className="cursor-pointer transition-all duration-150 hover:opacity-70"
-                style={{ fontSize: '12px', color: '#777C79', fontWeight: 500 }}
-              >
-                Detailed Note
-              </button>
-            </nav>
-
+          <div className="flex justify-start items-center gap-6">
             {/* Grid/List toggle */}
-            <div
-              className="flex items-center rounded-full p-1"
-              style={{ backgroundColor: '#F3F4F1', gap: '2px' }}
-            >
+            <div className="p-1 bg-stone-100 rounded-full flex justify-start items-start gap-1">
               <button
                 onClick={() => setViewMode('grid')}
-                className="flex items-center gap-1.5 rounded-full cursor-pointer transition-all duration-150"
-                style={{
-                  padding: '5px 14px',
-                  backgroundColor: viewMode === 'grid' ? '#FFFFFF' : 'transparent',
-                  color: viewMode === 'grid' ? '#2F3331' : '#777C79',
-                  boxShadow: viewMode === 'grid' ? '0px 1px 3px rgba(0,0,0,0.06)' : 'none',
-                }}
+                className="px-4 py-1.5 rounded-full flex justify-start items-center gap-2 cursor-pointer border-none transition-all"
+                style={{ backgroundColor: viewMode === 'grid' ? '#FFFFFF' : 'transparent', boxShadow: viewMode === 'grid' ? '0px 1px 2px 0px rgba(0,0,0,0.05)' : 'none' }}
               >
-                <IconGrid />
-                <span className="font-bold" style={{ fontSize: '11px' }}>Grid</span>
+                <span style={{ color: viewMode === 'grid' ? '#2F3331' : '#556071' }}><IconGrid /></span>
+                <span className="text-xs font-bold font-['Inter'] leading-4" style={{ color: viewMode === 'grid' ? '#2F3331' : '#556071' }}>Grid</span>
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className="flex items-center gap-1.5 rounded-full cursor-pointer transition-all duration-150"
-                style={{
-                  padding: '5px 14px',
-                  backgroundColor: viewMode === 'list' ? '#FFFFFF' : 'transparent',
-                  color: viewMode === 'list' ? '#2F3331' : '#777C79',
-                  boxShadow: viewMode === 'list' ? '0px 1px 3px rgba(0,0,0,0.06)' : 'none',
-                }}
+                className="px-4 py-1.5 rounded-full flex justify-start items-center gap-2 cursor-pointer border-none transition-all"
+                style={{ backgroundColor: viewMode === 'list' ? '#FFFFFF' : 'transparent', boxShadow: viewMode === 'list' ? '0px 1px 2px 0px rgba(0,0,0,0.05)' : 'none' }}
               >
-                <IconList />
-                <span className="font-bold" style={{ fontSize: '11px' }}>List</span>
+                <span style={{ color: viewMode === 'list' ? '#2F3331' : '#556071' }}><IconList /></span>
+                <span className="text-xs font-bold font-['Inter'] leading-4" style={{ color: viewMode === 'list' ? '#2F3331' : '#556071' }}>List</span>
               </button>
             </div>
-
-            {/* Bell */}
-            <button
-              className="flex items-center justify-center cursor-pointer transition-all duration-150 hover:opacity-70"
-              style={{ color: '#2F3331' }}
-            >
-              <IconBell />
-            </button>
-
-            {/* Avatar */}
-            <div
-              className="rounded-full flex-shrink-0 flex items-center justify-center cursor-pointer"
-              style={{ width: '32px', height: '32px', backgroundColor: '#C8C9C0' }}
-            >
-              <span style={{ fontSize: '12px', fontWeight: 700, color: '#5F5E5E' }}>A</span>
+            {/* Bell + Avatar */}
+            <div className="flex justify-start items-center gap-4">
+              <button className="flex justify-center items-center cursor-pointer hover:opacity-70 transition-opacity border-none bg-transparent text-slate-600">
+                <IconBell />
+              </button>
+              <div className="w-8 h-8 rounded-full bg-[#C8C9C0] flex items-center justify-center cursor-pointer">
+                <span className="text-xs font-bold text-zinc-600">A</span>
+              </div>
             </div>
           </div>
-        </header>
+        </div>
 
-        {/* ── Main Content ── */}
-        <main
-          className="flex-1"
-          style={{ padding: '32px 48px 100px', display: 'flex', flexDirection: 'column', gap: '64px' }}
-        >
-          {/* Session grid / list */}
-          <section>
-            <div
-              className={viewMode === 'grid' ? 'grid grid-cols-4 gap-6' : 'flex flex-col gap-4'}
-            >
+        {/* Content */}
+        <div className="w-full px-12 pt-24 pb-12 flex flex-col justify-start items-start gap-10">
+
+          {/* Session cards */}
+          {viewMode === 'grid' ? (
+            <div className="self-stretch grid grid-cols-4 gap-6">
               {SESSIONS.map((s) =>
-                s.status === 'processing' ? (
-                  <ProcessingCard key={s.id} />
-                ) : (
-                  <DoneCard
-                    key={s.id}
-                    card={s}
-                    onClick={() => navigate(`/notes/${s.id}`)}
-                  />
-                ),
+                s.status === 'processing'
+                  ? <ProcessingCard key={s.id} />
+                  : <DoneCard key={s.id} card={s} onClick={() => {
+                      openTab({ sessionId: s.id, label: s.course })
+                      navigate(`/notes/${s.id}`)
+                    }} />
               )}
             </div>
-          </section>
+          ) : (
+            <ListTable sessions={SESSIONS} onRowClick={(id) => {
+              const card = SESSIONS.find((s) => s.id === id)
+              openTab({ sessionId: id, label: card?.course ?? id })
+              navigate(`/notes/${id}`)
+            }} />
+          )}
 
-          {/* CTA section */}
-          <section
-            className="relative flex flex-col"
-            style={{
-              borderTop: '1px solid rgba(175, 179, 176, 0.12)',
-              paddingTop: '48px',
-              minHeight: '240px',
-            }}
-          >
-            {/* Icon decoration */}
-            <div
-              className="absolute"
-              style={{ right: '80px', top: '56px' }}
-            >
+          {/* Insight cards */}
+          <div className="self-stretch flex justify-between items-start">
+            <div className="flex justify-start items-start gap-4">
+              <div className="w-64 self-stretch p-8 bg-stone-100 rounded-[32px] flex flex-col justify-start items-start gap-1">
+                <IconVelocity />
+                <div className="self-stretch pt-3">
+                  <div className="text-zinc-800 text-sm font-bold font-['Inter'] leading-5">Study Velocity</div>
+                </div>
+                <div className="text-slate-600 text-xs font-normal font-['Inter'] leading-4">
+                  You've averaged 4.2 hours of recording this week. Consistency is key.
+                </div>
+              </div>
+              <div className="w-64 self-stretch p-8 bg-stone-100 rounded-[32px] flex flex-col justify-start items-start gap-1">
+                <IconAI />
+                <div className="self-stretch pt-3">
+                  <div className="text-zinc-800 text-sm font-bold font-['Inter'] leading-5">AI Insights</div>
+                </div>
+                <div className="text-slate-600 text-xs font-normal font-['Inter'] leading-4">
+                  3 summaries are ready for review from your recent Predictive Analytics lecture.
+                </div>
+              </div>
               <div
-                className="flex items-center justify-center rounded-full"
-                style={{
-                  width: '72px',
-                  height: '72px',
-                  backgroundColor: '#F3F4F1',
-                  color: '#777C79',
-                }}
+                className="w-96 self-stretch p-8 bg-stone-100 rounded-[32px] flex flex-col justify-start items-start gap-1 cursor-pointer hover:bg-stone-200 transition-colors"
+                onClick={() => navigate('/session/live')}
               >
-                <IconMic />
+                <IconLive />
+                <div className="self-stretch pt-3">
+                  <div className="text-zinc-800 text-sm font-bold font-['Inter'] leading-5">LIVE AI Courses</div>
+                </div>
+                <div className="text-slate-600 text-xs font-normal font-['Inter'] leading-4">
+                  AI with your class
+                </div>
               </div>
             </div>
-
-            {/* Upload decoration */}
-            <div
-              className="absolute"
-              style={{ right: '172px', top: '80px' }}
-            >
-              <div
-                className="flex items-center justify-center rounded-full"
-                style={{
-                  width: '48px',
-                  height: '48px',
-                  backgroundColor: '#F3F4F1',
-                  color: '#AFB3B0',
-                }}
-              >
-                <IconUpload />
-              </div>
-            </div>
-
-            {/* Text + CTA */}
-            <div className="flex flex-col items-start" style={{ maxWidth: '480px' }}>
-              <h3
-                className="font-bold"
-                style={{ fontSize: '18px', color: '#2F3331', lineHeight: '1.45' }}
-              >
-                Start a live recording
-              </h3>
-              <p
-                className="mt-2"
-                style={{ fontSize: '13px', color: '#556071', lineHeight: '1.65' }}
-              >
-                Capture your lecture audio and slides automatically.
-                <br />
-                LiberStudy will transcribe and summarize everything for you.
-              </p>
-
-              <div className="flex items-center gap-4 mt-6">
-                <button
-                  onClick={() => setShowModal(true)}
-                  className="flex items-center gap-2 cursor-pointer transition-all duration-150 hover:opacity-70"
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    color: '#5F5E5E',
-                  }}
-                >
-                  START RECORDING
-                  <IconArrow />
-                </button>
-
-                <div style={{ width: '1px', height: '12px', backgroundColor: 'rgba(175,179,176,0.4)' }} />
-
-                <button
-                  onClick={() => setShowModal(true)}
-                  className="flex items-center gap-2 cursor-pointer transition-all duration-150 hover:opacity-70"
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    color: '#777C79',
-                  }}
-                >
-                  UPLOAD FILES
-                  <IconArrow />
-                </button>
-              </div>
-            </div>
-          </section>
-        </main>
-
-        {/* ── Global Footer ── */}
-        <footer
-          className="flex items-center justify-between flex-shrink-0"
-          style={{
-            height: '40px',
-            padding: '0 32px',
-            borderTop: '1px solid rgba(175, 179, 176, 0.15)',
-          }}
-        >
-          <span
-            className="uppercase"
-            style={{ fontSize: '10px', color: '#556071', letterSpacing: '0.1em' }}
-          >
-            © 2024 LIBERSTUDY EDITORIAL. CRAFTED FOR CLARITY.
-          </span>
-          <div className="flex items-center gap-4">
-            {['SUPPORT', 'PRIVACY', 'TERMS'].map((link) => (
-              <button
-                key={link}
-                className="cursor-pointer transition-all duration-150 hover:opacity-70"
-                style={{
-                  fontSize: '10px',
-                  color: '#556071',
-                  letterSpacing: '0.1em',
-                  textTransform: 'uppercase',
-                  fontWeight: 500,
-                }}
-              >
-                {link}
-              </button>
-            ))}
           </div>
-        </footer>
+        </div>
       </div>
 
-      {showModal && (
-        <NewClassModal onClose={() => setShowModal(false)} navigate={navigate} />
-      )}
+      {showModal && <NewClassModal onClose={() => setShowModal(false)} navigate={navigate} />}
     </div>
   )
 }
