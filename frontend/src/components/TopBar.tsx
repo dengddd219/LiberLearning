@@ -52,13 +52,13 @@ export default function TopBar() {
     >
       {/* Left: Logo + Dashboard + Course Tabs */}
       <div className="flex items-center gap-2 overflow-hidden">
-        <span
-          className="font-bold flex-shrink-0 cursor-pointer"
-          style={{ fontSize: '20px', color: C.fg }}
+        <button
+          className="font-bold flex-shrink-0"
+          style={{ fontSize: '20px', color: C.fg, background: 'none', border: 'none', padding: 0 }}
           onClick={handleDashboard}
         >
           LiberStudy
-        </span>
+        </button>
 
         {/* Dashboard button */}
         <button
@@ -113,7 +113,7 @@ export default function TopBar() {
 
       {/* Right: Bell + Avatar */}
       <div className="flex items-center gap-3 flex-shrink-0">
-        <button className="cursor-pointer transition-all duration-150 p-1.5 rounded-lg hover:bg-black/5">
+        <button aria-label="通知" className="cursor-pointer transition-all duration-150 p-1.5 rounded-lg hover:bg-black/5">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
