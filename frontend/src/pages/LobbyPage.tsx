@@ -1,7 +1,7 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTabs } from '../context/TabsContext'
-import { uploadFiles } from '../lib/api'
+import { uploadFiles, listSessions } from '../lib/api'
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 
@@ -132,13 +132,27 @@ interface CourseCard {
   status: 'done' | 'processing'
 }
 
-const SESSIONS: CourseCard[] = [
-  { id: 's-processing', course: '', lecture: '', duration: '', notes: 0, time: '', date: '', thumbColor: '#AFB3B0', folder: '', folderColor: 'neutral', status: 'processing' },
-  { id: 's1', course: 'MSBA 7028: Predictive Analytics', lecture: 'Advanced Modeling & Forecasting', duration: '1h 20m', notes: 12, time: '2H AGO', date: 'Oct 24, 2023', thumbColor: '#4A6FA5', folder: 'Business Analytics', folderColor: 'blue', status: 'done' },
-  { id: 's2', course: 'CS 5010: Software Engineering', lecture: 'Agile Methodologies & Scrum', duration: '55m', notes: 8, time: 'YESTERDAY', date: 'Oct 22, 2023', thumbColor: '#6B8E6B', folder: 'Computer Science', folderColor: 'slate', status: 'done' },
-  { id: 's3', course: 'HUM 202: Media Studies', lecture: 'Digital Ethics in the 21st Century', duration: '1h 45m', notes: 24, time: 'OCT 24', date: 'Oct 19, 2023', thumbColor: '#8B7355', folder: 'Humanities', folderColor: 'neutral', status: 'done' },
-  { id: 's4', course: 'ACCT 410: Auditing Standards', lecture: 'Internal Control Frameworks', duration: '1h 10m', notes: 15, time: 'OCT 22', date: 'Oct 18, 2023', thumbColor: '#7B6B8B', folder: 'Business Analytics', folderColor: 'blue', status: 'done' },
-]
+const FALLBACK_SESSIONS: CourseCard[] = []
+
+function formatDuration(seconds: number): string {
+  if (!seconds) return '—'
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  if (h > 0) return `${h}h ${m}m`
+  return `${m}m`
+}
+
+function formatTimeAgo(ts: number | null): string {
+  if (!ts) return ''
+  const diff = (Date.now() / 1000) - ts
+  if (diff < 3600) return `${Math.floor(diff / 60)}M AGO`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}H AGO`
+  if (diff < 172800) return 'YESTERDAY'
+  const d = new Date(ts * 1000)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase()
+}
+
+const THUMB_COLORS = ['#4A6FA5', '#6B8E6B', '#8B7355', '#7B6B8B', '#5E8B8B', '#8B5E5E']
 
 // ─── Cards ───────────────────────────────────────────────────────────────────
 
@@ -172,9 +186,11 @@ function ProcessingCard() {
 
 function DoneCard({ card, onClick }: { card: CourseCard; onClick: () => void }) {
   return (
-    <div
+    <button
+      type="button"
       onClick={onClick}
-      className="self-stretch relative bg-white rounded-[32px] shadow-[0px_40px_40px_-15px_rgba(47,51,49,0.04)] outline outline-1 outline-offset-[-1px] outline-black/0 overflow-hidden cursor-pointer transition-all duration-150 hover:-translate-y-0.5 hover:shadow-[0px_40px_56px_-15px_rgba(47,51,49,0.10)]"
+      aria-label={`打开课程：${card.course}`}
+      className="self-stretch text-left relative bg-white rounded-[32px] shadow-[0px_40px_40px_-15px_rgba(47,51,49,0.04)] outline outline-1 outline-offset-[-1px] outline-black/0 overflow-hidden cursor-pointer transition-all duration-150 hover:-translate-y-0.5 hover:shadow-[0px_40px_56px_-15px_rgba(47,51,49,0.10)]"
     >
       {/* Thumbnail */}
       <div className="w-full relative" style={{ aspectRatio: '16/9', backgroundColor: card.thumbColor, opacity: 0.85 }}>
@@ -195,7 +211,7 @@ function DoneCard({ card, onClick }: { card: CourseCard; onClick: () => void }) 
         </div>
         <div className="text-neutral-500 text-[10.40px] font-bold font-['Inter'] uppercase leading-4 tracking-wide">{card.time}</div>
       </div>
-    </div>
+    </button>
   )
 }
 
@@ -210,9 +226,11 @@ const FOLDER_BADGE: Record<string, { bg: string; text: string }> = {
 function ListRow({ card, onClick, isLast }: { card: CourseCard; onClick: () => void; isLast: boolean }) {
   const badge = FOLDER_BADGE[card.folderColor]
   return (
-    <div
+    <button
+      type="button"
       onClick={onClick}
-      className={`flex items-center cursor-pointer hover:bg-stone-50/60 transition-colors${isLast ? '' : ' border-b border-gray-200'}`}
+      aria-label={`打开课程：${card.course}`}
+      className={`w-full text-left flex items-center cursor-pointer hover:bg-stone-50/60 transition-colors${isLast ? '' : ' border-b border-gray-200'}`}
     >
       {/* Thumbnail */}
       <div className="w-40 px-6 py-7 flex-shrink-0">
@@ -251,7 +269,7 @@ function ListRow({ card, onClick, isLast }: { card: CourseCard; onClick: () => v
         <IconNotes />
         {card.notes} notes
       </div>
-    </div>
+    </button>
   )
 }
 
@@ -385,6 +403,12 @@ function NewClassModal({ onClose, navigate }: { onClose: () => void; navigate: R
   const [audioError, setAudioError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose])
+
   const handlePpt = useCallback((file: File) => { const err = validateFile(file, ['.ppt', '.pptx', '.pdf']); setPptError(err); if (!err) setPptFile(file) }, [])
   const handleAudio = useCallback((file: File) => { const err = validateFile(file, ['.mp3', '.wav', '.m4a', '.aac'], MAX_AUDIO_MB); setAudioError(err); if (!err) setAudioFile(file) }, [])
   const handleSubmit = useCallback(async () => {
@@ -400,6 +424,9 @@ function NewClassModal({ onClose, navigate }: { onClose: () => void; navigate: R
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
       className="fixed inset-0 flex items-center justify-center z-50"
       style={{ backgroundColor: 'rgba(47,51,49,0.2)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', padding: '24px' }}
       onClick={onClose}
@@ -414,10 +441,10 @@ function NewClassModal({ onClose, navigate }: { onClose: () => void; navigate: R
           <div className="flex justify-between items-start">
             <div className="flex flex-col gap-2">
               <span className="font-bold text-base uppercase tracking-[0.2em]" style={{ color: 'rgba(95,94,94,0.6)' }}>ACTION CENTER</span>
-              <h2 className="font-bold text-[36px] leading-[1.11] tracking-[-0.025em] text-zinc-800 m-0">New Class</h2>
+              <h2 id="modal-title" className="font-bold text-[36px] leading-[1.11] tracking-[-0.025em] text-zinc-800 m-0">New Class</h2>
             </div>
-            <button onClick={onClose} className="flex items-center justify-center flex-shrink-0 cursor-pointer hover:opacity-70 transition-opacity" style={{ width: '40px', height: '40px', borderRadius: '9999px', backgroundColor: '#F3F4F1', color: '#5F5E5E', border: 'none' }}>
-              <IconModalClose />
+            <button type="button" onClick={onClose} aria-label="关闭对话框" className="flex items-center justify-center flex-shrink-0 cursor-pointer hover:opacity-70 transition-opacity" style={{ width: '40px', height: '40px', borderRadius: '9999px', backgroundColor: '#F3F4F1', color: '#5F5E5E', border: 'none' }}>
+              <IconModalClose aria-hidden="true" />
             </button>
           </div>
 
@@ -484,12 +511,34 @@ export default function LobbyPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
   const [activeNav, setActiveNav] = useState<'courses' | 'settings'>('courses')
   const [showModal, setShowModal] = useState(false)
+  const [sessions, setSessions] = useState<CourseCard[]>(FALLBACK_SESSIONS)
+
+  useEffect(() => {
+    listSessions()
+      .then((data) => {
+        const cards: CourseCard[] = data.map((s, i) => ({
+          id: s.session_id,
+          course: s.ppt_filename ?? '未命名课程',
+          lecture: '',
+          duration: formatDuration(s.total_duration),
+          notes: 0,
+          time: formatTimeAgo(s.created_at ? Number(s.created_at) : null),
+          date: s.created_at ? new Date(Number(s.created_at) * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
+          thumbColor: THUMB_COLORS[i % THUMB_COLORS.length],
+          folder: '',
+          folderColor: 'neutral' as const,
+          status: (s.status === 'processing' ? 'processing' : 'done') as 'done' | 'processing',
+        }))
+        setSessions(cards)
+      })
+      .catch(() => { /* keep empty list on error */ })
+  }, [])
 
   return (
-    <div className="w-[1280px] pl-48 pt-16 relative bg-stone-50 inline-flex flex-col justify-start items-start font-['Inter']">
+    <div className="w-full min-h-screen bg-stone-50 flex font-['Inter']">
 
       {/* ── Sidebar ── */}
-      <div className="w-48 h-full px-4 py-8 left-0 top-0 absolute bg-stone-100 flex flex-col justify-between items-start">
+      <aside aria-label="侧边导航" className="w-48 flex-shrink-0 px-4 py-8 bg-stone-100 flex flex-col justify-between items-start min-h-screen">
         {/* Brand */}
         <div className="self-stretch pb-10 flex flex-col justify-start items-start">
           <div className="self-stretch px-4 flex flex-col justify-start items-start">
@@ -557,10 +606,10 @@ export default function LobbyPage() {
             <div className="text-slate-600 text-[9.60px] font-normal font-['Inter'] leading-4">Graduate Student</div>
           </div>
         </div>
-      </div>
+      </aside>
 
       {/* ── Main Area ── */}
-      <div className="self-stretch min-h-screen bg-stone-50 flex flex-col justify-start items-start">
+      <div className="flex-1 min-w-0 min-h-screen bg-stone-50 flex flex-col justify-start items-start">
 
         {/* Header */}
         <div className="self-stretch px-12 py-6 bg-stone-50/80 backdrop-blur-md flex justify-between items-center sticky top-0 z-10">
@@ -592,12 +641,14 @@ export default function LobbyPage() {
             </div>
             {/* Bell + Avatar */}
             <div className="flex justify-start items-center gap-4">
-              <button className="flex justify-center items-center cursor-pointer hover:opacity-70 transition-opacity border-none bg-transparent text-slate-600">
-                <IconBell />
+              <button type="button" aria-label="通知" className="w-11 h-11 flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity border-none bg-transparent text-slate-600">
+                <IconBell aria-hidden="true" />
               </button>
-              <div className="w-8 h-8 rounded-full bg-[#C8C9C0] flex items-center justify-center cursor-pointer">
-                <span className="text-xs font-bold text-zinc-600">A</span>
-              </div>
+              <button type="button" aria-label="用户设置" className="w-11 h-11 flex items-center justify-center cursor-pointer border-none bg-transparent p-0">
+                <div className="w-8 h-8 rounded-full bg-[#C8C9C0] flex items-center justify-center">
+                  <span className="text-xs font-bold text-zinc-600">A</span>
+                </div>
+              </button>
             </div>
           </div>
         </div>
@@ -608,7 +659,7 @@ export default function LobbyPage() {
           {/* Session cards */}
           {viewMode === 'grid' ? (
             <div className="self-stretch grid grid-cols-4 gap-6">
-              {SESSIONS.map((s) =>
+              {sessions.map((s) =>
                 s.status === 'processing'
                   ? <ProcessingCard key={s.id} />
                   : <DoneCard key={s.id} card={s} onClick={() => {
@@ -616,10 +667,21 @@ export default function LobbyPage() {
                       navigate(`/notes/${s.id}`)
                     }} />
               )}
+              {sessions.length === 0 && (
+                <div className="col-span-4 flex flex-col items-center justify-center py-16">
+                  <p className="text-sm text-zinc-400 mb-4">还没有任何课程记录</p>
+                  <button
+                    onClick={() => setShowModal(true)}
+                    className="px-4 py-2 bg-zinc-600 text-white text-sm rounded-full cursor-pointer hover:opacity-85"
+                  >
+                    开始第一次录音
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
-            <ListTable sessions={SESSIONS} onRowClick={(id) => {
-              const card = SESSIONS.find((s) => s.id === id)
+            <ListTable sessions={sessions} onRowClick={(id) => {
+              const card = sessions.find((s) => s.id === id)
               openTab({ sessionId: id, label: card?.course ?? id })
               navigate(`/notes/${id}`)
             }} />
@@ -646,9 +708,11 @@ export default function LobbyPage() {
                   3 summaries are ready for review from your recent Predictive Analytics lecture.
                 </div>
               </div>
-              <div
-                className="w-96 self-stretch p-8 bg-stone-100 rounded-[32px] flex flex-col justify-start items-start gap-1 cursor-pointer hover:bg-stone-200 transition-colors"
+              <button
+                type="button"
+                className="w-96 self-stretch text-left p-8 bg-stone-100 rounded-[32px] flex flex-col justify-start items-start gap-1 cursor-pointer hover:bg-stone-200 transition-colors focus-visible:ring-2 focus-visible:ring-zinc-600 focus-visible:outline-none border-none"
                 onClick={() => navigate('/session/live')}
+                aria-label="进入 LIVE AI Courses"
               >
                 <IconLive />
                 <div className="self-stretch pt-3">
@@ -657,7 +721,7 @@ export default function LobbyPage() {
                 <div className="text-slate-600 text-xs font-normal font-['Inter'] leading-4">
                   AI with your class
                 </div>
-              </div>
+              </button>
             </div>
           </div>
         </div>
