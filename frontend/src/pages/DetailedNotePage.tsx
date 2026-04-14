@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 
 // Static mock data — replace with real API call when backend is ready
@@ -60,60 +60,18 @@ const MOCK_NOTE = {
 export default function DetailedNotePage() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
+  const [noteMode, setNoteMode] = useState<'my' | 'ai'>('ai')
+
+  // 后端接通后，这里改为从 API 拿真实 pages 列表
+  const MOCK_PAGE_IDS = ['s1', 's2', 's3', 's4']
+  const currentIndex = MOCK_PAGE_IDS.indexOf(sessionId ?? '')
+  const prevId = currentIndex > 0 ? MOCK_PAGE_IDS[currentIndex - 1] : null
+  const nextId = currentIndex < MOCK_PAGE_IDS.length - 1 ? MOCK_PAGE_IDS[currentIndex + 1] : null
   const headingRefs = useRef<Map<number, HTMLHeadingElement>>(new Map())
   const aiSectionRef = useRef<HTMLDivElement>(null)
 
   return (
-    <div className="min-h-screen" style={{ background: '#FAF9F7', fontFamily: 'Inter, sans-serif' }}>
-
-      {/* TopAppBar */}
-      <header
-        className="flex items-center justify-between px-6 z-30"
-        style={{
-          height: '64px',
-          background: 'rgba(250,249,247,0.8)',
-          backdropFilter: 'blur(24px)',
-          borderBottom: '1px solid rgba(175,179,176,0.1)',
-          position: 'sticky',
-          top: 0,
-        }}
-      >
-        <div className="flex items-center gap-6">
-          <span className="font-bold" style={{ fontSize: '20px', color: '#2F3331' }}>LiberStudy</span>
-          <nav className="flex items-center gap-1">
-            {['Dashboard', 'Courses', 'Detailed Note'].map((item) => (
-              <button
-                key={item}
-                onClick={() => { if (item !== 'Detailed Note') navigate('/') }}
-                className="px-3 py-1.5 rounded-lg text-sm cursor-pointer transition-all duration-150"
-                style={{
-                  color: item === 'Detailed Note' ? '#2F3331' : '#777C79',
-                  fontWeight: item === 'Detailed Note' ? '500' : '400',
-                  background: item === 'Detailed Note' ? 'rgba(175,179,176,0.1)' : 'transparent',
-                }}
-              >
-                {item}
-              </button>
-            ))}
-          </nav>
-        </div>
-        <div className="flex items-center gap-3">
-          <button type="button" aria-label="通知" className="cursor-pointer transition-all duration-150 p-1.5 rounded-lg hover:bg-black/5">
-            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#777C79" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            aria-label="用户菜单"
-            className="rounded-full flex items-center justify-center cursor-pointer"
-            style={{ width: '32px', height: '32px', background: '#5F5E5E', color: '#FFFFFF', fontSize: '13px', fontWeight: '600', border: 'none' }}
-          >
-            U
-          </button>
-        </div>
-      </header>
+    <div className="min-h-screen" style={{ background: '#FAF9F7', fontFamily: 'Inter, sans-serif', paddingTop: '64px' }}>
 
       {/* Page layout: sidebar + content */}
       <div className="flex" style={{ minHeight: 'calc(100vh - 64px - 40px)' }}>
@@ -179,6 +137,27 @@ export default function DetailedNotePage() {
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto px-16 py-12" style={{ maxWidth: '800px' }}>
 
+            {/* My Notes / AI Notes Pill toggle */}
+            <div className="flex items-center justify-between mb-8">
+              <div className="inline-flex rounded-full p-0.5" style={{ background: 'rgba(175,179,176,0.15)' }}>
+                {(['my', 'ai'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => setNoteMode(mode)}
+                    className="px-4 py-1 rounded-full text-sm cursor-pointer transition-all duration-150"
+                    style={{
+                      background: noteMode === mode ? '#FFFFFF' : 'transparent',
+                      color: noteMode === mode ? '#2F3331' : '#556071',
+                      fontWeight: noteMode === mode ? '500' : '400',
+                      boxShadow: noteMode === mode ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                    }}
+                  >
+                    {mode === 'my' ? 'My Notes' : 'AI Notes'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Metadata header */}
             <div className="flex items-center gap-3 mb-4">
               <span
@@ -213,6 +192,11 @@ export default function DetailedNotePage() {
             </h1>
 
             {/* Content sections */}
+            {noteMode === 'my' ? (
+              <div className="py-8 text-center" style={{ color: '#8a8f8a', fontSize: '14px' }}>
+                你还没有添加手动笔记
+              </div>
+            ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               {(() => {
                 let headingIndex = 0
@@ -326,8 +310,27 @@ export default function DetailedNotePage() {
                 </p>
               </div>
             </div>
+            )}
 
-            {/* Bottom spacing */}
+            {/* Bottom Navigation */}
+            <div className="flex justify-between items-center py-8 mt-4" style={{ borderTop: '1px solid rgba(175,179,176,0.2)' }}>
+              <button
+                onClick={() => prevId && navigate(`/notes/detail/${prevId}`)}
+                disabled={!prevId}
+                className="flex items-center gap-2 text-sm cursor-pointer transition-all duration-150"
+                style={{ color: prevId ? '#2F3331' : '#C4C7C4', background: 'none', border: 'none' }}
+              >
+                ← PREVIOUS
+              </button>
+              <button
+                onClick={() => nextId && navigate(`/notes/detail/${nextId}`)}
+                disabled={!nextId}
+                className="flex items-center gap-2 text-sm cursor-pointer transition-all duration-150"
+                style={{ color: nextId ? '#2F3331' : '#C4C7C4', background: 'none', border: 'none' }}
+              >
+                NEXT →
+              </button>
+            </div>
             <div style={{ height: '80px' }} />
           </div>
         </main>
