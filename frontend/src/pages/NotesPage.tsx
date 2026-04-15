@@ -280,6 +280,7 @@ export default function NotesPage() {
   // Canvas width for react-pdf
   const canvasAreaRef = useRef<HTMLDivElement>(null)
   const [canvasWidth, setCanvasWidth] = useState(800)
+  const [zoomLevel, setZoomLevel] = useState(100)
 
   useEffect(() => {
     if (!canvasAreaRef.current) return
@@ -689,8 +690,12 @@ export default function NotesPage() {
           {/* Canvas area — single page with wheel navigation */}
           <div
             ref={canvasAreaRef}
-            className="flex-1 flex items-center justify-center overflow-hidden"
-            style={{ background: 'rgba(232,231,226,0.6)' }}
+            className="flex-1 flex items-start justify-center"
+            style={{
+              background: 'rgba(232,231,226,0.6)',
+              overflowX: zoomLevel > 100 ? 'auto' : 'hidden',
+              overflowY: 'hidden',
+            }}
             onWheel={handleWheel}
           >
             {currentPageData && (() => {
@@ -720,7 +725,7 @@ export default function NotesPage() {
                       >
                         <Page
                           pageNumber={currentPageData.pdf_page_num}
-                          width={canvasWidth}
+                          width={Math.round(canvasWidth * zoomLevel / 100)}
                           renderTextLayer={true}
                           renderAnnotationLayer={false}
                         />
