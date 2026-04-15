@@ -133,7 +133,11 @@ function AiBulletRow({
 
   // 展开时逐词揭开，完成后通知父组件
   useEffect(() => {
-    if (!expanded || animationDone) return
+    if (!expanded) {
+      setRevealedCount(0)
+      return
+    }
+    if (animationDone) return
     setRevealedCount(0)
     let i = 0
     const interval = setInterval(() => {
@@ -141,7 +145,6 @@ function AiBulletRow({
       setRevealedCount(i)
       if (i >= words.length) {
         clearInterval(interval)
-        // 最后一词 shimmer 固化后通知
         setTimeout(onAnimationDone, SHIMMER_DURATION + 100)
       }
     }, WORD_REVEAL_INTERVAL)
@@ -610,8 +613,42 @@ export default function NotesPage() {
               </button>
             </div>
 
-            {/* Right: Download */}
-            <div className="flex items-center gap-2">
+            {/* Right: Translate + Download */}
+            <div className="flex items-center gap-2" style={{ position: 'relative' }}>
+              {/* 翻译按钮 */}
+              <button
+                onClick={() => setPopoverOpen((v) => !v)}
+                className="cursor-pointer transition-all duration-150 p-1.5 rounded hover:bg-black/5"
+                title="翻译"
+                style={{ color: translationEnabled ? '#1A1916' : '#9B9A94' }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="2" y1="12" x2="22" y2="12" />
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                </svg>
+              </button>
+
+              {/* 翻译弹窗 */}
+              {popoverOpen && (
+                <TranslationPopover
+                  enabled={translationEnabled}
+                  targetLang={targetLang}
+                  onTargetLangChange={setTargetLang}
+                  onClose={() => setPopoverOpen(false)}
+                  onTranslate={() => {
+                    setTranslationEnabled(true)
+                    setPopoverOpen(false)
+                    translatePage(currentPage)
+                  }}
+                  onShowOriginal={() => {
+                    setTranslationEnabled(false)
+                    setPopoverOpen(false)
+                  }}
+                />
+              )}
+
+              {/* 导出按钮 */}
               <button
                 onClick={handleExportMarkdown}
                 className="cursor-pointer transition-all duration-150 p-1.5 rounded hover:bg-black/5"
