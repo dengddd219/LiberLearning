@@ -9,6 +9,8 @@ import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 import { useHighlights } from '../hooks/useHighlights'
 import HighlightLayer from '../components/HighlightLayer'
+import { useTextAnnotations } from '../hooks/useTextAnnotations'
+import TextAnnotationLayer from '../components/TextAnnotationLayer'
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -254,9 +256,10 @@ export default function NotesPage() {
 
   // Highlight tool state
   const pageContainerRef = useRef<HTMLDivElement | null>(null)
-  const [activeTool, setActiveTool] = useState<'highlight' | 'eraser' | null>(null)
+  const [activeTool, setActiveTool] = useState<'highlight' | 'eraser' | 'text' | null>(null)
   const [highlightColor, setHighlightColor] = useState('#FAFF00')
   const { addHighlight, removeHighlight, highlightsForPage } = useHighlights(sessionId ?? '')
+  const { addAnnotation, updateAnnotation, removeAnnotation, annotationsForPage } = useTextAnnotations(sessionId ?? '')
 
   // Translation state
   const { enabled: translationEnabled, setEnabled: setTranslationEnabled, targetLang, setTargetLang, translate } = useTranslation()
@@ -748,6 +751,14 @@ export default function NotesPage() {
                       highlightColor={highlightColor}
                       onAdd={(rec) => addHighlight({ ...rec, sessionId: sessionId ?? '' })}
                       onRemove={removeHighlight}
+                    />
+                    {/* Text annotation layer */}
+                    <TextAnnotationLayer
+                      annotations={annotationsForPage(currentPage)}
+                      textToolActive={activeTool === 'text'}
+                      onPlaceAnnotation={(x, y) => addAnnotation(currentPage, x, y)}
+                      onUpdate={updateAnnotation}
+                      onRemove={removeAnnotation}
                     />
                     {/* Slide label bottom-right */}
                     <div
