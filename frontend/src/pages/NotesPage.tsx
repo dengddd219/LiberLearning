@@ -214,13 +214,12 @@ export default function NotesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
-  const [scrollToPage, setScrollToPage] = useState<number | null>(null)
   const [noteMode, setNoteMode] = useState<'my' | 'ai' | 'transcript'>('ai')
   const [copyToast, setCopyToast] = useState(false)
   const [retrying, setRetrying] = useState<number | null>(null)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map())
+  const [navVisible, setNavVisible] = useState(false)
   const audioRef = useRef<HTMLAudioElement>(null)
+  const wheelTimeoutRef = useRef<number | null>(null)
 
   // Resizable panel state
   const [notesPanelWidth, setNotesPanelWidth] = useState(320)
@@ -279,33 +278,35 @@ export default function NotesPage() {
       .catch(() => { setError('无法加载笔记数据'); setLoading(false) })
   }, [sessionId])
 
-  // Intersection observer for current page tracking
-  useEffect(() => {
-    if (!session) return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        let maxRatio = 0; let mostVisible = 1
-        entries.forEach((entry) => {
-          if (entry.intersectionRatio > maxRatio) {
-            maxRatio = entry.intersectionRatio
-            const p = Number(entry.target.getAttribute('data-page'))
-            if (!isNaN(p)) mostVisible = p
-          }
-        })
-        if (maxRatio > 0) setCurrentPage(mostVisible)
-      },
-      { threshold: Array.from({ length: 21 }, (_, i) => i * 0.05) }
-    )
-    pageRefs.current.forEach((el) => observer.observe(el))
-    return () => observer.disconnect()
-  }, [session])
+  // Wheel翻页 handler
+  const handleWheel = useCallback((e: WheelEvent) => {
+    e.preventDefault()
+    if (wheelTimeoutRef.current) return
+    const direction = e.deltaY > 0 ? 1 : -1
+    if (direction === 1 && currentPage < (session?.pages.length ?? 1)) {
+      setCurrentPage(p => p + 1)
+    } else if (direction === -1 && currentPage > 1) {
+      setCurrentPage(p => p - 1)
+    }
+    wheelTimeoutRef.current = window.setTimeout(() => {
+      wheelTimeoutRef.current = null
+    }, 300)
+  }, [currentPage, session?.pages.length])
 
+  // 键盘翻页
   useEffect(() => {
-    if (scrollToPage == null) return
-    const el = pageRefs.current.get(scrollToPage)
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    setTimeout(() => setScrollToPage(null), 100)
-  }, [scrollToPage])
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') {
+        e.preventDefault()
+        setCurrentPage(p => Math.min(p + 1, session?.pages.length ?? 1))
+      } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+        e.preventDefault()
+        setCurrentPage(p => Math.max(p - 1, 1))
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [session?.pages.length])
 
   const handleTimestampClick = useCallback((seconds: number) => {
     if (audioRef.current) {
@@ -403,83 +404,109 @@ export default function NotesPage() {
       {/* Main body (below TopAppBar) */}
       <div className="flex flex-1 overflow-hidden" style={{ marginTop: '64px' }}>
 
-        {/* Left sidebar: Lecture Slides */}
-        {sidebarOpen && (
+        {/* Left hover nav: Lecture Slides */}
+        <div
+          className="relative flex-shrink-0"
+          style={{ width: '8px', zIndex: 15 }}
+          onMouseEnter={() => setNavVisible(true)}
+          onMouseLeave={() => setNavVisible(false)}
+        >
+          {/* Trigger strip — always visible */}
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              bottom: 0,
+              width: '8px',
+              background: C.fg,
+              borderRadius: '4px 0 0 4px',
+              cursor: 'ew-resize',
+            }}
+          />
+
+          {/* Slide nav panel — hover to show */}
           <aside
-            className="flex-shrink-0 flex flex-col overflow-hidden"
-            style={{ width: '200px', background: C.sidebar, borderRight: '1px solid rgba(175,179,176,0.1)' }}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: '8px',
+              bottom: 0,
+              width: navVisible ? '200px' : '0px',
+              opacity: navVisible ? 1 : 0,
+              transition: 'width 200ms ease, opacity 200ms ease',
+              overflow: 'hidden',
+              zIndex: 20,
+            }}
           >
-            {/* Sidebar header */}
             <div
-              className="flex items-center justify-between flex-shrink-0 px-4"
-              style={{ height: '48px', borderBottom: '1px solid rgba(175,179,176,0.1)' }}
+              className="h-full flex flex-col overflow-hidden"
+              style={{ background: C.sidebar, width: '200px', borderRight: '1px solid rgba(175,179,176,0.1)' }}
             >
-              <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.secondary }}>
-                LECTURE SLIDES
-              </span>
-              <button
-                type="button"
-                aria-label="收起侧边栏"
-                onClick={() => setSidebarOpen(false)}
-                className="cursor-pointer transition-all duration-150 opacity-60 hover:opacity-100 min-w-[44px] min-h-[44px] flex items-center justify-center border-none bg-transparent p-0"
+              {/* Header */}
+              <div
+                className="flex items-center justify-between flex-shrink-0 px-4"
+                style={{ height: '48px', borderBottom: '1px solid rgba(175,179,176,0.1)' }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.secondary }}>
+                  LECTURE SLIDES
+                </span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: C.secondary, opacity: 0.6 }}>
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
-              </button>
-            </div>
+              </div>
 
-            {/* Slide thumbnails */}
-            <div className="flex-1 overflow-y-auto p-3" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {session.pages.map((page) => {
-                const isActive = page.page_num === currentPage
-                return (
-                  <button
-                    type="button"
-                    key={page.page_num}
-                    onClick={() => setScrollToPage(page.page_num)}
-                    aria-label={`跳转到第 ${page.page_num} 张幻灯片`}
-                    aria-current={isActive ? 'true' : undefined}
-                    className="relative cursor-pointer transition-all duration-150 rounded-md overflow-hidden flex-shrink-0 flex items-center justify-center w-full border-none p-0"
-                    style={{
-                      height: '96px',
-                      borderRadius: '6px',
-                      background: C.divider,
-                      boxShadow: isActive
-                        ? '0px 0px 0px 2px rgba(95,94,94,1)'
-                        : '0 1px 3px rgba(0,0,0,0.08)',
-                      opacity: isActive ? 1 : 0.7,
-                    }}
-                  >
-                    <img
-                      src={page.thumbnail_url
-                        ? `${API_BASE}${page.thumbnail_url}`
-                        : `${API_BASE}/api/sessions/${sessionId}/slide/${page.pdf_page_num}.png`}
-                      alt={`第${page.page_num}页`}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                      loading="lazy"
-                    />
-                    {/* Page badge */}
-                    <span
-                      className="absolute top-1.5 left-1.5 flex items-center justify-center"
+              {/* Thumbnails */}
+              <div className="flex-1 overflow-y-auto p-3" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {session.pages.map((page) => {
+                  const isActive = page.page_num === currentPage
+                  return (
+                    <button
+                      type="button"
+                      key={page.page_num}
+                      onClick={() => { setCurrentPage(page.page_num); setNavVisible(false) }}
+                      aria-label={`跳转到第 ${page.page_num} 张幻灯片`}
+                      aria-current={isActive ? 'true' : undefined}
+                      className="relative cursor-pointer transition-all duration-150 rounded-md overflow-hidden flex-shrink-0 flex items-center justify-center w-full border-none p-0"
                       style={{
-                        background: C.fg,
-                        color: C.white,
-                        fontSize: '9px',
-                        fontWeight: '700',
-                        borderRadius: '3px',
-                        padding: '1px 5px',
-                        minWidth: '18px',
+                        height: '80px',
+                        borderRadius: '6px',
+                        background: C.divider,
+                        boxShadow: isActive
+                          ? '0px 0px 0px 2px rgba(95,94,94,1)'
+                          : '0 1px 3px rgba(0,0,0,0.08)',
+                        opacity: isActive ? 1 : 0.7,
                       }}
                     >
-                      {page.page_num}
-                    </span>
-                  </button>
-                )
-              })}
+                      <img
+                        src={page.thumbnail_url
+                          ? `${API_BASE}${page.thumbnail_url}`
+                          : `${API_BASE}/api/sessions/${sessionId}/slide/${page.pdf_page_num}.png`}
+                        alt={`第${page.page_num}页`}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        loading="lazy"
+                      />
+                      <span
+                        className="absolute top-1 left-1.5 flex items-center justify-center"
+                        style={{
+                          background: C.fg,
+                          color: C.white,
+                          fontSize: '8px',
+                          fontWeight: '700',
+                          borderRadius: '3px',
+                          padding: '1px 5px',
+                          minWidth: '16px',
+                        }}
+                      >
+                        {page.page_num}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </aside>
-        )}
+        </div>
 
         {/* Center: PPT Canvas */}
         <main className="flex-1 flex flex-col overflow-hidden" style={{ background: C.bg }}>
@@ -496,22 +523,10 @@ export default function NotesPage() {
           >
             {/* Left: Navigation */}
             <div className="flex items-center gap-2">
-              {!sidebarOpen && (
-                <button
-                  type="button"
-                  aria-label="展开侧边栏"
-                  onClick={() => setSidebarOpen(true)}
-                  className="cursor-pointer transition-all duration-150 min-w-[44px] min-h-[44px] flex items-center justify-center rounded hover:bg-black/5 border-none bg-transparent"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                </button>
-              )}
               <button
                 type="button"
                 aria-label="上一页"
-                onClick={() => currentPage > 1 && setScrollToPage(currentPage - 1)}
+                onClick={() => currentPage > 1 && setCurrentPage(currentPage - 1)}
                 className="cursor-pointer transition-all duration-150 min-w-[44px] min-h-[44px] flex items-center justify-center rounded hover:bg-black/5 disabled:opacity-30 border-none bg-transparent"
                 disabled={currentPage <= 1}
               >
@@ -525,7 +540,7 @@ export default function NotesPage() {
               <button
                 type="button"
                 aria-label="下一页"
-                onClick={() => currentPage < totalPages && setScrollToPage(currentPage + 1)}
+                onClick={() => currentPage < totalPages && setCurrentPage(currentPage + 1)}
                 className="cursor-pointer transition-all duration-150 min-w-[44px] min-h-[44px] flex items-center justify-center rounded hover:bg-black/5 disabled:opacity-30 border-none bg-transparent"
                 disabled={currentPage >= totalPages}
               >
@@ -551,79 +566,71 @@ export default function NotesPage() {
             </div>
           </div>
 
-          {/* Canvas area — react-pdf */}
+          {/* Canvas area — single page with wheel navigation */}
           <div
             ref={canvasAreaRef}
-            className="flex-1 overflow-y-auto p-12"
+            className="flex-1 flex items-center justify-center overflow-hidden"
             style={{ background: 'rgba(232,231,226,0.6)' }}
+            onWheel={handleWheel}
           >
-            <div className="flex flex-col items-center gap-8 mx-auto" style={{ maxWidth: '896px' }}>
-              {session.pages.map((page) => {
-                const pdfUrl = page.pdf_url ? `${API_BASE}${page.pdf_url}` : null
-                return (
+            {currentPageData && (() => {
+              const pdfUrl = currentPageData.pdf_url ? `${API_BASE}${currentPageData.pdf_url}` : null
+              return (
+                <div
+                  className="relative"
+                  style={{ maxWidth: '100%', maxHeight: '100%' }}
+                >
                   <div
-                    key={page.page_num}
-                    data-page={page.page_num}
-                    ref={(el) => {
-                      if (el) pageRefs.current.set(page.page_num, el)
-                      else pageRefs.current.delete(page.page_num)
+                    className="relative rounded-lg overflow-hidden"
+                    style={{
+                      background: C.white,
+                      boxShadow: '0 4px 24px rgba(0,0,0,0.10)',
                     }}
-                    className="relative w-full"
                   >
-                    {/* Slide card */}
-                    <div
-                      className="relative rounded-lg overflow-hidden"
-                      style={{
-                        background: C.white,
-                        boxShadow: '0 4px 24px rgba(0,0,0,0.10)',
-                        width: '100%',
-                      }}
-                    >
-                      {pdfUrl ? (
-                        <Document
-                          file={pdfUrl}
-                          loading={
-                            <div style={{ height: '500px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin"
-                                style={{ borderColor: C.secondary, borderTopColor: 'transparent' }} />
-                            </div>
-                          }
-                        >
-                          <Page
-                            pageNumber={page.pdf_page_num}
-                            width={canvasWidth}
-                            renderTextLayer={true}
-                            renderAnnotationLayer={false}
-                          />
-                        </Document>
-                      ) : (
-                        <img
-                          src={`${API_BASE}/api/sessions/${sessionId}/slide/${page.pdf_page_num}.png`}
-                          alt={`第${page.page_num}页`}
-                          style={{ width: '100%', display: 'block' }}
-                          loading="lazy"
+                    {pdfUrl ? (
+                      <Document
+                        file={pdfUrl}
+                        loading={
+                          <div style={{ height: '500px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin"
+                              style={{ borderColor: C.secondary, borderTopColor: 'transparent' }} />
+                          </div>
+                        }
+                      >
+                        <Page
+                          pageNumber={currentPageData.pdf_page_num}
+                          width={canvasWidth}
+                          renderTextLayer={true}
+                          renderAnnotationLayer={false}
                         />
-                      )}
-                      {/* Play button */}
-                      <button
-                        onClick={() => handleTimestampClick(page.page_start_time)}
-                        className="absolute top-3 left-3 text-xs px-2 py-0.5 rounded cursor-pointer transition-all duration-150"
-                        style={{ background: 'rgba(47,51,49,0.7)', color: C.white }}
-                      >
-                        ▶ {formatTime(page.page_start_time)}
-                      </button>
-                      {/* Slide label bottom-right */}
-                      <div
-                        className="absolute bottom-3 right-3 text-xs px-2 py-0.5 rounded"
-                        style={{ background: 'rgba(47,51,49,0.5)', color: C.white, letterSpacing: '0.05em' }}
-                      >
-                        SLIDE {String(page.page_num).padStart(2, '0')} / {String(totalPages).padStart(2, '0')}
-                      </div>
+                      </Document>
+                    ) : (
+                      <img
+                        src={`${API_BASE}/api/sessions/${sessionId}/slide/${currentPageData.pdf_page_num}.png`}
+                        alt={`第${currentPageData.page_num}页`}
+                        style={{ maxWidth: '100%', maxHeight: '80vh', display: 'block' }}
+                        loading="lazy"
+                      />
+                    )}
+                    {/* Play button */}
+                    <button
+                      onClick={() => handleTimestampClick(currentPageData.page_start_time)}
+                      className="absolute top-3 left-3 text-xs px-2 py-0.5 rounded cursor-pointer transition-all duration-150"
+                      style={{ background: 'rgba(47,51,49,0.7)', color: C.white }}
+                    >
+                      ▶ {formatTime(currentPageData.page_start_time)}
+                    </button>
+                    {/* Slide label bottom-right */}
+                    <div
+                      className="absolute bottom-3 right-3 text-xs px-2 py-0.5 rounded"
+                      style={{ background: 'rgba(47,51,49,0.5)', color: C.white, letterSpacing: '0.05em' }}
+                    >
+                      SLIDE {String(currentPageData.page_num).padStart(2, '0')} / {String(totalPages).padStart(2, '0')}
                     </div>
                   </div>
-                )
-              })}
-            </div>
+                </div>
+              )
+            })()}
           </div>
         </main>
 
