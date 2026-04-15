@@ -7,6 +7,8 @@ import { getSession, retryPage } from '../lib/api'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
+import { useHighlights } from '../hooks/useHighlights'
+import HighlightLayer from '../components/HighlightLayer'
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -249,6 +251,12 @@ export default function NotesPage() {
   const [animatedBullets, setAnimatedBullets] = useState<Map<number, Set<number>>>(new Map())
   const audioRef = useRef<HTMLAudioElement>(null)
   const wheelTimeoutRef = useRef<number | null>(null)
+
+  // Highlight tool state
+  const pageContainerRef = useRef<HTMLDivElement | null>(null)
+  const [activeTool, setActiveTool] = useState<'highlight' | 'eraser' | null>(null)
+  const [highlightColor, setHighlightColor] = useState('#FAFF00')
+  const { addHighlight, removeHighlight, highlightsForPage } = useHighlights(sessionId ?? '')
 
   // Translation state
   const { enabled: translationEnabled, setEnabled: setTranslationEnabled, targetLang, setTargetLang, translate } = useTranslation()
@@ -690,6 +698,7 @@ export default function NotesPage() {
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
                 >
                   <div
+                    ref={pageContainerRef}
                     className="relative rounded-lg overflow-hidden"
                     style={{
                       background: C.white,
@@ -729,6 +738,17 @@ export default function NotesPage() {
                     >
                       ▶ {formatTime(currentPageData.page_start_time)}
                     </button>
+                    {/* Highlight layer */}
+                    <HighlightLayer
+                      pageContainerRef={pageContainerRef}
+                      pageNum={currentPage}
+                      highlights={highlightsForPage(currentPage)}
+                      highlightToolActive={activeTool === 'highlight'}
+                      eraserToolActive={activeTool === 'eraser'}
+                      highlightColor={highlightColor}
+                      onAdd={(rec) => addHighlight({ ...rec, sessionId: sessionId ?? '' })}
+                      onRemove={removeHighlight}
+                    />
                     {/* Slide label bottom-right */}
                     <div
                       className="absolute bottom-3 right-3 text-xs px-2 py-0.5 rounded"
