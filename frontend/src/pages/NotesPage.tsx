@@ -11,6 +11,8 @@ import { useHighlights } from '../hooks/useHighlights'
 import HighlightLayer from '../components/HighlightLayer'
 import { useTextAnnotations } from '../hooks/useTextAnnotations'
 import TextAnnotationLayer from '../components/TextAnnotationLayer'
+import { useSearch } from '../hooks/useSearch'
+import SearchDropdown from '../components/SearchDropdown'
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -260,6 +262,11 @@ export default function NotesPage() {
   const [highlightColor, setHighlightColor] = useState('#FAFF00')
   const { addHighlight, removeHighlight, highlightsForPage } = useHighlights(sessionId ?? '')
   const { addAnnotation, updateAnnotation, removeAnnotation, annotationsForPage } = useTextAnnotations(sessionId ?? '')
+
+  // Search state
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const { noteResults, pdfResults } = useSearch(searchQuery, session?.pages ?? [])
 
   // Translation state
   const { enabled: translationEnabled, setEnabled: setTranslationEnabled, targetLang, setTargetLang, translate } = useTranslation()
@@ -637,8 +644,49 @@ export default function NotesPage() {
               </button>
             </div>
 
-            {/* Right: Translate + Download */}
+            {/* Right: Search + Translate + Download */}
             <div className="flex items-center gap-2" style={{ position: 'relative' }}>
+              {/* 搜索区域 */}
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                {searchOpen && (
+                  <input
+                    autoFocus
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Escape') { setSearchOpen(false); setSearchQuery('') } }}
+                    placeholder="搜索笔记 / 幻灯片..."
+                    style={{
+                      width: '180px',
+                      height: '28px',
+                      padding: '0 8px',
+                      fontSize: '13px',
+                      border: '1px solid rgba(175,179,176,0.4)',
+                      borderRadius: '6px',
+                      outline: 'none',
+                      background: '#F5F5F3',
+                    }}
+                  />
+                )}
+                <button
+                  onClick={() => { setSearchOpen((v) => !v); if (searchOpen) setSearchQuery('') }}
+                  className="cursor-pointer transition-all duration-150 p-1.5 rounded hover:bg-black/5"
+                  title="搜索"
+                  style={{ color: searchOpen ? '#1A1916' : '#9B9A94' }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                </button>
+                {searchOpen && searchQuery.trim() && (
+                  <SearchDropdown
+                    noteResults={noteResults}
+                    pdfResults={pdfResults}
+                    query={searchQuery}
+                    onJumpToPage={(pageNum) => { setCurrentPage(pageNum); setSearchOpen(false); setSearchQuery('') }}
+                  />
+                )}
+              </div>
               {/* 翻译按钮 */}
               <button
                 onClick={() => setPopoverOpen((v) => !v)}
