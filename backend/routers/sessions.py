@@ -35,26 +35,37 @@ MOCK_SESSION = {
             "passive_notes": {
                 "bullets": [
                     {
-                        "text": "数据链路层位于OSI第二层，在相邻节点间提供可靠传输",
-                        "ai_comment": "「相邻节点」是关键限定词——数据链路层只负责一跳（hop）之内的传输，跨多跳由网络层负责",
+                        "ppt_text": "第三章 数据链路层",
+                        "level": 0,
+                        "ai_comment": "本章是OSI七层模型的第二层。核心职责是在相邻节点之间以帧为单位可靠传输数据。注意它只管一跳（hop）之内的传输，跨节点的端到端可靠性由传输层负责。",
                         "timestamp_start": 45,
                         "timestamp_end": 98
                     },
                     {
-                        "text": "成帧：将数据报文加帧头帧尾封装为帧（Frame）",
-                        "ai_comment": "常见成帧方法：字节计数法、字节填充法（标志字节+转义字节）、比特填充法（01111110标志序列）",
+                        "ppt_text": "功能与服务",
+                        "level": 1,
+                        "ai_comment": "数据链路层提供三大核心服务：成帧、差错控制、流量控制。成帧负责封装数据报；差错控制用CRC检错、ARQ纠错；流量控制用滑动窗口限速。三者协同保证一跳内的可靠传输。",
+                        "timestamp_start": 100,
+                        "timestamp_end": 170
+                    },
+                    {
+                        "ppt_text": "成帧（Framing）",
+                        "level": 1,
+                        "ai_comment": "将网络层数据报封装成帧，加帧头帧尾标识边界。常见方法有三种：字节计数法（帧头写长度）、字节填充法（FLAG字节转义）、比特填充法（5个1后插0）。帧头还包含源/目MAC地址和帧类型字段。",
                         "timestamp_start": 120,
                         "timestamp_end": 210
                     },
                     {
-                        "text": "差错控制：CRC校验 + ARQ（自动重传请求）",
-                        "ai_comment": "CRC只检错不纠错；ARQ负责重传。常见ARQ协议：Stop-and-Wait、Go-Back-N、Selective Repeat",
+                        "ppt_text": "差错控制",
+                        "level": 1,
+                        "ai_comment": "CRC只检错不纠错；ARQ负责重传。常见ARQ协议：Stop-and-Wait、Go-Back-N、Selective Repeat。",
                         "timestamp_start": 380,
                         "timestamp_end": 490
                     },
                     {
-                        "text": "流量控制：滑动窗口机制限制发送方速率",
-                        "ai_comment": "窗口大小决定吞吐量上限：throughput = window_size / RTT",
+                        "ppt_text": "流量控制",
+                        "level": 1,
+                        "ai_comment": "滑动窗口机制限制发送方速率，防止接收方缓冲区溢出。吞吐量上限 = window_size / RTT。",
                         "timestamp_start": 670,
                         "timestamp_end": 740
                     }
@@ -81,28 +92,32 @@ MOCK_SESSION = {
             "passive_notes": {
                 "bullets": [
                     {
-                        "text": "停止等待协议：每次只发一帧，收到ACK后才发下一帧",
-                        "ai_comment": "最简单的ARQ协议，实现简单但信道利用率极低，适合RTT小、帧大的场景",
+                        "ppt_text": "停止等待协议（Stop-and-Wait ARQ）",
+                        "level": 0,
+                        "ai_comment": "最简单的ARQ协议，每次只发一帧，等ACK后才发下一帧。实现极简，但信道利用率极低。当RTT很大时，发送方大部分时间在空等，这是滑动窗口协议被提出的根本动机。",
                         "timestamp_start": 1250,
                         "timestamp_end": 1360
                     },
                     {
-                        "text": "信道利用率公式：U = T_f / (T_f + RTT + T_a)，T_f为帧传输时间",
-                        "ai_comment": "当RTT >> T_f时，信道大部分时间处于等待状态，利用率趋近于0，这就是引入滑动窗口的动机",
-                        "timestamp_start": 1580,
-                        "timestamp_end": 1720
+                        "ppt_text": "发送一帧，等待ACK",
+                        "level": 1,
+                        "ai_comment": None,
+                        "timestamp_start": -1,
+                        "timestamp_end": -1
                     },
                     {
-                        "text": "超时重传（Timeout Retransmission）：计时器到期未收ACK则重发",
-                        "ai_comment": "超时时间设置是工程难题：太短导致误重传，太长导致恢复慢。TCP中用SRTT+4*RTTVAR动态估算",
+                        "ppt_text": "超时重传",
+                        "level": 1,
+                        "ai_comment": "计时器到期未收ACK则重发。超时时间设置是工程难题：太短误重传，太长恢复慢。TCP用SRTT+4×RTTVAR动态估算。",
                         "timestamp_start": 1920,
                         "timestamp_end": 2050
                     },
                     {
-                        "text": "序号只需1bit（0/1交替），因为任意时刻最多只有1帧在途",
-                        "ai_comment": "这是停止等待协议的特殊性质。滑动窗口协议需要更多位的序号",
-                        "timestamp_start": 2400,
-                        "timestamp_end": 2480
+                        "ppt_text": "信道利用率 = T1 / (T1 + RTT + T2)",
+                        "level": 1,
+                        "ai_comment": "当RTT >> T_f时信道大部分时间在等待，利用率趋近于0，这是引入滑动窗口的核心动机。",
+                        "timestamp_start": 1580,
+                        "timestamp_end": 1720
                     }
                 ]
             },

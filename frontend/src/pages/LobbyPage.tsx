@@ -158,7 +158,13 @@ function ProcessingCard() {
   )
 }
 
+const API_BASE_FOR_THUMB = import.meta.env.VITE_API_BASE_URL || ''
+
 function DoneCard({ card, onClick }: { card: CourseCard; onClick: () => void }) {
+  const [thumbLoaded, setThumbLoaded] = useState(false)
+  const [thumbError, setThumbError] = useState(false)
+  const thumbSrc = `${API_BASE_FOR_THUMB}/api/sessions/${card.id}/slide/1.png`
+
   return (
     <button
       type="button"
@@ -170,7 +176,19 @@ function DoneCard({ card, onClick }: { card: CourseCard; onClick: () => void }) 
       <div className="w-56 h-72 left-0 top-0 absolute bg-white/0 rounded-[32px] shadow-[0px_40px_40px_-15px_rgba(47,51,49,0.04)]" />
       {/* Thumbnail */}
       <div className="w-44 left-[25px] top-[25px] absolute bg-stone-100 rounded-md inline-flex flex-col justify-center items-start overflow-hidden">
-        <div className="self-stretch h-24 relative" style={{ backgroundColor: card.thumbColor, opacity: 0.85 }} />
+        <div className="self-stretch h-24 relative overflow-hidden" style={{ backgroundColor: card.thumbColor, opacity: thumbLoaded ? 1 : 0.85 }}>
+          {!thumbError && (
+            <img
+              src={thumbSrc}
+              alt=""
+              aria-hidden="true"
+              onLoad={() => setThumbLoaded(true)}
+              onError={() => setThumbError(true)}
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ opacity: thumbLoaded ? 1 : 0, transition: 'opacity 0.2s' }}
+            />
+          )}
+        </div>
         <div className="px-2 py-1 absolute bg-zinc-800/90 rounded-2xl" style={{ right: '8px', bottom: '8px' }}>
           <div className="text-white text-[10.40px] font-normal font-['Liberation_Mono'] leading-4">{card.duration}</div>
         </div>
@@ -206,6 +224,10 @@ const FOLDER_BADGE: Record<string, { bg: string; text: string }> = {
 
 function ListRow({ card, onClick, isLast }: { card: CourseCard; onClick: () => void; isLast: boolean }) {
   const badge = FOLDER_BADGE[card.folderColor]
+  const [thumbLoaded, setThumbLoaded] = useState(false)
+  const [thumbError, setThumbError] = useState(false)
+  const thumbSrc = `${API_BASE_FOR_THUMB}/api/sessions/${card.id}/slide/1.png`
+
   return (
     <button
       type="button"
@@ -215,7 +237,19 @@ function ListRow({ card, onClick, isLast }: { card: CourseCard; onClick: () => v
     >
       {/* Thumbnail */}
       <div className="w-40 px-6 py-7 flex-shrink-0">
-        <div className="w-16 h-10 rounded-2xl outline outline-1 outline-offset-[-1px] outline-zinc-400/10 overflow-hidden" style={{ backgroundColor: card.thumbColor, opacity: 0.8 }} />
+        <div className="w-16 h-10 rounded-2xl outline outline-1 outline-offset-[-1px] outline-zinc-400/10 overflow-hidden relative" style={{ backgroundColor: card.thumbColor, opacity: 0.8 }}>
+          {!thumbError && (
+            <img
+              src={thumbSrc}
+              alt=""
+              aria-hidden="true"
+              onLoad={() => setThumbLoaded(true)}
+              onError={() => setThumbError(true)}
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ opacity: thumbLoaded ? 1 : 0, transition: 'opacity 0.2s' }}
+            />
+          )}
+        </div>
       </div>
 
       {/* Course name & subtitle */}
@@ -360,29 +394,14 @@ function UploadZone({ label, hint, accept, icon, file, error, onFile, onClear }:
   )
 }
 
-const PIPELINE_STEPS = [
-  { key: 'uploading',    label: '上传文件' },
-  { key: 'converting',   label: '音频格式转换' },
-  { key: 'parsing_ppt',  label: 'PPT 解析' },
-  { key: 'transcribing', label: '语音转录' },
-  { key: 'aligning',     label: '语义对齐' },
-  { key: 'generating',   label: '生成结构化笔记' },
-] as const
-
-type StepKey = typeof PIPELINE_STEPS[number]['key']
-
-const STEP_ORDER: StepKey[] = PIPELINE_STEPS.map(s => s.key)
-
 const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
 
-function NewClassModal({ onClose, navigate }: { onClose: () => void; navigate: ReturnType<typeof useNavigate> }) {
+function NewClassModal({ onClose, onUploaded }: { onClose: () => void; onUploaded: (sessionId: string) => void }) {
   const [pptFile, setPptFile] = useState<File | null>(null)
   const [audioFile, setAudioFile] = useState<File | null>(null)
   const [pptError, setPptError] = useState<string | null>(null)
   const [audioError, setAudioError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [sessionId, setSessionId] = useState<string | null>(null)
-  const [currentStep, setCurrentStep] = useState<StepKey | 'done' | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -391,50 +410,22 @@ function NewClassModal({ onClose, navigate }: { onClose: () => void; navigate: R
     return () => window.removeEventListener('keydown', handler);
   }, [onClose, uploading])
 
-  // 轮询进度
-  useEffect(() => {
-    if (!sessionId) return
-    let stopped = false
-    const poll = setInterval(async () => {
-      try {
-        const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`)
-        if (!res.ok || stopped) return
-        const data = await res.json()
-        if (data.progress?.step) {
-          setCurrentStep(data.progress.step as StepKey)
-        }
-        if (data.status === 'ready' || data.status === 'partial_ready') {
-          stopped = true
-          clearInterval(poll)
-          setCurrentStep('done')
-          setTimeout(() => navigate(`/notes/${sessionId}`), 600)
-        } else if (data.status === 'error') {
-          stopped = true
-          clearInterval(poll)
-          setUploading(false)
-          setUploadError(data.error || '处理失败，请重试')
-        }
-      } catch { /* 网络抖动，继续轮询 */ }
-    }, 1500)
-    return () => { stopped = true; clearInterval(poll) }
-  }, [sessionId, navigate])
-
   const handlePpt = useCallback((file: File) => { const err = validateFile(file, ['.ppt', '.pptx', '.pdf']); setPptError(err); if (!err) setPptFile(file) }, [])
   const handleAudio = useCallback((file: File) => { const err = validateFile(file, ['.mp3', '.wav', '.m4a', '.aac'], MAX_AUDIO_MB); setAudioError(err); if (!err) setAudioFile(file) }, [])
   const handleSubmit = useCallback(async () => {
     if (!audioFile) return
     setUploading(true)
     setUploadError(null)
-    setCurrentStep('uploading')
     try {
       const result = await uploadFiles(pptFile ?? undefined, audioFile)
-      setSessionId(result.session_id)
+      // 拿到 session_id 后立即关闭 Modal，交给 LobbyPage 后台轮询
+      onUploaded(result.session_id)
+      onClose()
     } catch {
       setUploading(false)
-      setCurrentStep(null)
       setUploadError('上传失败，请检查网络后重试')
     }
-  }, [pptFile, audioFile])
+  }, [pptFile, audioFile, onUploaded, onClose])
 
   const canSubmit = !!audioFile && !pptError && !audioError && !uploading
 
@@ -464,54 +455,14 @@ function NewClassModal({ onClose, navigate }: { onClose: () => void; navigate: R
             </button>
           </div>
 
-          {/* Upload / Processing */}
-          {!uploading ? (
-            <>
-              <div className="flex gap-0 items-stretch">
-                <UploadZone label="PPT/PDF Materials" hint="Drag or click to upload" accept=".ppt,.pptx,.pdf" icon={<IconPPT />} file={pptFile} error={pptError} onFile={handlePpt} onClear={() => { setPptFile(null); setPptError(null) }} />
-                <UploadZone label="Audio Recording" hint="Upload MP3, WAV or AAC" accept=".mp3,.wav,.m4a,.aac" icon={<IconAudioFile />} file={audioFile} error={audioError} onFile={handleAudio} onClear={() => { setAudioFile(null); setAudioError(null) }} />
-              </div>
-              {uploadError && (
-                <div className="text-sm text-red-500 text-center -mt-4">{uploadError}</div>
-              )}
-            </>
-          ) : (
-            <div className="flex flex-col gap-3 py-2">
-              {PIPELINE_STEPS.map((step, i) => {
-                const stepIdx = currentStep === 'done' ? STEP_ORDER.length : STEP_ORDER.indexOf(currentStep as StepKey)
-                const done = i < stepIdx
-                const active = STEP_ORDER[stepIdx] === step.key
-                return (
-                  <div key={step.key} className="flex items-center gap-4">
-                    <div style={{ width: '24px', height: '24px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {done ? (
-                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                          <circle cx="10" cy="10" r="9" stroke="#5F5E5E" strokeWidth="1.5" fill="none" />
-                          <path d="M6 10l3 3 5-5" stroke="#5F5E5E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      ) : active ? (
-                        <div className="animate-spin" style={{ width: '18px', height: '18px' }}>
-                          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                            <circle cx="9" cy="9" r="7.5" stroke="rgba(95,94,94,0.2)" strokeWidth="2" />
-                            <path d="M9 1.5C4.86 1.5 1.5 4.86 1.5 9" stroke="#5F5E5E" strokeWidth="2" strokeLinecap="round" />
-                          </svg>
-                        </div>
-                      ) : (
-                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'rgba(175,179,176,0.4)' }} />
-                      )}
-                    </div>
-                    <span style={{
-                      fontSize: '14px',
-                      fontWeight: active ? '500' : '400',
-                      color: done ? '#5F5E5E' : active ? '#1A1916' : 'rgba(95,94,94,0.4)',
-                      transition: 'color 0.2s',
-                    }}>
-                      {step.label}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
+          {/* Upload zones */}
+          <div className="flex gap-0 items-stretch">
+            <UploadZone label="PPT/PDF Materials" hint="Drag or click to upload" accept=".ppt,.pptx,.pdf" icon={<IconPPT />} file={pptFile} error={pptError} onFile={handlePpt} onClear={() => { setPptFile(null); setPptError(null) }} />
+            <UploadZone label="Audio Recording" hint="Upload MP3, WAV or AAC" accept=".mp3,.wav,.m4a,.aac" icon={<IconAudioFile />} file={audioFile} error={audioError} onFile={handleAudio} onClear={() => { setAudioFile(null); setAudioError(null) }} />
+          </div>
+
+          {uploadError && (
+            <div className="text-sm text-red-500 text-center -mt-6">{uploadError}</div>
           )}
 
           {/* CTA */}
@@ -521,10 +472,10 @@ function NewClassModal({ onClose, navigate }: { onClose: () => void; navigate: R
             </button>
             <button
               onClick={handleSubmit} disabled={!canSubmit}
-              className="px-8 py-3 rounded-full font-bold text-base border-none cursor-pointer transition-all"
+              className="px-8 py-3 rounded-full font-bold text-base border-none transition-all"
               style={{ backgroundColor: canSubmit ? '#5F5E5E' : 'rgba(95,94,94,0.35)', color: '#FAF7F6', cursor: canSubmit ? 'pointer' : 'not-allowed', boxShadow: canSubmit ? '0px 4px 6px -4px rgba(0,0,0,0.1), 0px 10px 15px -3px rgba(0,0,0,0.1)' : 'none' }}
             >
-              {uploading ? 'Processing…' : 'Save Workspace'}
+              {uploading ? 'Uploading…' : 'Save Workspace'}
             </button>
           </div>
         </div>
@@ -533,7 +484,137 @@ function NewClassModal({ onClose, navigate }: { onClose: () => void; navigate: R
   )
 }
 
-// ─── Main Page ───────────────────────────────────────────────────────────────
+// ─── Processing Toast ─────────────────────────────────────────────────────────
+
+interface ToastState {
+  sessionId: string
+  step: string
+  status: 'processing' | 'ready' | 'partial_ready' | 'error'
+  errorMsg?: string
+}
+
+function ProcessingToast({ toast, onClose, onOpen }: {
+  toast: ToastState
+  onClose: () => void
+  onOpen: () => void
+}) {
+  const isDone = toast.status === 'ready' || toast.status === 'partial_ready'
+  const isError = toast.status === 'error'
+
+  const STEP_LABELS: Record<string, string> = {
+    uploading: '上传文件',
+    converting: '音频格式转换',
+    parsing_ppt: 'PPT 解析',
+    transcribing: '语音转录',
+    aligning: '语义对齐',
+    generating: '生成结构化笔记',
+  }
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        position: 'fixed',
+        bottom: '24px',
+        left: '24px',
+        zIndex: 100,
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '12px',
+        padding: '16px 20px',
+        backgroundColor: '#FFFFFF',
+        borderRadius: '20px',
+        boxShadow: '0px 8px 24px -4px rgba(47,51,49,0.18), 0px 0px 0px 1px rgba(175,179,176,0.12)',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        minWidth: '260px',
+        maxWidth: '320px',
+        animation: 'slideInToast 0.25s ease',
+      }}
+    >
+      {/* Status icon */}
+      <div style={{ flexShrink: 0, paddingTop: '2px' }}>
+        {isDone ? (
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <circle cx="9" cy="9" r="8.25" stroke="#5F5E5E" strokeWidth="1.5" fill="none" />
+            <path d="M5.5 9l2.5 2.5 4.5-4.5" stroke="#5F5E5E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        ) : isError ? (
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <circle cx="9" cy="9" r="8.25" stroke="rgba(224,92,64,0.8)" strokeWidth="1.5" fill="none" />
+            <path d="M6 6l6 6M12 6l-6 6" stroke="rgba(224,92,64,0.8)" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        ) : (
+          <div className="animate-spin" style={{ width: '18px', height: '18px' }}>
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <circle cx="9" cy="9" r="7.5" stroke="rgba(95,94,94,0.2)" strokeWidth="2" />
+              <path d="M9 1.5C4.86 1.5 1.5 4.86 1.5 9" stroke="#5F5E5E" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </div>
+        )}
+      </div>
+
+      {/* Text */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '13px', fontWeight: 600, color: '#2F3331', marginBottom: '2px' }}>
+          {isDone ? '笔记已生成完成' : isError ? '处理失败' : '正在处理课堂录音'}
+        </div>
+        <div style={{ fontSize: '11px', color: '#556071' }}>
+          {isDone
+            ? '点击查看笔记'
+            : isError
+            ? (toast.errorMsg || '请重新上传或稍后重试')
+            : (STEP_LABELS[toast.step] ?? '处理中…')}
+        </div>
+      </div>
+
+      {/* Action buttons */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px', flexShrink: 0 }}>
+        {isDone && (
+          <button
+            onClick={onOpen}
+            style={{
+              fontSize: '11px',
+              fontWeight: 700,
+              color: '#FFFFFF',
+              background: '#5F5E5E',
+              border: 'none',
+              borderRadius: '9999px',
+              padding: '4px 12px',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            查看
+          </button>
+        )}
+        <button
+          onClick={onClose}
+          aria-label="关闭通知"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '20px',
+            height: '20px',
+            borderRadius: '9999px',
+            backgroundColor: 'rgba(175,179,176,0.15)',
+            color: '#5F5E5E',
+            border: 'none',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+
 
 export default function LobbyPage() {
   const navigate = useNavigate()
@@ -542,6 +623,64 @@ export default function LobbyPage() {
   const [activeNav, setActiveNav] = useState<'courses' | 'settings'>('courses')
   const [showModal, setShowModal] = useState(false)
   const [sessions, setSessions] = useState<CourseCard[]>(FALLBACK_SESSIONS)
+
+  // ── Background processing toast ──────────────────────────────────────────
+  const [toast, setToast] = useState<ToastState | null>(null)
+
+  const handleUploaded = useCallback((sessionId: string) => {
+    setToast({ sessionId, step: 'uploading', status: 'processing' })
+  }, [])
+
+  // Poll in background when toast is active
+  useEffect(() => {
+    if (!toast || toast.status !== 'processing') return
+    const { sessionId } = toast
+    let stopped = false
+
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`)
+        if (!res.ok || stopped) return
+        const data = await res.json()
+
+        if (data.progress?.step) {
+          setToast(prev => prev ? { ...prev, step: data.progress.step } : prev)
+        }
+
+        if (data.status === 'ready' || data.status === 'partial_ready') {
+          stopped = true
+          clearInterval(poll)
+          setToast(prev => prev ? { ...prev, status: data.status } : prev)
+          // Refresh session list
+          listSessions()
+            .then((refreshed) => {
+              const cards: CourseCard[] = refreshed.map((s, i) => ({
+                id: s.session_id,
+                course: s.ppt_filename ?? '未命名课程',
+                lecture: '',
+                duration: formatDuration(s.total_duration),
+                notes: 0,
+                time: formatTimeAgo(s.created_at ? Number(s.created_at) : null),
+                date: s.created_at ? new Date(Number(s.created_at) * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
+                thumbColor: THUMB_COLORS[i % THUMB_COLORS.length],
+                folder: '',
+                folderColor: 'neutral' as const,
+                status: (s.status === 'processing' ? 'processing' : 'done') as 'done' | 'processing',
+              }))
+              setSessions(cards)
+            })
+            .catch(() => {})
+        } else if (data.status === 'error') {
+          stopped = true
+          clearInterval(poll)
+          setToast(prev => prev ? { ...prev, status: 'error', errorMsg: data.error } : prev)
+        }
+      } catch { /* 网络抖动继续轮询 */ }
+    }, 2000)
+
+    return () => { stopped = true; clearInterval(poll) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toast?.sessionId, toast?.status])
 
   useEffect(() => {
     listSessions()
@@ -736,7 +875,27 @@ export default function LobbyPage() {
         </div>
       </div>
 
-      {showModal && <NewClassModal onClose={() => setShowModal(false)} navigate={navigate} />}
+      {showModal && <NewClassModal onClose={() => setShowModal(false)} onUploaded={(sid) => { handleUploaded(sid); setShowModal(false) }} />}
+
+      {toast && (
+        <ProcessingToast
+          toast={toast}
+          onClose={() => setToast(null)}
+          onOpen={() => {
+            const card = sessions.find(s => s.id === toast.sessionId)
+            openTab({ sessionId: toast.sessionId, label: card?.course ?? toast.sessionId })
+            navigate(`/notes/${toast.sessionId}`)
+            setToast(null)
+          }}
+        />
+      )}
+
+      <style>{`
+        @keyframes slideInToast {
+          from { opacity: 0; transform: translateY(12px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   )
 }

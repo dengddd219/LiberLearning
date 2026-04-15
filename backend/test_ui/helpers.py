@@ -9,7 +9,7 @@ from pathlib import Path
 import streamlit as st
 
 # ── Cost constants ─────────────────────────────────────────────────────────────
-WHISPER_COST_PER_MIN  = 0.006
+ALIYUN_COST_PER_MIN   = 0.0014
 EMBED_COST_PER_1M_TOK = 0.02
 CLAUDE_INPUT_PER_1M   = 3.0
 CLAUDE_OUTPUT_PER_1M  = 15.0

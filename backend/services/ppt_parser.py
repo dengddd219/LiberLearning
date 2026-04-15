@@ -209,6 +209,65 @@ def _extract_text_pptx(pptx_path: str) -> list[str]:
     return slide_texts
 
 
+def _extract_bullets_pptx(pptx_path: str) -> list[list[dict]]:
+    """
+    Extract structured bullets per slide with level information from a .pptx file.
+
+    Returns a list (one per slide) of bullet lists, each bullet being:
+      {
+        "text": str,    # paragraph text
+        "level": int,   # 0 = title/heading, 1 = first-level bullet, 2 = sub-bullet, etc.
+      }
+
+    Heuristic: shapes are sorted so title placeholders come first (level 0),
+    then body text frames use paragraph.level directly.
+    """
+    if not _HAS_PPTX:
+        return []
+
+    from pptx.util import Pt
+    from pptx.enum.text import PP_ALIGN
+
+    prs = _Presentation(pptx_path)
+    slides_bullets: list[list[dict]] = []
+
+    for slide in prs.slides:
+        bullets: list[dict] = []
+
+        # Separate title placeholders from body shapes so titles always come first
+        title_shapes = []
+        body_shapes = []
+        for shape in slide.shapes:
+            if not shape.has_text_frame:
+                continue
+            ph = getattr(shape, "placeholder_format", None)
+            if ph is not None and ph.idx == 0:
+                title_shapes.append(shape)
+            else:
+                body_shapes.append(shape)
+
+        for shape in title_shapes:
+            for para in shape.text_frame.paragraphs:
+                text = para.text.strip()
+                if not text or text.replace(".", "").isdigit():
+                    continue
+                bullets.append({"text": text, "level": 0})
+
+        for shape in body_shapes:
+            for para in shape.text_frame.paragraphs:
+                text = para.text.strip()
+                if not text or text.replace(".", "").isdigit():
+                    continue
+                # python-pptx paragraph.level: 0 = top-level body, 1 = first indent, etc.
+                # We add 1 so that body level 0 becomes level 1 (below the title at level 0)
+                level = (para.level or 0) + 1
+                bullets.append({"text": text, "level": level})
+
+        slides_bullets.append(bullets)
+
+    return slides_bullets
+
+
 def parse_ppt(
     ppt_path: str,
     slides_output_dir: str,
@@ -240,10 +299,14 @@ def parse_ppt(
     with tempfile.TemporaryDirectory() as tmp_dir:
         # --- Determine text extraction source ---
         pptx_texts: list[str] | None = None
+        pptx_bullets: list[list[dict]] | None = None
+
+        pptx_bullets: list[list[dict]] | None = None
 
         if suffix == ".pptx" and _HAS_PPTX:
             # Direct python-pptx extraction from the original file
             pptx_texts = _extract_text_pptx(ppt_path)
+            pptx_bullets = _extract_bullets_pptx(ppt_path)
 
         elif suffix == ".ppt" and _HAS_PPTX:
             # Convert .ppt → .pptx via LibreOffice, then extract with python-pptx
@@ -257,6 +320,7 @@ def parse_ppt(
                 pptx_file = str(Path(tmp_dir) / (Path(ppt_path).stem + ".pptx"))
                 if Path(pptx_file).exists():
                     pptx_texts = _extract_text_pptx(pptx_file)
+                    pptx_bullets = _extract_bullets_pptx(pptx_file)
 
         # --- Convert to PDF for rendering ---
         if suffix == ".pdf":
@@ -296,6 +360,11 @@ def parse_ppt(
                 {
                     "page_num": page_num,
                     "ppt_text": ppt_text,
+                    "ppt_bullets": (
+                        pptx_bullets[i]
+                        if pptx_bullets is not None and i < len(pptx_bullets)
+                        else None
+                    ),
                     "pdf_url": pdf_url,
                     "pdf_page_num": page_num,
                     "thumbnail_url": thumbnail_url,

@@ -388,9 +388,9 @@ def main():
     parser.add_argument("--lang", default="en", help="Language code: en or zh (default: en)")
     parser.add_argument(
         "--engines", nargs="+",
-        default=["whisper"],
+        default=["aliyun"],
         choices=list(ENGINE_RUNNERS.keys()),
-        help="Engines to benchmark (default: whisper)",
+        help="Engines to benchmark (default: aliyun)",
     )
     parser.add_argument(
         "--ground-truth", default=None,

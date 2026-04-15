@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { type TargetLang } from '../context/TranslationContext'
 
 interface TranslationPopoverProps {
@@ -17,7 +17,6 @@ export default function TranslationPopover({
   targetLang,
   onTargetLangChange,
 }: TranslationPopoverProps) {
-  const [moreOpen, setMoreOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
   // 点击弹窗外部关闭
@@ -97,61 +96,21 @@ export default function TranslationPopover({
       </div>
 
       {/* 底部按钮行 */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', position: 'relative' }}>
-        {/* 更多 ▾ */}
-        <div style={{ position: 'relative' }}>
-          <button
-            onClick={() => setMoreOpen((v) => !v)}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '14px',
-              color: '#6B6A64',
-              padding: '6px 8px',
-              borderRadius: '6px',
-            }}
-          >
-            更多 ▾
-          </button>
-          {moreOpen && (
-            <div
-              style={{
-                position: 'absolute',
-                bottom: 'calc(100% + 4px)',
-                right: 0,
-                background: '#FFFFFF',
-                borderRadius: '8px',
-                boxShadow: '0 2px 12px rgba(0,0,0,0.1)',
-                padding: '4px',
-                minWidth: '120px',
-                zIndex: 51,
-              }}
-            >
-              <button
-                onClick={() => {
-                  setMoreOpen(false)
-                  onShowOriginal()
-                }}
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  textAlign: 'left',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  color: '#1A1916',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                }}
-                className="hover:bg-black/5"
-              >
-                显示原文
-              </button>
-            </div>
-          )}
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+        <button
+          onClick={onShowOriginal}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '14px',
+            color: '#6B6A64',
+            padding: '6px 8px',
+            borderRadius: '6px',
+          }}
+        >
+          显示原文
+        </button>
 
         {/* 翻译按钮 */}
         <button

@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useTabs } from '../context/TabsContext'
 import { useTranslation } from '../context/TranslationContext'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import TranslationPopover from '../components/TranslationPopover'
+import CanvasToolbar from '../components/CanvasToolbar'
 import { getSession, retryPage } from '../lib/api'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
@@ -59,9 +59,11 @@ function formatTime(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-// ─── ai-enhance-animation.tsx RevealText（原版，未改动）───
-const SHIMMER_DURATION = 500  // ms
+function stripBullet(text: string): string {
+  return text.replace(/^[\s•\-–—*]+/, '')
+}
 
+// ─── RevealText：CSS class 方式，对齐 ai-text-enhancement.html ───
 function RevealText({
   children,
   revealed,
@@ -81,16 +83,16 @@ function RevealText({
     const el = ref.current
     if (!el) return
 
-    el.classList.add('shimmer-text')
+    // 1. 揭开瞬间：下落 + 彩色流光
+    el.classList.add('drop-in', 'shimmer-text')
 
+    // 2. 500ms 后固化为最终颜色
     const t = setTimeout(() => {
       el.classList.remove('shimmer-text')
       el.classList.add('color-settle')
       el.style.color = highlight ? '#92400e' : muted ? '#9ca3af' : '#111827'
-      el.style.backgroundImage = ''
-      el.style.webkitTextFillColor = ''
       settledRef.current = true
-    }, SHIMMER_DURATION)
+    }, 500)
 
     return () => clearTimeout(t)
   }, [revealed])
@@ -102,9 +104,120 @@ function RevealText({
   )
 }
 
-// 每个词的揭开间隔（ms），模拟光波从左到右扫过
-const WORD_REVEAL_INTERVAL = 35
+// ─── LineByLineReveal：测量视觉行后逐行 shimmer 揭开 ───
+function LineByLineReveal({
+  text,
+  startReveal,
+  onDone,
+}: {
+  text: string
+  startReveal: boolean
+  onDone: () => void
+}) {
+  const measureRef = useRef<HTMLSpanElement>(null)
+  const [lines, setLines] = useState<string[]>([])
+  const [revealedLines, setRevealedLines] = useState<Set<number>>(new Set())
 
+  // 挂载后测量视觉行
+  useEffect(() => {
+    const el = measureRef.current
+    if (!el || !text) return
+
+    const range = document.createRange()
+    const textNode = el.firstChild
+    if (!textNode) return
+
+    const measured: string[] = []
+    let lineStart = 0
+    let prevTop: number | null = null
+
+    for (let i = 0; i <= text.length; i++) {
+      range.setStart(textNode, i === text.length ? i - 1 : i)
+      range.setEnd(textNode, i === text.length ? i : i + 1)
+      const rect = range.getBoundingClientRect()
+      const top = Math.round(rect.top)
+
+      if (prevTop !== null && top !== prevTop) {
+        measured.push(text.slice(lineStart, i))
+        lineStart = i
+      }
+      prevTop = top
+    }
+    // 最后一行
+    if (lineStart < text.length) {
+      measured.push(text.slice(lineStart))
+    }
+
+    setLines(measured.length > 0 ? measured : [text])
+  }, [text])
+
+  // startReveal 触发时逐行揭开
+  useEffect(() => {
+    if (!startReveal || lines.length === 0) return
+    setRevealedLines(new Set())
+
+    const INTERVAL = 120
+    const timers: number[] = []
+    lines.forEach((_, i) => {
+      const t = window.setTimeout(() => {
+        setRevealedLines(prev => new Set(prev).add(i))
+        if (i === lines.length - 1) {
+          window.setTimeout(onDone, 500)
+        }
+      }, i * INTERVAL)
+      timers.push(t)
+    })
+    return () => timers.forEach(clearTimeout)
+  }, [startReveal, lines, onDone])
+
+  const baseStyle: React.CSSProperties = {
+    fontSize: '14px', lineHeight: '1.625', fontWeight: '400',
+    margin: 0, userSelect: 'text',
+  }
+
+  return (
+    <>
+      {/* 不可见的测量层 */}
+      <p style={{ ...baseStyle, position: 'absolute', visibility: 'hidden', pointerEvents: 'none', width: '100%' }}>
+        <span ref={measureRef}>{text}</span>
+      </p>
+      {/* 逐行渲染层 */}
+      <p style={{ ...baseStyle }}>
+        {lines.length === 0
+          ? <span style={{ color: 'transparent' }}>{text}</span>
+          : lines.map((line, i) => (
+              <LineRevealSpan key={i} text={line} revealed={revealedLines.has(i)} />
+            ))
+        }
+      </p>
+    </>
+  )
+}
+
+function LineRevealSpan({ text, revealed }: { text: string; revealed: boolean }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const settledRef = useRef(false)
+
+  useEffect(() => {
+    if (!revealed || settledRef.current) return
+    const el = ref.current
+    if (!el) return
+    el.classList.add('drop-in', 'shimmer-text')
+    const t = setTimeout(() => {
+      el.classList.remove('shimmer-text')
+      el.classList.add('color-settle')
+      el.style.color = '#6B6A64'
+      settledRef.current = true
+    }, 300)
+    return () => clearTimeout(t)
+  }, [revealed])
+
+  return (
+    <span ref={ref} style={{ color: 'transparent', display: 'inline' }}>{text}</span>
+  )
+}
+
+// ─── AiBulletRow：点击展开时 ppt_text 向上抹去，然后 ppt_text + AI 解释全部逐项彩虹揭开 ───
 function AiBulletRow({
   bullet,
   expanded,
@@ -129,102 +242,158 @@ function AiBulletRow({
   const hasComment = !!bullet.ai_comment
   const indent = bullet.level * 16
 
-  // 把 ai_comment 按空格切成词组（保留空格作为分隔）
-  const words = hasComment
-    ? (bullet.ai_comment as string).split(/(\s+)/).filter(Boolean)
-    : []
+  const [revealedSet, setRevealedSet] = useState<Set<number>>(new Set())
+  // ppt_text 是否正在向上退场
+  const [pptExiting, setPptExiting] = useState(false)
+  // ppt_text swipe-up 完成，隐藏原始 ppt_text（由 reveal 版本接管）
+  // animationDone=true 说明已经播过，直接初始化为 true 跳过退场层
+  const [pptSwipedAway, setPptSwipedAway] = useState(animationDone)
+  // ai 正文逐行揭开是否已触发
+  const [startAiLineReveal, setStartAiLineReveal] = useState(false)
 
-  // 每个词的揭开状态
-  const [revealedCount, setRevealedCount] = useState(0)
 
-  // 展开时逐词揭开，完成后通知父组件
+  // 展开/收起时控制退场和揭开动画
   useEffect(() => {
     if (!expanded) {
-      setRevealedCount(0)
+      // 收起：重置动画中间状态（animationDone=true 的不需要重置，下次展开直接走已完成分支）
+      if (!animationDone) {
+        setRevealedSet(new Set())
+        setPptExiting(false)
+        setPptSwipedAway(false)
+        setStartAiLineReveal(false)
+      }
       return
     }
     if (animationDone) return
-    setRevealedCount(0)
-    let i = 0
-    const interval = setInterval(() => {
-      i++
-      setRevealedCount(i)
-      if (i >= words.length) {
-        clearInterval(interval)
-        setTimeout(onAnimationDone, SHIMMER_DURATION + 100)
-      }
-    }, WORD_REVEAL_INTERVAL)
-    return () => clearInterval(interval)
-  }, [expanded])
 
+    const timers: number[] = []
+    const after = (delay: number, fn: () => void) => {
+      const t = window.setTimeout(fn, delay)
+      timers.push(t)
+      return t
+    }
+
+    // Phase 1：ppt_text 向上退场（swipe-up）
+    setPptExiting(true)
+    after(320, () => {
+      // Phase 2：ppt_text 揭开，等 shimmer 固色
+      setPptSwipedAway(true)
+      setRevealedSet(new Set([0]))
+      after(300, () => {
+        // Phase 3：label 揭开
+        setRevealedSet(new Set([0, 1]))
+        after(250, () => {
+          // Phase 4：ai 正文逐行揭开
+          setStartAiLineReveal(true)
+        })
+      })
+    })
+
+    return () => timers.forEach(clearTimeout)
+  }, [expanded, animationDone])
+
+  const pptRevealed = revealedSet.has(0)
+  const labelRevealed = revealedSet.has(1)
+  const pptText = translationEnabled && translatedPptText ? translatedPptText : stripBullet(bullet.ppt_text)
+
+  // 始终渲染同一套 DOM，避免 expanded 切换时销毁/重建节点导致闪烁
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: indent }}>
-      {/* PPT 原文行 */}
-      <button
-        type="button"
-        onClick={() => { if (hasComment) onToggle() }}
-        className="text-left w-full transition-all duration-150"
-        style={{
-          background: 'none', border: 'none', padding: '4px 0',
-          cursor: hasComment ? 'pointer' : 'default',
-          display: 'flex', alignItems: 'flex-start', gap: '8px', userSelect: 'text',
-        }}
-      >
-        <span style={{ color: '#AFB3B0', flexShrink: 0, marginTop: '2px', fontSize: '14px' }}>
-          {bullet.level === 0 ? '' : '•'}
-        </span>
-        <span style={{
-          fontSize: bullet.level === 0 ? '15px' : '14px',
-          color: '#1A1916', lineHeight: '1.625',
-          fontWeight: bullet.level === 0 ? '600' : '500',
-          opacity: translationEnabled && !translatedPptText ? 0.4 : (hasComment ? 1 : 0.5),
-          transition: 'opacity 0.2s',
-        }}>
-          {translationEnabled && translatedPptText ? translatedPptText : bullet.ppt_text}
-        </span>
-        {hasComment && (
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"
-            style={{ flexShrink: 0, marginTop: '4px', color: '#9B9A94', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}>
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        )}
-      </button>
-
-      {/* AI 解释面板：条件渲染，animationDone 时直接显示固化文字跳过动画 */}
-      {expanded && hasComment && (
-        <div style={{ marginLeft: '18px', paddingLeft: '14px', borderLeft: '2px solid rgba(85,96,113,0.2)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M12 2L14.09 8.26L21 9.27L16 13.97L17.18 21L12 17.77L6.82 21L8 13.97L3 9.27L9.91 8.26L12 2Z" fill="#556071" />
-            </svg>
-            <span style={{ fontSize: '9px', fontWeight: '700', letterSpacing: '0.08em', color: '#556071', textTransform: 'uppercase' }}>
-              AI Clarification
-            </span>
-            {bullet.timestamp_start >= 0 && (
-              <button type="button"
-                onClick={(e) => { e.stopPropagation(); onTimestampClick(bullet.timestamp_start) }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '9px', color: '#AFB3B0', fontWeight: '700', padding: 0, marginLeft: '4px' }}>
-                {String(Math.floor(bullet.timestamp_start / 60)).padStart(2, '0')}:
-                {String(Math.floor(bullet.timestamp_start % 60)).padStart(2, '0')}
-              </button>
-            )}
-          </div>
-          {/* 正文：animationDone=true 直接显示；否则逐词 shimmer 揭开 */}
-          <p style={{ fontSize: '14px', lineHeight: '1.625', fontWeight: '400', margin: 0, userSelect: 'text',
-            opacity: translationEnabled && !translatedAiComment ? 0.4 : 1,
+      {/* ppt_text 行：收起时是可点击 button，展开动画期间 swipe-up 退场，退场完成后由 reveal 版本接管 */}
+      <div style={{ position: 'relative' }}>
+        {/* 退场层：始终存在，expanded+pptExiting 时播 swipe-up，pptSwipedAway 后隐藏 */}
+        <button
+          type="button"
+          onClick={() => { if (hasComment) onToggle() }}
+          className="text-left w-full"
+          style={{
+            background: 'none', border: 'none', padding: '4px 0',
+            cursor: hasComment ? 'pointer' : 'default',
+            display: pptSwipedAway ? 'none' : 'flex',
+            alignItems: 'flex-start', gap: '8px', userSelect: 'text',
+            width: '100%',
+            ...(pptExiting ? { animation: 'swipe-up 0.32s ease-in forwards' } : {}),
+          }}
+        >
+          <span style={{ color: '#AFB3B0', flexShrink: 0, marginTop: '2px', fontSize: '14px' }}>
+            {bullet.level === 0 ? '' : '•'}
+          </span>
+          <span style={{
+            fontSize: '14px',
+            color: '#1A1916', lineHeight: '1.625',
+            fontWeight: '400',
+            opacity: !expanded
+              ? (translationEnabled && !translatedPptText ? 0.4 : (hasComment ? 1 : 0.5))
+              : 1,
             transition: 'opacity 0.2s',
           }}>
+            {pptText}
+          </span>
+          {!expanded && hasComment && (
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"
+              style={{ flexShrink: 0, marginTop: '4px', color: '#9B9A94' }}>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          )}
+        </button>
+
+        {/* reveal 层：swipe-up 完成后接管显示 */}
+        {pptSwipedAway && (
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '4px 0' }}>
+            <span style={{ color: '#AFB3B0', flexShrink: 0, marginTop: '2px', fontSize: '14px' }}>
+              {bullet.level === 0 ? '' : '•'}
+            </span>
+            <p style={{ fontSize: '14px', lineHeight: '1.625', fontWeight: '400', margin: 0, minHeight: '1.4em' }}>
+              {animationDone
+                ? <span style={{ color: '#1A1916' }}>{pptText}</span>
+                : <RevealText revealed={pptRevealed} muted={false} highlight={false}>{pptText}</RevealText>
+              }
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* AI 解释区域 — label 揭开后才挂载 */}
+      {hasComment && (animationDone || labelRevealed) && (
+        <div style={{ marginLeft: '18px', paddingLeft: '14px', borderLeft: '2px solid rgba(85,96,113,0.2)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minHeight: '1.4em' }}>
+            <RevealText revealed={labelRevealed} muted={false} highlight={false}>
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ display: 'inline', transform: 'translateY(1px)' }}>
+                <path d="M12 2L14.09 8.26L21 9.27L16 13.97L17.18 21L12 17.77L6.82 21L8 13.97L3 9.27L9.91 8.26L12 2Z" fill="#556071" />
+              </svg>
+            </RevealText>
+            <RevealText revealed={labelRevealed} muted={false} highlight={false}>
+              <span style={{ fontSize: '9px', fontWeight: '700', letterSpacing: '0.08em', color: '#556071', textTransform: 'uppercase' }}>
+                AI Clarification
+              </span>
+            </RevealText>
+            {bullet.timestamp_start >= 0 && (
+              <RevealText revealed={labelRevealed} muted={false} highlight={false}>
+                <button type="button"
+                  onClick={(e) => { e.stopPropagation(); onTimestampClick(bullet.timestamp_start) }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '9px', color: '#AFB3B0', fontWeight: '700', padding: 0, marginLeft: '4px' }}>
+                  {String(Math.floor(bullet.timestamp_start / 60)).padStart(2, '0')}:
+                  {String(Math.floor(bullet.timestamp_start % 60)).padStart(2, '0')}
+                </button>
+              </RevealText>
+            )}
+          </div>
+          <div style={{
+            opacity: translationEnabled && !translatedAiComment ? 0.4 : 1,
+            transition: 'opacity 0.2s',
+            position: 'relative',
+          }}>
             {translationEnabled && translatedAiComment
-              ? <span style={{ color: '#111827' }}>{translatedAiComment}</span>
+              ? <p style={{ fontSize: '14px', lineHeight: '1.625', fontWeight: '400', margin: 0, userSelect: 'text', color: '#6B6A64' }}>{translatedAiComment}</p>
               : animationDone
-                ? <span style={{ color: '#111827' }}>{bullet.ai_comment}</span>
-                : words.map((word, wi) => (
-                    <RevealText key={wi} revealed={wi < revealedCount} muted={false} highlight={false}>
-                      {word}
-                    </RevealText>
-                  ))
+                ? <p style={{ fontSize: '14px', lineHeight: '1.625', fontWeight: '400', margin: 0, userSelect: 'text', color: '#6B6A64' }}>{bullet.ai_comment}</p>
+                : <LineByLineReveal
+                    text={bullet.ai_comment as string}
+                    startReveal={startAiLineReveal}
+                    onDone={onAnimationDone}
+                  />
             }
-          </p>
+          </div>
         </div>
       )}
     </div>
@@ -243,10 +412,20 @@ export default function NotesPage() {
   const [copyToast, setCopyToast] = useState(false)
   const [retrying, setRetrying] = useState<number | null>(null)
   const [navVisible, setNavVisible] = useState(false)
+
+  // Toolbar state
+  const [activeTool, setActiveTool] = useState<'none' | 'highlight' | 'eraser' | 'text'>('none')
+  const [highlightColor, setHighlightColor] = useState('#FAFF00')
+  const [zoomLevel, setZoomLevel] = useState(100)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [pageInputValue, setPageInputValue] = useState('1')
+
   // 跨页持久化的展开状态：pageNum → Set<bulletIndex>
   const [expandedBullets, setExpandedBullets] = useState<Map<number, Set<number>>>(new Map())
   // 记录哪些 bullet 的 shimmer 动画已播完，跨页持久化，切回来直接显示文本
   const [animatedBullets, setAnimatedBullets] = useState<Map<number, Set<number>>>(new Map())
+  const prevPageRef = useRef<number>(1)
   const audioRef = useRef<HTMLAudioElement>(null)
   const wheelTimeoutRef = useRef<number | null>(null)
 
@@ -261,7 +440,7 @@ export default function NotesPage() {
   }>>(new Map())
 
   // Resizable panel state
-  const [notesPanelWidth, setNotesPanelWidth] = useState(320)
+  const [notesPanelWidth, setNotesPanelWidth] = useState(500)
   const isResizingRef = useRef(false)
   const resizeStartXRef = useRef(0)
   const resizeStartWidthRef = useRef(320)
@@ -274,7 +453,7 @@ export default function NotesPage() {
     if (!canvasAreaRef.current) return
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setCanvasWidth(Math.max(400, entry.contentRect.width - 192))
+        setCanvasWidth(Math.max(400, entry.contentRect.width - 48))
       }
     })
     ro.observe(canvasAreaRef.current)
@@ -346,6 +525,11 @@ export default function NotesPage() {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [session?.pages.length])
+
+  // 页码输入框同步 currentPage
+  useEffect(() => {
+    setPageInputValue(String(currentPage))
+  }, [currentPage])
 
   const handleTimestampClick = useCallback((seconds: number) => {
     if (audioRef.current) {
@@ -441,6 +625,23 @@ export default function NotesPage() {
     }
   }, [currentPage, translationEnabled, session])
 
+  // 切页时把上一页所有展开中的 bullet 标记为动画完成，跳回来直接显示文本
+  useEffect(() => {
+    const prevPage = prevPageRef.current
+    if (prevPage === currentPage) return
+    const expanded = expandedBullets.get(prevPage)
+    if (expanded && expanded.size > 0) {
+      setAnimatedBullets(prev => {
+        const next = new Map(prev)
+        const pageSet = new Set(next.get(prevPage) ?? [])
+        expanded.forEach(i => pageSet.add(i))
+        next.set(prevPage, pageSet)
+        return next
+      })
+    }
+    prevPageRef.current = currentPage
+  }, [currentPage])
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: C.bg }}>
@@ -477,203 +678,91 @@ export default function NotesPage() {
     <div className="flex flex-col h-screen overflow-hidden" style={{ background: C.bg, fontFamily: FONT_SERIF }}>
 
       {/* Main body (below TopAppBar) */}
-      <div className="flex flex-1 overflow-hidden" style={{ marginTop: '64px' }}>
+      <div className="flex flex-1 overflow-hidden" style={{ marginTop: '40px' }}>
 
-        {/* Left hover nav: Lecture Slides */}
-        <div
-          className="relative flex-shrink-0"
-          style={{ width: '8px', zIndex: 15 }}
-          onMouseEnter={() => setNavVisible(true)}
-          onMouseLeave={() => setNavVisible(false)}
-        >
-          {/* Trigger strip — always visible */}
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              bottom: 0,
-              width: '8px',
-              background: C.fg,
-              borderRadius: '4px 0 0 4px',
-              cursor: 'ew-resize',
-            }}
-          />
-
-          {/* Slide nav panel — hover to show */}
+        {/* Left slide nav: click-toggle */}
+        {navVisible && (
           <aside
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: '8px',
-              bottom: 0,
-              width: navVisible ? '200px' : '0px',
-              opacity: navVisible ? 1 : 0,
-              transition: 'width 200ms ease, opacity 200ms ease',
-              overflow: 'hidden',
-              zIndex: 20,
-            }}
+            className="flex-shrink-0 flex flex-col overflow-hidden"
+            style={{ width: '200px', background: C.sidebar, borderRight: '1px solid rgba(175,179,176,0.1)', zIndex: 15 }}
           >
             <div
-              className="h-full flex flex-col overflow-hidden"
-              style={{ background: C.sidebar, width: '200px', borderRight: '1px solid rgba(175,179,176,0.1)' }}
+              className="flex items-center justify-between flex-shrink-0 px-4"
+              style={{ height: '48px', borderBottom: '1px solid rgba(175,179,176,0.1)' }}
             >
-              {/* Header */}
-              <div
-                className="flex items-center justify-between flex-shrink-0 px-4"
-                style={{ height: '48px', borderBottom: '1px solid rgba(175,179,176,0.1)' }}
-              >
-                <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.secondary }}>
-                  LECTURE SLIDES
-                </span>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: C.secondary, opacity: 0.6 }}>
-                  <polyline points="15 18 9 12 15 6" />
+              <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.secondary }}>目录</span>
+              <button type="button" onClick={() => setNavVisible(false)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '2px', borderRadius: '4px' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: C.secondary }}>
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
-              </div>
-
-              {/* Thumbnails */}
-              <div className="flex-1 overflow-y-auto p-3" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {session.pages.map((page) => {
-                  const isActive = page.page_num === currentPage
-                  return (
-                    <button
-                      type="button"
-                      key={page.page_num}
-                      onClick={() => { setCurrentPage(page.page_num); setNavVisible(false) }}
-                      aria-label={`跳转到第 ${page.page_num} 张幻灯片`}
-                      aria-current={isActive ? 'true' : undefined}
-                      className="relative cursor-pointer transition-all duration-150 rounded-md overflow-hidden flex-shrink-0 flex items-center justify-center w-full border-none p-0"
-                      style={{
-                        height: '80px',
-                        borderRadius: '6px',
-                        background: C.divider,
-                        boxShadow: isActive
-                          ? '0px 0px 0px 2px rgba(95,94,94,1)'
-                          : '0 1px 3px rgba(0,0,0,0.08)',
-                        opacity: isActive ? 1 : 0.7,
-                      }}
-                    >
-                      <img
-                        src={page.thumbnail_url
-                          ? `${API_BASE}${page.thumbnail_url}`
-                          : `${API_BASE}/api/sessions/${sessionId}/slide/${page.pdf_page_num}.png`}
-                        alt={`第${page.page_num}页`}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                        loading="lazy"
-                      />
-                      <span
-                        className="absolute top-1 left-1.5 flex items-center justify-center"
-                        style={{
-                          background: C.fg,
-                          color: C.white,
-                          fontSize: '8px',
-                          fontWeight: '700',
-                          borderRadius: '3px',
-                          padding: '1px 5px',
-                          minWidth: '16px',
-                        }}
-                      >
-                        {page.page_num}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {session.pages.map((page) => {
+                const isActive = page.page_num === currentPage
+                return (
+                  <button
+                    type="button"
+                    key={page.page_num}
+                    onClick={() => setCurrentPage(page.page_num)}
+                    aria-label={`跳转到第 ${page.page_num} 张幻灯片`}
+                    aria-current={isActive ? 'true' : undefined}
+                    className="relative cursor-pointer transition-all duration-150 rounded-md overflow-hidden flex-shrink-0 flex items-center justify-center w-full border-none p-0"
+                    style={{ height: '80px', borderRadius: '6px', background: C.divider, boxShadow: isActive ? '0px 0px 0px 2px rgba(95,94,94,1)' : '0 1px 3px rgba(0,0,0,0.08)', opacity: isActive ? 1 : 0.7 }}
+                  >
+                    <img
+                      src={page.thumbnail_url ? `${API_BASE}${page.thumbnail_url}` : `${API_BASE}/api/sessions/${sessionId}/slide/${page.pdf_page_num}.png`}
+                      alt={`第${page.page_num}页`}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      loading="lazy"
+                    />
+                    <span className="absolute top-1 left-1.5 flex items-center justify-center" style={{ background: C.fg, color: C.white, fontSize: '8px', fontWeight: '700', borderRadius: '3px', padding: '1px 5px', minWidth: '16px' }}>
+                      {page.page_num}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           </aside>
-        </div>
+        )}
 
         {/* Center: PPT Canvas */}
         <main className="flex-1 flex flex-col overflow-hidden" style={{ background: C.bg }}>
 
-          {/* PDF-style Toolbar */}
-          <div
-            className="flex items-center justify-between px-4 flex-shrink-0"
-            style={{
-              height: '48px',
-              background: C.white,
-              borderBottom: '1px solid rgba(175,179,176,0.15)',
-              boxShadow: '0px 1px 2px rgba(0,0,0,0.05)',
+          {/* Toolbar */}
+          <CanvasToolbar
+            navVisible={navVisible}
+            onNavToggle={() => setNavVisible((v) => !v)}
+            activeTool={activeTool}
+            onToolChange={setActiveTool}
+            highlightColor={highlightColor}
+            onHighlightColorChange={setHighlightColor}
+            translationEnabled={translationEnabled}
+            popoverOpen={popoverOpen}
+            onPopoverToggle={() => setPopoverOpen((v) => !v)}
+            targetLang={targetLang}
+            onTargetLangChange={setTargetLang}
+            onTranslate={() => { setTranslationEnabled(true); setPopoverOpen(false); translatePage(currentPage) }}
+            onShowOriginal={() => { setTranslationEnabled(false); setPopoverOpen(false) }}
+            onClosePopover={() => setPopoverOpen(false)}
+            zoomLevel={zoomLevel}
+            onZoomChange={setZoomLevel}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageInputValue={pageInputValue}
+            onPageInputChange={setPageInputValue}
+            onPageInputCommit={() => {
+              const n = parseInt(pageInputValue, 10)
+              if (!isNaN(n) && n >= 1 && n <= totalPages) setCurrentPage(n)
+              else setPageInputValue(String(currentPage))
             }}
-          >
-            {/* Left: Navigation */}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                aria-label="上一页"
-                onClick={() => currentPage > 1 && setCurrentPage(currentPage - 1)}
-                className="cursor-pointer transition-all duration-150 min-w-[44px] min-h-[44px] flex items-center justify-center rounded hover:bg-black/5 disabled:opacity-30 border-none bg-transparent"
-                disabled={currentPage <= 1}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-              </button>
-              <span className="text-xs" style={{ color: C.muted }}>
-                {currentPage} / {totalPages}
-              </span>
-              <button
-                type="button"
-                aria-label="下一页"
-                onClick={() => currentPage < totalPages && setCurrentPage(currentPage + 1)}
-                className="cursor-pointer transition-all duration-150 min-w-[44px] min-h-[44px] flex items-center justify-center rounded hover:bg-black/5 disabled:opacity-30 border-none bg-transparent"
-                disabled={currentPage >= totalPages}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Right: Translate + Download */}
-            <div className="flex items-center gap-2" style={{ position: 'relative' }}>
-              {/* 翻译按钮 */}
-              <button
-                onClick={() => setPopoverOpen((v) => !v)}
-                className="cursor-pointer transition-all duration-150 p-1.5 rounded hover:bg-black/5"
-                title="翻译"
-                style={{ color: translationEnabled ? '#1A1916' : '#9B9A94' }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="2" y1="12" x2="22" y2="12" />
-                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                </svg>
-              </button>
-
-              {/* 翻译弹窗 */}
-              {popoverOpen && (
-                <TranslationPopover
-                  enabled={translationEnabled}
-                  targetLang={targetLang}
-                  onTargetLangChange={setTargetLang}
-                  onClose={() => setPopoverOpen(false)}
-                  onTranslate={() => {
-                    setTranslationEnabled(true)
-                    setPopoverOpen(false)
-                    translatePage(currentPage)
-                  }}
-                  onShowOriginal={() => {
-                    setTranslationEnabled(false)
-                    setPopoverOpen(false)
-                  }}
-                />
-              )}
-
-              {/* 导出按钮 */}
-              <button
-                onClick={handleExportMarkdown}
-                className="cursor-pointer transition-all duration-150 p-1.5 rounded hover:bg-black/5"
-                title="导出 Markdown"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-              </button>
-            </div>
-          </div>
+            onPrevPage={() => currentPage > 1 && setCurrentPage(currentPage - 1)}
+            onNextPage={() => currentPage < totalPages && setCurrentPage(currentPage + 1)}
+            searchOpen={searchOpen}
+            onSearchToggle={() => { setSearchOpen((v) => !v); if (searchOpen) setSearchQuery('') }}
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
+          />
 
           {/* Canvas area — single page with wheel navigation */}
           <div

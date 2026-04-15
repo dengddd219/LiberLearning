@@ -43,7 +43,7 @@ TEMPLATES = [
 
 async def run_case(case: dict) -> dict:
     from services.audio import convert_to_wav, get_audio_duration
-    from services.asr import transcribe_openai
+    from services.asr import transcribe
     from services.ppt_parser import parse_ppt
     from services.alignment import build_page_timeline
     from services.note_generator import generate_notes_for_all_pages
@@ -73,10 +73,10 @@ async def run_case(case: dict) -> dict:
 
     # Step 2: ASR
     t0 = time.time()
-    segments = transcribe_openai(str(wav_path), language=language)
+    segments, raw_segments = transcribe(str(wav_path), language=language)
     result["steps"]["asr"] = {
         "n_segments": len(segments),
-        "cost_usd": (dur / 60) * 0.006,
+        "cost_usd": (dur / 60) * 0.0014,
         "elapsed_s": time.time() - t0,
     }
     print(f"[{label}] Step 2 done: {len(segments)} segments")

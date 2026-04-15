@@ -26,7 +26,7 @@ MVP-0 focuses on **Scene ② (real-time in-class recording)** as the core, with 
 - **PPT Parsing & Rendering**: LibreOffice (headless, converts .ppt/.pptx to PDF) + PyMuPDF (text extraction + PNG rendering)
 - **Audio Format Conversion**: FFmpeg (WebM/Opus → WAV for ASR APIs)
 - **Chinese ASR**: Alibaba Cloud ASR API
-- **English ASR**: OpenAI Whisper API
+- **English ASR**: Alibaba Cloud ASR API (same as Chinese, supports `language_id: en-us`; OpenAI Whisper is the fallback only)
 - **Semantic Alignment**: OpenAI text-embedding-3-small
 - **Note Generation**: Claude API (claude-sonnet)
 - **Deployment**: Cloud deployment (frontend + backend separated), API keys in server-side environment variables
@@ -346,7 +346,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 | `frontend/src/pages/UploadPage.tsx` | 上传页：PPT + 音频文件上传，调用 `/api/process-mock` |
 | `frontend/src/pages/SessionPage.tsx` | 课中录音页：实时录音 + inline 文字标注 |
 | `frontend/src/pages/ProcessingPage.tsx` | 处理中等待页：流水线进度显示 |
-| `frontend/src/pages/NotesPage.tsx` | 笔记主视图：三栏布局（slide nav + PPT 画布 + 笔记面板）|
+| `frontend/src/pages/NotesPage.tsx` | 笔记主视图：三栏布局（slide nav + PPT 画布 + 笔记面板）。`AiBulletRow`(L62) / `NotesPage` state(L228) / bullets 渲染(L885) |
 | `frontend/src/pages/DetailedNotePage.tsx` | 单页笔记详情视图 |
 
 #### Components

@@ -27,6 +27,7 @@ app.add_middleware(
 
 app.mount("/slides", StaticFiles(directory="static/slides"), name="slides")
 app.mount("/audio", StaticFiles(directory="static/audio"), name="audio")
+app.mount("/runs", StaticFiles(directory="static/runs"), name="runs")
 
 app.include_router(process.router, prefix="/api")
 app.include_router(sessions.router, prefix="/api")

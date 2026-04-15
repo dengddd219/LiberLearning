@@ -23,7 +23,7 @@ LiberStudy 全局配置中心。
 #   "v4_1"  V4 修复 Drag-Back 效应
 #   "v5"    Viterbi/HMM 全局解码
 #   "v5_1"  V5 参数调优
-ALIGNMENT_VERSION: str = "v2"
+ALIGNMENT_VERSION: str = "v5"
 
 # Embedding 模型（OpenAI 兼容接口）
 EMBEDDING_MODEL: str = "text-embedding-3-small"
@@ -47,8 +47,8 @@ ALIGNMENT_LOW_CONFIDENCE_THRESHOLD: float = 0.60
 
 # ASR 引擎，可选值：
 #   "whisper"  OpenAI Whisper API（支持中英文）
-#   "aliyun"   阿里云 ASR（仅中文，需配置 ALIYUN_* 环境变量）
-ASR_ENGINE: str = "whisper"
+#   "aliyun"   阿里云录音文件识别 RESTful API（支持中英文，需配置 ALIYUN_* + OSS 环境变量）
+ASR_ENGINE: str = "aliyun"  # 用阿里云
 
 # Whisper 模型（目前 API 只有 whisper-1）
 ASR_WHISPER_MODEL: str = "whisper-1"

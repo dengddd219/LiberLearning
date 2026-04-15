@@ -4,7 +4,7 @@ import time
 import streamlit as st
 
 from test_ui.helpers import (
-    WHISPER_COST_PER_MIN,
+    ALIYUN_COST_PER_MIN,
     _badge, _log_run,
     _wav_path, _asr_path, _asr_raw_path,
     _save_json, _load_json,
@@ -21,10 +21,10 @@ def render_step2(language):
             total_chars = sum(len(s["text"]) for s in segments)
             st.success(f"✅ Cached — {len(segments)} sentences, {total_chars:,} chars")
 
-            with st.expander("🔍 Merge comparison — raw Whisper vs sentence-merged", expanded=False):
+            with st.expander("🔍 Merge comparison — raw segments vs sentence-merged", expanded=False):
                 col_raw, col_merged = st.columns(2)
                 with col_raw:
-                    st.markdown("**Raw Whisper segments** (pre-merge)")
+                    st.markdown("**Raw Aliyun segments** (pre-merge)")
                     if asr_raw.exists():
                         raw_segs = _load_json(asr_raw)
                         st.caption(f"{len(raw_segs)} raw segments")
@@ -48,14 +48,14 @@ def render_step2(language):
                 t0 = time.time()
                 from services.audio import get_audio_duration
                 dur = get_audio_duration(str(wav))
-                prog = st.progress(0, text="Sending to Whisper API…")
-                from services.asr import transcribe_openai
-                sentences, raw_segments = transcribe_openai(str(wav), language=language)
+                prog = st.progress(0, text="Sending to Aliyun ASR…")
+                from services.asr import transcribe
+                sentences, raw_segments = transcribe(str(wav), language=language)
                 _save_json(asr_raw, raw_segments)
                 _save_json(asr, sentences)
                 prog.progress(100, text="Done")
                 elapsed = time.time() - t0
-                cost = (dur / 60) * WHISPER_COST_PER_MIN
+                cost = (dur / 60) * ALIYUN_COST_PER_MIN
                 _log_run("asr", elapsed, cost=cost,
                          extra={"n_sentences": len(sentences), "n_raw": len(raw_segments), "duration_s": dur})
                 st.success(f"✅ {_badge(elapsed, cost=cost)} — {len(raw_segments)} raw → {len(sentences)} sentences")

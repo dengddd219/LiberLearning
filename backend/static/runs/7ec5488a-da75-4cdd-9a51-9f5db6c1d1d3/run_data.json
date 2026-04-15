@@ -1,0 +1,107 @@
+{
+  "session_id": "7ec5488a-da75-4cdd-9a51-9f5db6c1d1d3",
+  "started_at": "2026-04-15 17:22:55",
+  "config": {
+    "alignment_version": "v5",
+    "asr_engine": "aliyun",
+    "note_provider": "中转站",
+    "note_model": "claude-sonnet-4-6",
+    "note_passive_template": "passive_ppt_notes",
+    "note_granularity": "detailed"
+  },
+  "steps": {
+    "step1_audio": {
+      "status": "ok",
+      "wav_path": "C:\\Users\\19841\\AppData\\Local\\Temp\\liberstudy\\7ec5488a-da75-4cdd-9a51-9f5db6c1d1d3\\audio.wav",
+      "duration_seconds": 1509.652,
+      "elapsed_s": 3.37
+    },
+    "step2_ppt": {
+      "status": "ok",
+      "ppt_path": "C:\\Users\\19841\\AppData\\Local\\Temp\\liberstudy\\7ec5488a-da75-4cdd-9a51-9f5db6c1d1d3\\lec3_38-56.pdf",
+      "num_pages": 19,
+      "pages_summary": [
+        {
+          "page_num": 1,
+          "ppt_text_len": 42
+        },
+        {
+          "page_num": 2,
+          "ppt_text_len": 182
+        },
+        {
+          "page_num": 3,
+          "ppt_text_len": 133
+        },
+        {
+          "page_num": 4,
+          "ppt_text_len": 434
+        },
+        {
+          "page_num": 5,
+          "ppt_text_len": 319
+        },
+        {
+          "page_num": 6,
+          "ppt_text_len": 149
+        },
+        {
+          "page_num": 7,
+          "ppt_text_len": 139
+        },
+        {
+          "page_num": 8,
+          "ppt_text_len": 137
+        },
+        {
+          "page_num": 9,
+          "ppt_text_len": 77
+        },
+        {
+          "page_num": 10,
+          "ppt_text_len": 53
+        },
+        {
+          "page_num": 11,
+          "ppt_text_len": 0
+        },
+        {
+          "page_num": 12,
+          "ppt_text_len": 0
+        },
+        {
+          "page_num": 13,
+          "ppt_text_len": 144
+        },
+        {
+          "page_num": 14,
+          "ppt_text_len": 28
+        },
+        {
+          "page_num": 15,
+          "ppt_text_len": 0
+        },
+        {
+          "page_num": 16,
+          "ppt_text_len": 210
+        },
+        {
+          "page_num": 17,
+          "ppt_text_len": 70
+        },
+        {
+          "page_num": 18,
+          "ppt_text_len": 148
+        },
+        {
+          "page_num": 19,
+          "ppt_text_len": 240
+        }
+      ],
+      "elapsed_s": 2.13
+    }
+  },
+  "finished_at": "2026-04-15 17:23:06",
+  "overall_status": "error",
+  "error": "Aliyun SubmitTask failed: {'RequestId': '80510837-A9DF-5EA1-9136-786F3691E16E', 'StatusText': 'USER_BIZDURATION_QUOTA_EXCEED', 'StatusCode': 41050001}"
+}

@@ -29,7 +29,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
 export default function ProcessingPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const sessionId = searchParams.get('session_id') ?? 'mock-session-001'
+  const sessionId = searchParams.get('session_id') ?? ''
 
   const [currentStage, setCurrentStage] = useState(0)
   const [failed, setFailed] = useState(false)
@@ -39,6 +39,7 @@ export default function ProcessingPage() {
 
   useEffect(() => {
     if (failed) return
+    if (!sessionId) { navigate('/'); return }
 
     const timer = setInterval(() => setElapsed((t) => t + 1), 1000)
 

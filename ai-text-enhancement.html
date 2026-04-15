@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Text Enhancement</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/framer-motion@10/dist/framer-motion.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+
+    /*
+      核心：彩色光波 → 固化
+      文字通过一个从左上到右下的渐变 mask 被揭开。
+      揭开瞬间是彩色，随后 color transition 到黑/灰。
+    */
+
+    /* 光波扫描：用一个大的对角线渐变作为 mask，
+       通过 background-position 从左上移到右下 */
+    @keyframes wave-reveal {
+      0%   { -webkit-mask-position: -100% -100%; mask-position: -100% -100%; }
+      100% { -webkit-mask-position: 200% 200%;  mask-position: 200% 200%;  }
+    }
+
+    /* 彩色渐变背景流动 */
+    @keyframes color-flow {
+      0%   { background-position: 0% 0%; }
+      100% { background-position: 100% 100%; }
+    }
+
+    /* 每个文字节点的彩色 → 固化过渡 */
+    .shimmer-text {
+      background-image: linear-gradient(
+        135deg,
+        #f472b6 0%,
+        #fb923c 20%,
+        #facc15 40%,
+        #86efac 60%,
+        #67e8f9 80%,
+        #c084fc 100%
+      );
+      background-size: 300% 300%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: color-flow 0.6s ease-out forwards;
+    }
+
+    /* 固化后的 transition */
+    .color-settle {
+      transition: color 0.4s ease-out;
+      -webkit-text-fill-color: unset;
+    }
+
+    /* 原始文本向上消失 */
+    @keyframes swipe-up {
+      0%   { opacity: 1; transform: translateY(0);   filter: blur(0px); }
+      100% { opacity: 0; transform: translateY(-18px); filter: blur(3px); }
+    }
+    .raw-exit {
+      animation: swipe-up 0.35s ease-in forwards;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-white flex items-center justify-center p-12">
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+const { motion, AnimatePresence } = Motion;
+
+/* ─── 数据 ─────────────────────────────────────────── */
+const RAW_LINES = [
+  "100, growing",
+  "use tuesday.ai, v manual",
+  "180",
+  '"a priority for q2"',
+];
+
+// 每个 item 按"揭开顺序"有一个 revealIndex（从0开始，控制 mask 时序）
+const SECTIONS = [
+  {
+    id: "overview",
+    header: "AllFound Overview",
+    headerReveal: 0,
+    items: [
+      { text: "100 employees, adding 20 more next quarter.", muted: false, reveal: 1 },
+      { text: "Office in San Francisco and Austin.",         muted: true,  reveal: 2 },
+    ],
+  },
+  {
+    id: "provider",
+    header: "Current Provider (Tuesday.ai)",
+    headerReveal: 3,
+    items: [
+      { text: "Data input is too manual.",                    muted: false, reveal: 4 },
+      { text: "Too complex for non-technical team members.",  muted: true,  reveal: 5 },
+      { text: '$180 per employee per year ("too expensive").', muted: false, reveal: 6 },
+    ],
+  },
+  {
+    id: "requirements",
+    header: "Their Requirements",
+    headerReveal: 7,
+    items: [
+      {
+        muted: false, reveal: 8,
+        parts: [
+          { t: "Finding a better tool is ",  highlight: false },
+          { t: '"a priority for Q2"',        highlight: true  },
+          { t: ".",                           highlight: false },
+        ],
+      },
+      { text: "Need secure information sharing.", muted: true, reveal: 9 },
+    ],
+  },
+];
+
+const TOTAL_REVEALS = 10;
+// 每个 revealIndex 延迟多少 ms 出现
+const REVEAL_INTERVAL = 90; // ms 间隔，快速扫过
+const SHIMMER_DURATION = 500; // ms，彩色持续时间后固化
+
+/* ─── 单个文字节点 ──────────────────────────────────── */
+function RevealText({ children, revealIndex, revealed, muted, highlight }) {
+  const ref = useRef(null);
+  const settledRef = useRef(false);
+
+  useEffect(() => {
+    if (!revealed || settledRef.current) return;
+    const el = ref.current;
+    if (!el) return;
+
+    // 1. 立刻应用彩色
+    el.classList.add("shimmer-text");
+
+    // 2. SHIMMER_DURATION 后固化
+    const t = setTimeout(() => {
+      el.classList.remove("shimmer-text");
+      el.classList.add("color-settle");
+      // 设置目标颜色
+      if (highlight) {
+        el.style.color = "#92400e";
+      } else if (muted) {
+        el.style.color = "#9ca3af";
+      } else {
+        el.style.color = "#111827";
+      }
+      settledRef.current = true;
+    }, SHIMMER_DURATION);
+
+    return () => clearTimeout(t);
+  }, [revealed]);
+
+  // 未揭开时透明
+  const baseStyle = {
+    color: "transparent",
+    display: "inline",
+  };
+
+  const highlightStyle = highlight && revealed
+    ? { background: "transparent" }
+    : {};
+
+  return (
+    <span ref={ref} style={baseStyle}>
+      {children}
+    </span>
+  );
+}
+
+/* ─── 单行渲染 ───────────────────────────────────────── */
+function StructuredLine({ item, revealedSet }) {
+  const revealed = revealedSet.has(item.reveal);
+
+  if (item.parts) {
+    return (
+      <p className="text-sm leading-relaxed" style={{ minHeight: "1.4em" }}>
+        {item.parts.map((p, k) => (
+          <RevealText
+            key={k}
+            revealIndex={item.reveal}
+            revealed={revealed}
+            muted={false}
+            highlight={p.highlight}
+          >
+            {p.t}
+          </RevealText>
+        ))}
+      </p>
+    );
+  }
+
+  return (
+    <p className="text-sm leading-relaxed" style={{ minHeight: "1.4em" }}>
+      <RevealText
+        revealIndex={item.reveal}
+        revealed={revealed}
+        muted={item.muted}
+        highlight={false}
+      >
+        {item.text}
+      </RevealText>
+    </p>
+  );
+}
+
+/* ─── 主卡片 ─────────────────────────────────────────── */
+function AITextCard() {
+  const [status, setStatus] = useState("raw"); // "raw" | "animating" | "enhanced"
+  const [rawExiting, setRawExiting] = useState(false);
+  const [revealedSet, setRevealedSet] = useState(new Set());
+
+  const handleEnhance = useCallback(() => {
+    if (status !== "raw") return;
+
+    // Phase 1: 原始文本向上抹除
+    setRawExiting(true);
+
+    setTimeout(() => {
+      // Phase 2: 切换到增强态，开始逐行揭开光波
+      setStatus("animating");
+      setRevealedSet(new Set());
+
+      // 逐个 revealIndex 定时揭开（模拟光波从左上到右下扫过）
+      for (let i = 0; i < TOTAL_REVEALS; i++) {
+        setTimeout(() => {
+          setRevealedSet(prev => {
+            const next = new Set(prev);
+            next.add(i);
+            return next;
+          });
+          if (i === TOTAL_REVEALS - 1) {
+            // 最后一个揭开后，等固化完成再标记 enhanced
+            setTimeout(() => setStatus("enhanced"), SHIMMER_DURATION + 100);
+          }
+        }, i * REVEAL_INTERVAL);
+      }
+    }, 350 + (RAW_LINES.length - 1) * 50); // 等最后一行也消失完
+  }, [status]);
+
+  const handleReset = () => {
+    setStatus("raw");
+    setRawExiting(false);
+    setRevealedSet(new Set());
+  };
+
+  return (
+    <div className="w-full max-w-md bg-white">
+
+      {/* ── 顶栏 ── */}
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-2">
+          <span className="text-base select-none">✨</span>
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border transition-all duration-300 ${
+            status === "enhanced"
+              ? "bg-violet-50 border-violet-200 text-violet-600"
+              : status === "animating"
+              ? "bg-orange-50 border-orange-200 text-orange-500"
+              : "bg-gray-50 border-gray-200 text-gray-400"
+          }`}>
+            AI enhanced
+          </span>
+        </div>
+
+        {status === "raw" && (
+          <button
+            onClick={handleEnhance}
+            className="text-xs font-semibold px-3.5 py-1.5 rounded-lg bg-gray-900 text-white hover:bg-gray-700 transition-colors"
+          >
+            Enhance ✦
+          </button>
+        )}
+        {status === "enhanced" && (
+          <button
+            onClick={handleReset}
+            className="text-xs px-3.5 py-1.5 rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-50 transition-colors"
+          >
+            Reset
+          </button>
+        )}
+        {status === "animating" && (
+          <span className="text-xs text-gray-300">processing…</span>
+        )}
+      </div>
+
+      {/* ── 固定标题 ── */}
+      <h2
+        style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+        className="text-2xl font-semibold text-gray-900 tracking-tight mb-4"
+      >
+        Intro call: AllFound
+      </h2>
+
+      {/* ── 内容区 ── */}
+      <div className="relative min-h-[180px]">
+
+        {/* Raw 文本（逐行向上消失，每行错开 70ms） */}
+        {(status === "raw" || rawExiting) && (
+          <div>
+            {RAW_LINES.map((line, i) => (
+              <p
+                key={i}
+                className="text-sm text-gray-400 font-mono leading-relaxed mb-1.5"
+                style={rawExiting ? {
+                  animation: `swipe-up 0.32s ease-in forwards`,
+                  animationDelay: `${i * 50}ms`,
+                } : {}}
+              >
+                {line}
+              </p>
+            ))}
+          </div>
+        )}
+
+        {/* 增强后的结构（始终渲染，靠 revealedSet 控制可见） */}
+        {(status === "animating" || status === "enhanced") && (
+          <div className="space-y-4">
+            {SECTIONS.map((section) => (
+              <div key={section.id}>
+                {/* 小标题 */}
+                <p className="text-sm font-semibold mb-1.5" style={{ minHeight: "1.4em" }}>
+                  <RevealText
+                    revealIndex={section.headerReveal}
+                    revealed={revealedSet.has(section.headerReveal)}
+                    muted={false}
+                    highlight={false}
+                  >
+                    {section.header}
+                  </RevealText>
+                </p>
+
+                {/* 子条目 */}
+                <div className="pl-4 border-l-2 border-gray-100 space-y-0.5">
+                  {section.items.map((item, ii) => (
+                    <StructuredLine
+                      key={ii}
+                      item={item}
+                      revealedSet={revealedSet}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<AITextCard />);
+</script>
+</body>
+</html>

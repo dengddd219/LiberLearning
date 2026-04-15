@@ -9,6 +9,7 @@ Process router.
 import json as _json
 import shutil
 import tempfile
+import time as _time
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -19,7 +20,7 @@ import db
 import settings as _settings
 from db import check_and_record_rate_limit, get_rate_limit_status, RateLimitExceeded
 from services.audio import convert_to_wav, get_audio_duration
-from services.ppt_parser import parse_ppt, extract_domain_terms
+from services.ppt_parser import parse_ppt
 from services.asr import transcribe
 from services.note_generator import generate_notes_for_all_pages, PROVIDER_ZHONGZHUAN
 
@@ -97,12 +98,14 @@ async def process_real(
             detail=f"Unsupported audio type '{audio_content_type}'. Supported: webm, mp3, wav, m4a",
         )
 
-    # 2. Rate limit
+    # 2. Rate limit（本地开发 IP 跳过限制）
     ip = request.client.host
-    try:
-        check_and_record_rate_limit(ip, max_calls=MAX_CALLS_PER_DAY, window_seconds=DAY_SECONDS)
-    except RateLimitExceeded as exc:
-        raise HTTPException(status_code=429, detail=str(exc))
+    is_localhost = ip in ("127.0.0.1", "::1", "localhost")
+    if not is_localhost:
+        try:
+            check_and_record_rate_limit(ip, max_calls=MAX_CALLS_PER_DAY, window_seconds=DAY_SECONDS)
+        except RateLimitExceeded as exc:
+            raise HTTPException(status_code=429, detail=str(exc))
 
     # 3. 保存上传文件
     session_id = str(uuid.uuid4())
@@ -153,10 +156,34 @@ async def _run_pipeline(
     user_anchors: list[dict],
 ):
     """Background task: full processing pipeline with progress updates."""
+    # ── Run data 初始化 ────────────────────────────────────────────────────
+    runs_dir = Path("static") / "runs" / session_id
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    run_data_path = runs_dir / "run_data.json"
+
+    run_data: dict = {
+        "session_id": session_id,
+        "started_at": _time.strftime("%Y-%m-%d %H:%M:%S"),
+        "config": {
+            "alignment_version": _settings.ALIGNMENT_VERSION,
+            "asr_engine": _settings.ASR_ENGINE,
+            "note_provider": _settings.NOTE_PROVIDER,
+            "note_model": _settings.NOTE_MODEL,
+            "note_passive_template": _settings.NOTE_PASSIVE_TEMPLATE,
+            "note_granularity": _settings.NOTE_GRANULARITY,
+        },
+        "steps": {},
+    }
+
+    def _save_run_data():
+        with open(run_data_path, "w", encoding="utf-8") as f:
+            _json.dump(run_data, f, ensure_ascii=False, indent=2, default=str)
+
     try:
         session_path = Path(session_dir)
 
         # Step 1: 音频转 WAV
+        t1_start = _time.time()
         db.update_session(session_id, {"progress": {"step": "converting", "percent": 15}})
         wav_path = str(session_path / "audio.wav")
         convert_to_wav(audio_raw_path, wav_path)
@@ -168,6 +195,10 @@ async def _run_pipeline(
                 "error": f"Audio exceeds 120-minute limit ({duration/60:.1f} min)",
                 "progress": None,
             })
+            run_data["steps"]["step1_audio"] = {"status": "error", "error": "duration_exceeded", "duration_seconds": duration}
+            run_data["finished_at"] = _time.strftime("%Y-%m-%d %H:%M:%S")
+            run_data["overall_status"] = "error"
+            _save_run_data()
             return
 
         db.update_session(session_id, {"total_duration": int(duration)})
@@ -177,7 +208,17 @@ async def _run_pipeline(
         audio_static_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy2(wav_path, str(audio_static_dir / "audio.wav"))
 
+        t1_end = _time.time()
+        run_data["steps"]["step1_audio"] = {
+            "status": "ok",
+            "wav_path": wav_path,
+            "duration_seconds": duration,
+            "elapsed_s": round(t1_end - t1_start, 2),
+        }
+        _save_run_data()
+
         # Step 2: PPT 解析
+        t2_start = _time.time()
         db.update_session(session_id, {"progress": {"step": "parsing_ppt", "percent": 30}})
         slides_dir = str(Path("static") / "slides" / session_id)
         ppt_pages: list[dict] = []
@@ -193,12 +234,39 @@ async def _run_pipeline(
                     png_name = page["thumbnail_url"].split("/")[-1]
                     page["thumbnail_url"] = f"/slides/{session_id}/{png_name}"
 
+        t2_end = _time.time()
+        run_data["steps"]["step2_ppt"] = {
+            "status": "ok",
+            "ppt_path": str(ppt_path) if ppt_path else None,
+            "num_pages": len(ppt_pages),
+            "pages_summary": [
+                {"page_num": p.get("page_num"), "ppt_text_len": len(p.get("ppt_text", ""))}
+                for p in ppt_pages
+            ],
+            "elapsed_s": round(t2_end - t2_start, 2),
+        }
+        _save_run_data()
+
         # Step 3: ASR 转录
+        t3_start = _time.time()
         db.update_session(session_id, {"progress": {"step": "transcribing", "percent": 55}})
-        asr_prompt = extract_domain_terms(ppt_pages) if ppt_pages else None
-        segments, _raw = transcribe(wav_path, language=language, prompt=asr_prompt)
+        segments, raw_segments = transcribe(wav_path, language=language)
+        t3_end = _time.time()
+
+        run_data["steps"]["step3_asr"] = {
+            "status": "ok",
+            "engine": _settings.ASR_ENGINE,
+            "language": language,
+            "num_sentences": len(segments),
+            "num_raw_segments": len(raw_segments),
+            "sentences": segments,
+            "raw_segments": raw_segments,
+            "elapsed_s": round(t3_end - t3_start, 2),
+        }
+        _save_run_data()
 
         # Step 4: 语义对齐（版本由 settings.ALIGNMENT_VERSION 控制）
+        t4_start = _time.time()
         db.update_session(session_id, {"progress": {"step": "aligning", "percent": 70}})
         if ppt_pages:
             align_module = _settings.get_alignment_module()
@@ -221,13 +289,58 @@ async def _run_pipeline(
                 "page_supplement": None,
                 "active_notes": None,
             }]
+        t4_end = _time.time()
+
+        def _serialize(obj):
+            if hasattr(obj, "model_dump"):
+                return obj.model_dump()
+            return obj
+
+        run_data["steps"]["step4_alignment"] = {
+            "status": "ok",
+            "version": _settings.ALIGNMENT_VERSION,
+            "num_pages": len(aligned_pages),
+            "pages_summary": [
+                {
+                    "page_num": p.get("page_num") if isinstance(p, dict) else getattr(p, "page_num", "?"),
+                    "num_segments": len(p.get("aligned_segments", []) if isinstance(p, dict) else getattr(p, "aligned_segments", [])),
+                }
+                for p in aligned_pages
+            ],
+            "aligned_pages": [_serialize(p) for p in aligned_pages],
+            "elapsed_s": round(t4_end - t4_start, 2),
+        }
+        _save_run_data()
 
         # Step 5: LLM 笔记生成（模板和 provider 由 settings 控制）
+        t5_start = _time.time()
         db.update_session(session_id, {"progress": {"step": "generating", "percent": 85}})
         generated_pages = await generate_notes_for_all_pages(
             aligned_pages,
             provider=_settings.NOTE_PROVIDER,
         )
+        t5_end = _time.time()
+
+        run_data["steps"]["step5_notes"] = {
+            "status": "ok",
+            "provider": _settings.NOTE_PROVIDER,
+            "model": _settings.NOTE_MODEL,
+            "template": _settings.NOTE_PASSIVE_TEMPLATE,
+            "granularity": _settings.NOTE_GRANULARITY,
+            "num_pages": len(generated_pages),
+            "pages_summary": [
+                {
+                    "page_num": p.get("page_num"),
+                    "status": p.get("status"),
+                    "num_bullets": len(p.get("passive_notes", {}).get("bullets", [])) if p.get("passive_notes") else 0,
+                    "cost": p.get("_cost"),
+                }
+                for p in generated_pages
+            ],
+            "generated_pages": generated_pages,
+            "elapsed_s": round(t5_end - t5_start, 2),
+        }
+        _save_run_data()
 
         any_partial = any(p.get("status") == "partial_ready" for p in generated_pages)
         overall_status = "partial_ready" if any_partial else "ready"
@@ -239,12 +352,20 @@ async def _run_pipeline(
             "progress": None,
         })
 
+        run_data["finished_at"] = _time.strftime("%Y-%m-%d %H:%M:%S")
+        run_data["overall_status"] = overall_status
+        _save_run_data()
+
     except Exception as exc:
         db.update_session(session_id, {
             "status": "error",
             "error": str(exc),
             "progress": None,
         })
+        run_data["finished_at"] = _time.strftime("%Y-%m-%d %H:%M:%S")
+        run_data["overall_status"] = "error"
+        run_data["error"] = str(exc)
+        _save_run_data()
 
 
 # ── Per-page retry ─────────────────────────────────────────────────────────────
