@@ -112,6 +112,9 @@ function AiBulletRow({
   onToggle,
   onAnimationDone,
   onTimestampClick,
+  translationEnabled,
+  translatedPptText,
+  translatedAiComment,
 }: {
   bullet: Bullet
   expanded: boolean
@@ -119,6 +122,9 @@ function AiBulletRow({
   onToggle: () => void
   onAnimationDone: () => void
   onTimestampClick: (t: number) => void
+  translationEnabled?: boolean
+  translatedPptText?: string
+  translatedAiComment?: string | null
 }) {
   const hasComment = !!bullet.ai_comment
   const indent = bullet.level * 16
@@ -171,9 +177,10 @@ function AiBulletRow({
           fontSize: bullet.level === 0 ? '15px' : '14px',
           color: '#1A1916', lineHeight: '1.625',
           fontWeight: bullet.level === 0 ? '600' : '500',
-          opacity: hasComment ? 1 : 0.5,
+          opacity: translationEnabled && !translatedPptText ? 0.4 : (hasComment ? 1 : 0.5),
+          transition: 'opacity 0.2s',
         }}>
-          {bullet.ppt_text}
+          {translationEnabled && translatedPptText ? translatedPptText : bullet.ppt_text}
         </span>
         {hasComment && (
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"
@@ -203,14 +210,19 @@ function AiBulletRow({
             )}
           </div>
           {/* 正文：animationDone=true 直接显示；否则逐词 shimmer 揭开 */}
-          <p style={{ fontSize: '14px', lineHeight: '1.625', fontWeight: '400', margin: 0, userSelect: 'text' }}>
-            {animationDone
-              ? <span style={{ color: '#111827' }}>{bullet.ai_comment}</span>
-              : words.map((word, wi) => (
-                  <RevealText key={wi} revealed={wi < revealedCount} muted={false} highlight={false}>
-                    {word}
-                  </RevealText>
-                ))
+          <p style={{ fontSize: '14px', lineHeight: '1.625', fontWeight: '400', margin: 0, userSelect: 'text',
+            opacity: translationEnabled && !translatedAiComment ? 0.4 : 1,
+            transition: 'opacity 0.2s',
+          }}>
+            {translationEnabled && translatedAiComment
+              ? <span style={{ color: '#111827' }}>{translatedAiComment}</span>
+              : animationDone
+                ? <span style={{ color: '#111827' }}>{bullet.ai_comment}</span>
+                : words.map((word, wi) => (
+                    <RevealText key={wi} revealed={wi < revealedCount} muted={false} highlight={false}>
+                      {word}
+                    </RevealText>
+                  ))
             }
           </p>
         </div>
@@ -915,8 +927,13 @@ export default function NotesPage() {
                           AI Clarification
                         </span>
                       </div>
-                      <p style={{ fontSize: '14px', color: C.fg, lineHeight: '1.6' }}>
-                        {currentPageData.active_notes.ai_expansion}
+                      <p style={{ fontSize: '14px', color: C.fg, lineHeight: '1.6',
+                        opacity: translationEnabled && !translatedTexts.get(currentPage)?.aiExpansion ? 0.4 : 1,
+                        transition: 'opacity 0.2s',
+                      }}>
+                        {translationEnabled && translatedTexts.get(currentPage)?.aiExpansion
+                          ? translatedTexts.get(currentPage)!.aiExpansion!
+                          : currentPageData.active_notes.ai_expansion}
                       </p>
                     </div>
                   </div>
@@ -992,6 +1009,9 @@ export default function NotesPage() {
                             })
                           }}
                           onTimestampClick={handleTimestampClick}
+                          translationEnabled={translationEnabled}
+                          translatedPptText={translatedTexts.get(currentPage)?.bullets[i]}
+                          translatedAiComment={translatedTexts.get(currentPage)?.aiComments[i]}
                         />
                       ))}
                     </div>
@@ -1026,8 +1046,13 @@ export default function NotesPage() {
                           {formatTime(currentPageData.page_supplement.timestamp_start)} - {formatTime(currentPageData.page_supplement.timestamp_end)}
                         </button>
                       </div>
-                      <p style={{ fontSize: '13px', color: C.fg, lineHeight: '1.6' }}>
-                        {currentPageData.page_supplement.content}
+                      <p style={{ fontSize: '13px', color: C.fg, lineHeight: '1.6',
+                        opacity: translationEnabled && !translatedTexts.get(currentPage)?.supplement ? 0.4 : 1,
+                        transition: 'opacity 0.2s',
+                      }}>
+                        {translationEnabled && translatedTexts.get(currentPage)?.supplement
+                          ? translatedTexts.get(currentPage)!.supplement!
+                          : currentPageData.page_supplement.content}
                       </p>
                     </div>
                   </div>
