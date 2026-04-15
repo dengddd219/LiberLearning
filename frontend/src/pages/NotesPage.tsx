@@ -1,18 +1,19 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTabs } from '../context/TabsContext'
+import { useTranslation } from '../context/TranslationContext'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import TranslationPopover from '../components/TranslationPopover'
 import { getSession, retryPage } from '../lib/api'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
-import { useTypewriter } from '../hooks/useTypewriter'
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
   import.meta.url,
 ).toString()
 
-interface Bullet { text: string; ppt_bullet?: string; ai_comment: string; timestamp_start: number; timestamp_end: number; transcript_excerpt?: string }
+interface Bullet { ppt_text: string; level: number; ai_comment: string | null; timestamp_start: number; timestamp_end: number; }
 interface AlignedSegment { start: number; end: number; text: string; similarity?: number }
 interface PageData {
   page_num: number
@@ -58,147 +59,156 @@ function formatTime(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-/** 单行：PPT 原文 + 点击展开 AI 解释（打字机） */
-function AiBulletRow({
-  pptLine,
-  aiBullet,
-  onTimestampClick,
+// ─── ai-enhance-animation.tsx RevealText（原版，未改动）───
+const SHIMMER_DURATION = 500  // ms
+
+function RevealText({
+  children,
+  revealed,
+  muted,
+  highlight,
 }: {
-  pptLine: string
-  aiBullet?: Bullet
-  onTimestampClick: (t: number) => void
+  children: React.ReactNode
+  revealed: boolean
+  muted: boolean
+  highlight: boolean
 }) {
-  const [expanded, setExpanded] = useState(false)
-  const { displayed, done, start, reset } = useTypewriter(aiBullet?.ai_comment ?? '', 15)
+  const ref = useRef<HTMLSpanElement>(null)
+  const settledRef = useRef(false)
 
-  function toggle() {
-    if (!aiBullet) return
-    if (expanded) {
-      setExpanded(false)
-      reset()
-    } else {
-      setExpanded(true)
-      start()
-    }
-  }
+  useEffect(() => {
+    if (!revealed || settledRef.current) return
+    const el = ref.current
+    if (!el) return
 
-  // Strip leading bullet markers (•, -, *)
-  const cleanLine = pptLine.replace(/^[\u2022\-\*]\s*/, '').trim()
+    el.classList.add('shimmer-text')
+
+    const t = setTimeout(() => {
+      el.classList.remove('shimmer-text')
+      el.classList.add('color-settle')
+      el.style.color = highlight ? '#92400e' : muted ? '#9ca3af' : '#111827'
+      el.style.backgroundImage = ''
+      el.style.webkitTextFillColor = ''
+      settledRef.current = true
+    }, SHIMMER_DURATION)
+
+    return () => clearTimeout(t)
+  }, [revealed])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    <span ref={ref} style={{ color: 'transparent', display: 'inline' }}>
+      {children}
+    </span>
+  )
+}
+
+// 每个词的揭开间隔（ms），模拟光波从左到右扫过
+const WORD_REVEAL_INTERVAL = 35
+
+function AiBulletRow({
+  bullet,
+  expanded,
+  animationDone,
+  onToggle,
+  onAnimationDone,
+  onTimestampClick,
+}: {
+  bullet: Bullet
+  expanded: boolean
+  animationDone: boolean
+  onToggle: () => void
+  onAnimationDone: () => void
+  onTimestampClick: (t: number) => void
+}) {
+  const hasComment = !!bullet.ai_comment
+  const indent = bullet.level * 16
+
+  // 把 ai_comment 按空格切成词组（保留空格作为分隔）
+  const words = hasComment
+    ? (bullet.ai_comment as string).split(/(\s+)/).filter(Boolean)
+    : []
+
+  // 每个词的揭开状态
+  const [revealedCount, setRevealedCount] = useState(0)
+
+  // 展开时逐词揭开，完成后通知父组件
+  useEffect(() => {
+    if (!expanded || animationDone) return
+    setRevealedCount(0)
+    let i = 0
+    const interval = setInterval(() => {
+      i++
+      setRevealedCount(i)
+      if (i >= words.length) {
+        clearInterval(interval)
+        // 最后一词 shimmer 固化后通知
+        setTimeout(onAnimationDone, SHIMMER_DURATION + 100)
+      }
+    }, WORD_REVEAL_INTERVAL)
+    return () => clearInterval(interval)
+  }, [expanded])
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: indent }}>
       {/* PPT 原文行 */}
       <button
         type="button"
-        onClick={toggle}
+        onClick={() => { if (hasComment) onToggle() }}
         className="text-left w-full transition-all duration-150"
         style={{
-          background: 'none',
-          border: 'none',
-          padding: '4px 0',
-          cursor: aiBullet ? 'pointer' : 'default',
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: '8px',
+          background: 'none', border: 'none', padding: '4px 0',
+          cursor: hasComment ? 'pointer' : 'default',
+          display: 'flex', alignItems: 'flex-start', gap: '8px', userSelect: 'text',
         }}
       >
-        <span style={{ color: '#AFB3B0', flexShrink: 0, marginTop: '2px', fontSize: '14px' }}>•</span>
-        <span
-          style={{
-            fontSize: '14px',
-            color: '#1A1916',
-            lineHeight: '1.625',
-            fontWeight: '500',
-            opacity: aiBullet ? 1 : 0.5,
-          }}
-        >
-          {cleanLine}
+        <span style={{ color: '#AFB3B0', flexShrink: 0, marginTop: '2px', fontSize: '14px' }}>
+          {bullet.level === 0 ? '' : '•'}
         </span>
-        {/* Expand indicator */}
-        {aiBullet && (
-          <svg
-            width="10"
-            height="10"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            aria-hidden="true"
-            style={{
-              flexShrink: 0,
-              marginTop: '4px',
-              color: '#9B9A94',
-              transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition: 'transform 0.15s',
-            }}
-          >
+        <span style={{
+          fontSize: bullet.level === 0 ? '15px' : '14px',
+          color: '#1A1916', lineHeight: '1.625',
+          fontWeight: bullet.level === 0 ? '600' : '500',
+          opacity: hasComment ? 1 : 0.5,
+        }}>
+          {bullet.ppt_text}
+        </span>
+        {hasComment && (
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"
+            style={{ flexShrink: 0, marginTop: '4px', color: '#9B9A94', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}>
             <polyline points="6 9 12 15 18 9" />
           </svg>
         )}
       </button>
 
-      {/* AI 解释（展开时显示，打字机效果） */}
-      {expanded && aiBullet && (
-        <div
-          style={{
-            marginLeft: '18px',
-            paddingLeft: '14px',
-            borderLeft: '2px solid rgba(85,96,113,0.2)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '4px',
-          }}
-        >
-          {/* AI CLARIFICATION header */}
+      {/* AI 解释面板：条件渲染，animationDone 时直接显示固化文字跳过动画 */}
+      {expanded && hasComment && (
+        <div style={{ marginLeft: '18px', paddingLeft: '14px', borderLeft: '2px solid rgba(85,96,113,0.2)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
             <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                d="M12 2L14.09 8.26L21 9.27L16 13.97L17.18 21L12 17.77L6.82 21L8 13.97L3 9.27L9.91 8.26L12 2Z"
-                fill="#556071"
-              />
+              <path d="M12 2L14.09 8.26L21 9.27L16 13.97L17.18 21L12 17.77L6.82 21L8 13.97L3 9.27L9.91 8.26L12 2Z" fill="#556071" />
             </svg>
-            <span
-              style={{
-                fontSize: '9px',
-                fontWeight: '700',
-                letterSpacing: '0.08em',
-                color: '#556071',
-                textTransform: 'uppercase',
-              }}
-            >
+            <span style={{ fontSize: '9px', fontWeight: '700', letterSpacing: '0.08em', color: '#556071', textTransform: 'uppercase' }}>
               AI Clarification
             </span>
-            {/* Timestamp */}
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onTimestampClick(aiBullet.timestamp_start) }}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '9px',
-                color: '#AFB3B0',
-                fontWeight: '700',
-                padding: 0,
-                marginLeft: '4px',
-              }}
-            >
-              {String(Math.floor(aiBullet.timestamp_start / 60)).padStart(2, '0')}:
-              {String(Math.floor(aiBullet.timestamp_start % 60)).padStart(2, '0')}
-            </button>
+            {bullet.timestamp_start >= 0 && (
+              <button type="button"
+                onClick={(e) => { e.stopPropagation(); onTimestampClick(bullet.timestamp_start) }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '9px', color: '#AFB3B0', fontWeight: '700', padding: 0, marginLeft: '4px' }}>
+                {String(Math.floor(bullet.timestamp_start / 60)).padStart(2, '0')}:
+                {String(Math.floor(bullet.timestamp_start % 60)).padStart(2, '0')}
+              </button>
+            )}
           </div>
-          {/* 打字机正文 */}
-          <p
-            style={{
-              fontSize: '14px',
-              color: '#374151',
-              lineHeight: '1.625',
-              fontWeight: '400',
-              margin: 0,
-            }}
-          >
-            {displayed}
-            {!done && <span style={{ opacity: 0.4 }}>▍</span>}
+          {/* 正文：animationDone=true 直接显示；否则逐词 shimmer 揭开 */}
+          <p style={{ fontSize: '14px', lineHeight: '1.625', fontWeight: '400', margin: 0, userSelect: 'text' }}>
+            {animationDone
+              ? <span style={{ color: '#111827' }}>{bullet.ai_comment}</span>
+              : words.map((word, wi) => (
+                  <RevealText key={wi} revealed={wi < revealedCount} muted={false} highlight={false}>
+                    {word}
+                  </RevealText>
+                ))
+            }
           </p>
         </div>
       )}
@@ -218,8 +228,22 @@ export default function NotesPage() {
   const [copyToast, setCopyToast] = useState(false)
   const [retrying, setRetrying] = useState<number | null>(null)
   const [navVisible, setNavVisible] = useState(false)
+  // 跨页持久化的展开状态：pageNum → Set<bulletIndex>
+  const [expandedBullets, setExpandedBullets] = useState<Map<number, Set<number>>>(new Map())
+  // 记录哪些 bullet 的 shimmer 动画已播完，跨页持久化，切回来直接显示文本
+  const [animatedBullets, setAnimatedBullets] = useState<Map<number, Set<number>>>(new Map())
   const audioRef = useRef<HTMLAudioElement>(null)
   const wheelTimeoutRef = useRef<number | null>(null)
+
+  // Translation state
+  const { enabled: translationEnabled, setEnabled: setTranslationEnabled, targetLang, setTargetLang, translate } = useTranslation()
+  const [popoverOpen, setPopoverOpen] = useState(false)
+  const [translatedTexts, setTranslatedTexts] = useState<Map<number, {
+    bullets: string[]
+    aiComments: (string | null)[]
+    supplement: string | null
+    aiExpansion: string | null
+  }>>(new Map())
 
   // Resizable panel state
   const [notesPanelWidth, setNotesPanelWidth] = useState(320)
@@ -365,6 +389,42 @@ export default function NotesPage() {
       setRetrying(null)
     }
   }, [sessionId, retrying])
+
+  const translatePage = useCallback(async (pageNum: number) => {
+    if (!session) return
+    const page = session.pages.find((p) => p.page_num === pageNum)
+    if (!page) return
+
+    const bullets = page.passive_notes?.bullets ?? []
+    const supplement = page.page_supplement?.content ?? null
+    const aiExpansion = page.active_notes?.ai_expansion ?? null
+
+    const [translatedBullets, translatedAiComments, translatedSupplement, translatedAiExpansion] =
+      await Promise.all([
+        Promise.all(bullets.map((b) => translate(b.ppt_text))),
+        Promise.all(bullets.map((b) => (b.ai_comment ? translate(b.ai_comment) : Promise.resolve(null)))),
+        supplement ? translate(supplement) : Promise.resolve(null),
+        aiExpansion ? translate(aiExpansion) : Promise.resolve(null),
+      ])
+
+    setTranslatedTexts((prev) => {
+      const next = new Map(prev)
+      next.set(pageNum, {
+        bullets: translatedBullets,
+        aiComments: translatedAiComments,
+        supplement: translatedSupplement,
+        aiExpansion: translatedAiExpansion,
+      })
+      return next
+    })
+  }, [session, translate])
+
+  // 翻译已开启时，翻页自动翻译新页
+  useEffect(() => {
+    if (translationEnabled && session) {
+      translatePage(currentPage)
+    }
+  }, [currentPage, translationEnabled, session])
 
   if (loading) {
     return (
@@ -861,7 +921,7 @@ export default function NotesPage() {
                 )}
 
                 {/* PPT bullets + AI 解释（点击展开，打字机） */}
-                {currentPageData?.ppt_text && (
+                {currentPageData?.passive_notes?.bullets && currentPageData.passive_notes.bullets.length > 0 && (
                   <div>
                     <div className="mb-3">
                       <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '0.1em', color: '#777C79', textTransform: 'uppercase' }}>
@@ -869,74 +929,40 @@ export default function NotesPage() {
                       </span>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      {(() => {
-                        const lines = currentPageData.ppt_text
-                          .split('\n')
-                          .filter((line) => line.trim().length > 0)
-                        const bullets = currentPageData.passive_notes?.bullets ?? []
-                        const used = new Set<number>()
-
-                        return lines.map((line, i) => {
-                          const cleanLine = line.replace(/^[\u2022\-\*]\s*/, '').trim().toLowerCase()
-                          // Find best matching bullet by ppt_bullet field (not yet used by another line)
-                          let bestIdx = -1
-                          let bestScore = 0
-                          bullets.forEach((b, bi) => {
-                            if (used.has(bi)) return
-                            const ref = (b.ppt_bullet ?? b.text ?? '').replace(/^[\u2022\-\*]\s*/, '').trim().toLowerCase()
-                            if (!ref) return
-                            // Exact match
-                            if (ref === cleanLine) { bestIdx = bi; bestScore = 3; return }
-                            // Containment match
-                            if (ref.includes(cleanLine) || cleanLine.includes(ref)) {
-                              const score = 2
-                              if (score > bestScore) { bestIdx = bi; bestScore = score }
-                            }
-                          })
-                          const matched = bestIdx >= 0 ? bullets[bestIdx] : undefined
-                          if (bestIdx >= 0) used.add(bestIdx)
-
-                          return (
-                            <AiBulletRow
-                              key={i}
-                              pptLine={line}
-                              aiBullet={matched}
-                              onTimestampClick={handleTimestampClick}
-                            />
-                          )
-                        })
-                      })()}
-                    </div>
-                  </div>
-                )}
-
-                {/* Fallback: 如果没有 ppt_text，退回显示纯 AI bullets */}
-                {!currentPageData?.ppt_text && currentPageData?.passive_notes && currentPageData.passive_notes.bullets.length > 0 && (
-                  <div>
-                    <div className="mb-3">
-                      <span style={{ fontSize: '10px', fontWeight: '800', letterSpacing: '0.1em', color: '#777C79', textTransform: 'uppercase' }}>
-                        AI Notes
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {currentPageData.passive_notes.bullets.map((bullet, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                          <span style={{ color: '#AFB3B0', marginTop: '2px', flexShrink: 0 }}>•</span>
-                          <button
-                            onClick={() => handleTimestampClick(bullet.timestamp_start)}
-                            className="text-left cursor-pointer transition-all duration-150 hover:opacity-70"
-                            style={{ fontSize: '14px', color: C.fg, lineHeight: '1.625', background: 'none', border: 'none', padding: 0 }}
-                          >
-                            {bullet.text}
-                          </button>
-                        </div>
+                        <AiBulletRow
+                          key={`${currentPage}-${i}`}
+                          bullet={bullet}
+                          expanded={expandedBullets.get(currentPage)?.has(i) ?? false}
+                          animationDone={animatedBullets.get(currentPage)?.has(i) ?? false}
+                          onToggle={() => {
+                            setExpandedBullets(prev => {
+                              const next = new Map(prev)
+                              const pageSet = new Set(next.get(currentPage) ?? [])
+                              if (pageSet.has(i)) pageSet.delete(i)
+                              else pageSet.add(i)
+                              next.set(currentPage, pageSet)
+                              return next
+                            })
+                          }}
+                          onAnimationDone={() => {
+                            setAnimatedBullets(prev => {
+                              const next = new Map(prev)
+                              const pageSet = new Set(next.get(currentPage) ?? [])
+                              pageSet.add(i)
+                              next.set(currentPage, pageSet)
+                              return next
+                            })
+                          }}
+                          onTimestampClick={handleTimestampClick}
+                        />
                       ))}
                     </div>
                   </div>
                 )}
 
                 {/* No data at all */}
-                {!currentPageData?.active_notes && !currentPageData?.passive_notes?.error && !currentPageData?.ppt_text && (!currentPageData?.passive_notes || currentPageData.passive_notes.bullets.length === 0) && (
+                {!currentPageData?.active_notes && !currentPageData?.passive_notes?.error && (!currentPageData?.passive_notes || currentPageData.passive_notes.bullets.length === 0) && (
                   <div className="flex items-center justify-center py-8">
                     <p style={{ fontSize: '13px', color: C.muted }}>该页暂无 AI 笔记</p>
                   </div>
