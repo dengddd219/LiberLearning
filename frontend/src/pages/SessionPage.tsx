@@ -11,21 +11,7 @@ interface Annotation {
   timestamp: number // seconds elapsed
 }
 
-interface SlideInfo {
-  pageNum: number
-  slideImageUrl: string
-}
-
 const SESSION_ID = `session-${Date.now()}`
-
-const MOCK_SLIDES: SlideInfo[] = [
-  { pageNum: 1, slideImageUrl: 'https://placehold.co/175x96' },
-  { pageNum: 2, slideImageUrl: '' },
-  { pageNum: 3, slideImageUrl: '' },
-]
-
-// Waveform bar heights (mock)
-const WAVEFORM_BARS = [24, 40, 20, 48, 36, 28, 56, 24, 40, 20, 44, 32]
 
 function useRecordingTimer(isRecording: boolean) {
   const [elapsed, setElapsed] = useState(0)
@@ -53,18 +39,22 @@ function formatTimestamp(seconds: number) {
 
 export default function SessionPage() {
   const navigate = useNavigate()
-  const [slides] = useState<SlideInfo[]>(MOCK_SLIDES)
+  const [pptFileName, setPptFileName] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [annotations, setAnnotations] = useState<Annotation[]>([])
   const [pptFile, _setPptFile] = useState<File | null>(null)
   const [audioChunks, setAudioChunks] = useState<Blob[]>([])
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [recoveryModal, setRecoveryModal] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [noteInput, setNoteInput] = useState('')
   const [noteMode, setNoteMode] = useState<'my' | 'ai'>('my')
+  const [waveformBars, setWaveformBars] = useState<number[]>(Array(12).fill(4))
   const recoverySessionRef = useRef<string | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const animFrameRef = useRef<number>(0)
   const { display: recTimer, elapsed } = useRecordingTimer(isRecording)
 
   useEffect(() => {
@@ -103,6 +93,24 @@ export default function SessionPage() {
       }
       mr.start(1000)
       setIsRecording(true)
+
+      const audioCtx = new AudioContext()
+      const source = audioCtx.createMediaStreamSource(stream)
+      const analyser = audioCtx.createAnalyser()
+      analyser.fftSize = 32
+      source.connect(analyser)
+      analyserRef.current = analyser
+      const dataArray = new Uint8Array(analyser.frequencyBinCount)
+      const draw = () => {
+        analyser.getByteFrequencyData(dataArray)
+        const bars = Array.from({ length: 12 }, (_, i) => {
+          const val = dataArray[Math.floor(i * dataArray.length / 12)]
+          return Math.max(4, Math.round((val / 255) * 48))
+        })
+        setWaveformBars(bars)
+        animFrameRef.current = requestAnimationFrame(draw)
+      }
+      draw()
     } catch {
       alert('无法访问麦克风，请检查权限设置')
     }
@@ -113,6 +121,9 @@ export default function SessionPage() {
       mediaRecorderRef.current.stop()
       setIsRecording(false)
     }
+    cancelAnimationFrame(animFrameRef.current)
+    analyserRef.current = null
+    setWaveformBars(Array(12).fill(4))
   }, [isRecording])
 
   const handleAddNote = useCallback(() => {
@@ -130,16 +141,18 @@ export default function SessionPage() {
 
   const handleGenerateNotes = useCallback(async () => {
     setSubmitting(true)
+    setSubmitError(null)
     try {
       const audioBlob = audioChunks.length > 0 ? new Blob(audioChunks, { type: 'audio/webm' }) : undefined
       const audioFile = audioBlob ? new File([audioBlob], 'recording.webm', { type: 'audio/webm' }) : undefined
-      const result = await uploadFiles(pptFile ?? undefined, audioFile)
+      const userAnchors = annotations.map((ann) => ({ page_num: ann.pageNum, timestamp: ann.timestamp }))
+      const result = await uploadFiles(pptFile ?? undefined, audioFile, 'zh', userAnchors)
       navigate(`/processing?session_id=${result.session_id}`)
     } catch {
       setSubmitting(false)
-      alert('上传失败，请重试')
+      setSubmitError('提交失败，请检查网络后重试')
     }
-  }, [pptFile, audioChunks, navigate])
+  }, [pptFile, audioChunks, annotations, navigate])
 
   return (
     <div className="w-full pb-24 relative bg-stone-50 inline-flex flex-col justify-start items-start" style={{ fontFamily: 'Inter, sans-serif', minHeight: '100vh' }}>
@@ -161,41 +174,16 @@ export default function SessionPage() {
           </div>
           {/* Slide Thumbnails */}
           <div className="self-stretch flex-1 p-3 flex flex-col justify-start items-start gap-4 overflow-y-auto overflow-x-hidden">
-            {slides.map((slide, index) => {
-              const isActive = slide.pageNum === currentPage
-              return (
-                <button
-                  key={slide.pageNum}
-                  type="button"
-                  onClick={() => setCurrentPage(slide.pageNum)}
-                  aria-label={`跳转到第 ${slide.pageNum} 张幻灯片`}
-                  aria-current={isActive ? 'true' : undefined}
-                  className="self-stretch relative flex flex-col justify-start items-start overflow-hidden border-none p-0 cursor-pointer"
-                  style={{
-                    borderRadius: '6px',
-                    opacity: isActive ? 1 : 0.7,
-                    background: isActive ? 'rgba(255,255,255,0)' : '#E5E7EB',
-                    boxShadow: isActive
-                      ? '0px 1px 2px 0px rgba(0,0,0,0.05), 0px 0px 0px 2px rgba(95,94,94,1)'
-                      : undefined,
-                  }}
-                >
-                  {isActive ? (
-                    <img className="self-stretch h-24 relative object-cover" src={slide.slideImageUrl || 'https://placehold.co/175x96'} alt={`Slide ${slide.pageNum}`} />
-                  ) : (
-                    <div className="self-stretch h-24 relative bg-white" style={{ background: 'rgba(255,255,255,0.5)' }} />
-                  )}
-                  <div
-                    className="px-1.5 absolute"
-                    style={{ left: '4px', top: '4px', background: isActive ? '#556071' : '#556071', borderRadius: '3px' }}
-                  >
-                    <div className="justify-center text-white text-[10px] font-normal leading-4">
-                      {String(slide.pageNum).padStart(2, '0')}
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
+            {pptFileName ? (
+              <div className="self-stretch flex flex-col justify-start items-start gap-1 px-1">
+                <div className="text-zinc-800 text-xs font-medium leading-4 break-all">{pptFileName}</div>
+                <div className="text-slate-400 text-[10px] leading-4">上传后解析页数</div>
+              </div>
+            ) : (
+              <div className="self-stretch flex flex-col justify-start items-center gap-1 px-1 py-4">
+                <div className="text-slate-400 text-xs leading-4">未上传 PPT</div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -271,31 +259,17 @@ export default function SessionPage() {
 
           {/* Slide Canvas Area */}
           <div className="self-stretch flex-1 p-12 bg-stone-100/50 inline-flex justify-center items-center overflow-hidden">
-            <div className="w-[896px] max-w-[896px] px-16 py-36 relative bg-white rounded-sm outline outline-1 outline-offset-[-1px] outline-zinc-400/5 inline-flex flex-col justify-center items-start">
+            <div className="w-[896px] max-w-[896px] px-16 py-36 relative bg-white rounded-sm outline outline-1 outline-offset-[-1px] outline-zinc-400/5 inline-flex flex-col justify-center items-center">
               <div className="w-full h-[506px] left-0 top-0 absolute bg-white/0 rounded-sm shadow-[0px_8px_10px_-6px_rgba(0,0,0,0.10),0px_20px_25px_-5px_rgba(0,0,0,0.10)]" />
-              <div className="self-stretch pb-8 flex flex-col justify-start items-start">
-                <div className="self-stretch flex flex-col justify-start items-start">
-                  <div className="self-stretch justify-center text-zinc-800 text-4xl font-bold leading-10">Advanced Cognitive Architectures</div>
-                </div>
-              </div>
-              <div className="self-stretch flex flex-col justify-start items-start gap-6">
-                {[
-                  'Synthesis of symbolic and sub-symbolic processing frameworks.',
-                  'Integration of long-term memory structures (Declarative & Procedural).',
-                  'Real-time meta-cognition and attention filtering mechanisms.',
-                ].map((text, i) => (
-                  <div key={i} className="self-stretch inline-flex justify-start items-start gap-4">
-                    <div className="w-1.5 h-4 pt-2.5 inline-flex flex-col justify-start items-start">
-                      <div className="w-1.5 h-1.5 bg-zinc-600 rounded-full" />
-                    </div>
-                    <div className="self-stretch inline-flex flex-col justify-start items-start">
-                      <div className="justify-center text-zinc-600 text-lg font-normal leading-7">{text}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="absolute flex flex-col justify-start items-start" style={{ right: '112px', top: '33px' }}>
-                <div className="justify-center text-zinc-400 text-[10px] font-bold leading-4 tracking-wide">SLIDE 04 / 24</div>
+              <div className="flex flex-col justify-center items-center gap-3">
+                {isRecording ? (
+                  <>
+                    <div className="w-3 h-3 rounded-full bg-red-500" style={{ animation: 'pulse 1.5s infinite' }} />
+                    <div className="text-zinc-500 text-base font-normal leading-6">录音中...</div>
+                  </>
+                ) : (
+                  <div className="text-zinc-400 text-base font-normal leading-6">点击开始录音</div>
+                )}
               </div>
             </div>
           </div>
@@ -356,7 +330,7 @@ export default function SessionPage() {
               </div>
               {/* Waveform */}
               <div className="self-stretch h-16 px-2 inline-flex justify-center items-end gap-1">
-                {WAVEFORM_BARS.map((h, i) => (
+                {waveformBars.map((h, i) => (
                   <div
                     key={i}
                     className="flex-1 rounded-full"
@@ -406,70 +380,28 @@ export default function SessionPage() {
               {/* Notes List */}
               <div className="self-stretch flex-1 pr-2 flex flex-col justify-start items-start gap-6 overflow-y-auto">
                 {/* Existing annotations */}
-                {annotations.map((ann) => (
-                  <div key={ann.id} className="self-stretch pl-4 relative flex flex-col justify-start items-start gap-[3.13px]">
-                    <div className="self-stretch inline-flex justify-start items-center gap-2">
-                      <div className="p-1 bg-gray-200 rounded-2xl inline-flex flex-col justify-start items-start">
-                        <div className="justify-center text-slate-600 text-[10px] font-normal leading-4" style={{ fontFamily: 'Liberation Mono, monospace' }}>
-                          {formatTimestamp(ann.timestamp)}
+                {annotations.length === 0 ? (
+                  <div className="self-stretch flex flex-col justify-center items-center py-6">
+                    <div className="text-slate-400 text-xs leading-4">暂无笔记，点击 + 添加标注</div>
+                  </div>
+                ) : (
+                  annotations.map((ann) => (
+                    <div key={ann.id} className="self-stretch pl-4 relative flex flex-col justify-start items-start gap-[3.13px]">
+                      <div className="self-stretch inline-flex justify-start items-center gap-2">
+                        <div className="p-1 bg-gray-200 rounded-2xl inline-flex flex-col justify-start items-start">
+                          <div className="justify-center text-slate-600 text-[10px] font-normal leading-4" style={{ fontFamily: 'Liberation Mono, monospace' }}>
+                            {formatTimestamp(ann.timestamp)}
+                          </div>
                         </div>
+                        <div className="justify-center text-zinc-800 text-xs font-semibold leading-4">{ann.title}</div>
                       </div>
-                      <div className="justify-center text-zinc-800 text-xs font-semibold leading-4">{ann.title}</div>
+                      <div className="self-stretch pb-px flex flex-col justify-start items-start">
+                        <div className="self-stretch justify-center text-zinc-600 text-sm font-normal leading-6">{ann.text}</div>
+                      </div>
+                      <div className="w-0.5 h-full left-0 top-0 absolute bg-zinc-600/20 rounded-full" />
                     </div>
-                    <div className="self-stretch pb-px flex flex-col justify-start items-start">
-                      <div className="self-stretch justify-center text-zinc-600 text-sm font-normal leading-6">{ann.text}</div>
-                    </div>
-                    <div className="w-0.5 h-full left-0 top-0 absolute bg-zinc-600/20 rounded-full" />
-                  </div>
-                ))}
-
-                {/* Demo note 1 */}
-                <div className="self-stretch pl-4 relative flex flex-col justify-start items-start gap-[3.13px]">
-                  <div className="self-stretch inline-flex justify-start items-center gap-2">
-                    <div className="p-1 bg-gray-200 rounded-2xl inline-flex flex-col justify-start items-start">
-                      <div className="justify-center text-slate-600 text-[10px] font-normal leading-4" style={{ fontFamily: 'Liberation Mono, monospace' }}>00:45</div>
-                    </div>
-                    <div className="justify-center text-zinc-800 text-xs font-semibold leading-4">Contextual Anchors</div>
-                  </div>
-                  <div className="self-stretch pb-px flex flex-col justify-start items-start">
-                    <div className="self-stretch justify-center text-zinc-600 text-sm font-normal leading-6">
-                      Discussing how neural networks<br/>bridge the gap between abstract<br/>symbolic reasoning and raw data<br/>input.
-                    </div>
-                  </div>
-                  <div className="w-0.5 h-28 left-0 top-0 absolute bg-zinc-600/20 rounded-full" />
-                </div>
-
-                {/* Demo note 2 - active/current */}
-                <div className="self-stretch pl-4 relative flex flex-col justify-start items-start gap-1">
-                  <div className="self-stretch inline-flex justify-start items-center gap-2">
-                    <div className="p-1 bg-zinc-600 rounded-2xl inline-flex flex-col justify-start items-start">
-                      <div className="justify-center text-stone-50 text-[10px] font-normal leading-4" style={{ fontFamily: 'Liberation Mono, monospace' }}>03:52</div>
-                    </div>
-                    <div className="justify-center text-zinc-800 text-xs font-semibold leading-4">Latency vs Throughput</div>
-                  </div>
-                  <div className="self-stretch flex flex-col justify-start items-start gap-2">
-                    <div className="self-stretch relative" style={{ minHeight: '40px' }}>
-                      <div className="text-zinc-600 text-sm font-normal leading-5">Critical bottleneck identified in the pre-processing layer.</div>
-                    </div>
-                    <div className="self-stretch relative" style={{ minHeight: '40px' }}>
-                      <div className="text-zinc-600 text-sm font-normal leading-5">Real-time capture requires 4ms response time.</div>
-                    </div>
-                    <div className="self-stretch relative" style={{ minHeight: '40px' }}>
-                      <div className="text-zinc-600 text-sm font-normal leading-5">Possible solution: Distributed nodes.</div>
-                    </div>
-                  </div>
-                  <div className="w-0.5 h-40 left-0 top-0 absolute bg-zinc-600 rounded-full" />
-                </div>
-
-                {/* AI Transcription loading indicator */}
-                <div className="self-stretch p-4 bg-stone-100 rounded-[48px] outline outline-1 outline-offset-[-1px] outline-zinc-400/10 flex flex-col justify-start items-start gap-2">
-                  <div className="self-stretch inline-flex justify-start items-center gap-2">
-                    <div className="w-3 h-3 bg-zinc-600" />
-                    <div className="justify-center text-slate-600 text-[10px] font-bold uppercase leading-4 tracking-wide">AI TRANSCRIPTION...</div>
-                  </div>
-                  <div className="w-44 h-2 bg-zinc-400/20 rounded-full" />
-                  <div className="w-28 h-2 bg-zinc-400/20 rounded-full" />
-                </div>
+                  ))
+                )}
               </div>
 
               {/* Input area */}
@@ -523,6 +455,7 @@ export default function SessionPage() {
               >
                 {submitting ? '提交中…' : '生成课堂笔记 →'}
               </button>
+              {submitError && <p role="alert" style={{ color: '#E05C40', fontSize: '13px', marginTop: '8px' }}>{submitError}</p>}
             </div>
           )}
         </div>
