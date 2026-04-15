@@ -90,31 +90,6 @@ function IconBell() {
   )
 }
 
-function IconVelocity() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <path d="M2 12 L8 4 L14 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function IconAI() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-      <circle cx="10" cy="10" r="4" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M10 2v2M10 16v2M2 10h2M16 10h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function IconLive() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-      <circle cx="10" cy="10" r="3" fill="currentColor" />
-      <circle cx="10" cy="10" r="6.5" stroke="currentColor" strokeWidth="1.2" strokeDasharray="2 2" />
-    </svg>
-  )
-}
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -340,23 +315,6 @@ function IconAudioFile() {
   )
 }
 
-function IconCheckCircle() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-      <circle cx="7.5" cy="7.5" r="7" stroke="#5F5E5E" strokeWidth="1.5" />
-      <path d="M4.5 7.5l2 2 4-4" stroke="#5F5E5E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function IconLoadingCircle() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <circle cx="8" cy="8" r="6.5" stroke="rgba(95,94,94,0.3)" strokeWidth="2" />
-      <path d="M8 1.5C4.41 1.5 1.5 4.41 1.5 8" stroke="#5F5E5E" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  )
-}
 
 interface UploadZoneProps {
   label: string; hint: string; accept: string; icon: React.ReactNode
@@ -402,29 +360,81 @@ function UploadZone({ label, hint, accept, icon, file, error, onFile, onClear }:
   )
 }
 
+const PIPELINE_STEPS = [
+  { key: 'uploading',    label: '上传文件' },
+  { key: 'converting',   label: '音频格式转换' },
+  { key: 'parsing_ppt',  label: 'PPT 解析' },
+  { key: 'transcribing', label: '语音转录' },
+  { key: 'aligning',     label: '语义对齐' },
+  { key: 'generating',   label: '生成结构化笔记' },
+] as const
+
+type StepKey = typeof PIPELINE_STEPS[number]['key']
+
+const STEP_ORDER: StepKey[] = PIPELINE_STEPS.map(s => s.key)
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
+
 function NewClassModal({ onClose, navigate }: { onClose: () => void; navigate: ReturnType<typeof useNavigate> }) {
   const [pptFile, setPptFile] = useState<File | null>(null)
   const [audioFile, setAudioFile] = useState<File | null>(null)
   const [pptError, setPptError] = useState<string | null>(null)
   const [audioError, setAudioError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [currentStep, setCurrentStep] = useState<StepKey | 'done' | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape' && !uploading) onClose(); };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onClose])
+  }, [onClose, uploading])
+
+  // 轮询进度
+  useEffect(() => {
+    if (!sessionId) return
+    let stopped = false
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`)
+        if (!res.ok || stopped) return
+        const data = await res.json()
+        if (data.progress?.step) {
+          setCurrentStep(data.progress.step as StepKey)
+        }
+        if (data.status === 'ready' || data.status === 'partial_ready') {
+          stopped = true
+          clearInterval(poll)
+          setCurrentStep('done')
+          setTimeout(() => navigate(`/notes/${sessionId}`), 600)
+        } else if (data.status === 'error') {
+          stopped = true
+          clearInterval(poll)
+          setUploading(false)
+          setUploadError(data.error || '处理失败，请重试')
+        }
+      } catch { /* 网络抖动，继续轮询 */ }
+    }, 1500)
+    return () => { stopped = true; clearInterval(poll) }
+  }, [sessionId, navigate])
 
   const handlePpt = useCallback((file: File) => { const err = validateFile(file, ['.ppt', '.pptx', '.pdf']); setPptError(err); if (!err) setPptFile(file) }, [])
   const handleAudio = useCallback((file: File) => { const err = validateFile(file, ['.mp3', '.wav', '.m4a', '.aac'], MAX_AUDIO_MB); setAudioError(err); if (!err) setAudioFile(file) }, [])
   const handleSubmit = useCallback(async () => {
     if (!audioFile) return
     setUploading(true)
+    setUploadError(null)
+    setCurrentStep('uploading')
     try {
       const result = await uploadFiles(pptFile ?? undefined, audioFile)
-      navigate(`/processing?session_id=${result.session_id}`)
-    } catch { setUploading(false); alert('上传失败，请重试') }
-  }, [pptFile, audioFile, navigate])
+      setSessionId(result.session_id)
+    } catch {
+      setUploading(false)
+      setCurrentStep(null)
+      setUploadError('上传失败，请检查网络后重试')
+    }
+  }, [pptFile, audioFile])
 
   const canSubmit = !!audioFile && !pptError && !audioError && !uploading
 
@@ -456,37 +466,51 @@ function NewClassModal({ onClose, navigate }: { onClose: () => void; navigate: R
 
           {/* Upload / Processing */}
           {!uploading ? (
-            <div className="flex gap-0 items-stretch">
-              <UploadZone label="PPT/PDF Materials" hint="Drag or click to upload" accept=".ppt,.pptx,.pdf" icon={<IconPPT />} file={pptFile} error={pptError} onFile={handlePpt} onClear={() => { setPptFile(null); setPptError(null) }} />
-              <UploadZone label="Audio Recording" hint="Upload MP3, WAV or AAC" accept=".mp3,.wav,.m4a,.aac" icon={<IconAudioFile />} file={audioFile} error={audioError} onFile={handleAudio} onClear={() => { setAudioFile(null); setAudioError(null) }} />
-            </div>
+            <>
+              <div className="flex gap-0 items-stretch">
+                <UploadZone label="PPT/PDF Materials" hint="Drag or click to upload" accept=".ppt,.pptx,.pdf" icon={<IconPPT />} file={pptFile} error={pptError} onFile={handlePpt} onClear={() => { setPptFile(null); setPptError(null) }} />
+                <UploadZone label="Audio Recording" hint="Upload MP3, WAV or AAC" accept=".mp3,.wav,.m4a,.aac" icon={<IconAudioFile />} file={audioFile} error={audioError} onFile={handleAudio} onClear={() => { setAudioFile(null); setAudioError(null) }} />
+              </div>
+              {uploadError && (
+                <div className="text-sm text-red-500 text-center -mt-4">{uploadError}</div>
+              )}
+            </>
           ) : (
-            <div className="flex flex-col gap-8">
-              <div className="flex flex-col gap-4">
-                <div className="flex justify-between items-end">
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-zinc-600 flex-shrink-0" />
-                    <span className="font-medium text-sm text-zinc-800">Synthesis engine is mapping audio to visual anchors...</span>
+            <div className="flex flex-col gap-3 py-2">
+              {PIPELINE_STEPS.map((step, i) => {
+                const stepIdx = currentStep === 'done' ? STEP_ORDER.length : STEP_ORDER.indexOf(currentStep as StepKey)
+                const done = i < stepIdx
+                const active = STEP_ORDER[stepIdx] === step.key
+                return (
+                  <div key={step.key} className="flex items-center gap-4">
+                    <div style={{ width: '24px', height: '24px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {done ? (
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                          <circle cx="10" cy="10" r="9" stroke="#5F5E5E" strokeWidth="1.5" fill="none" />
+                          <path d="M6 10l3 3 5-5" stroke="#5F5E5E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      ) : active ? (
+                        <div className="animate-spin" style={{ width: '18px', height: '18px' }}>
+                          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                            <circle cx="9" cy="9" r="7.5" stroke="rgba(95,94,94,0.2)" strokeWidth="2" />
+                            <path d="M9 1.5C4.86 1.5 1.5 4.86 1.5 9" stroke="#5F5E5E" strokeWidth="2" strokeLinecap="round" />
+                          </svg>
+                        </div>
+                      ) : (
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'rgba(175,179,176,0.4)' }} />
+                      )}
+                    </div>
+                    <span style={{
+                      fontSize: '14px',
+                      fontWeight: active ? '500' : '400',
+                      color: done ? '#5F5E5E' : active ? '#1A1916' : 'rgba(95,94,94,0.4)',
+                      transition: 'color 0.2s',
+                    }}>
+                      {step.label}
+                    </span>
                   </div>
-                  <span className="font-black text-lg text-zinc-800">68%</span>
-                </div>
-                <div className="h-3 rounded-full bg-[#E6E9E6] overflow-hidden">
-                  <div className="h-full w-[68%] rounded-full" style={{ background: 'linear-gradient(90deg, #5F5E5E 0%, #535252 100%)', boxShadow: '0px 0px 20px 0px rgba(95,94,94,0.2)' }} />
-                </div>
-              </div>
-              <div className="border-t border-zinc-400/10 pt-4 flex flex-col gap-4">
-                <div className="flex items-center gap-3"><IconCheckCircle /><span className="font-medium text-sm text-zinc-800">Transcription complete</span></div>
-                <div className="flex items-center gap-3"><div className="animate-spin"><IconLoadingCircle /></div><span className="font-normal text-sm text-slate-600">Alignment in progress...</span></div>
-                <div className="rounded-[32px] bg-stone-100 p-4 pb-5 flex flex-col gap-2">
-                  <div className="flex justify-between">
-                    <span className="font-bold text-[11px] uppercase tracking-[0.1em] text-zinc-600">PAGE 3/18</span>
-                    <span className="font-bold text-[11px] uppercase tracking-[0.1em] text-zinc-600">GENERATING NOTES...</span>
-                  </div>
-                  <div className="h-1 rounded-full bg-[#E0E3E0] overflow-hidden">
-                    <div className="h-full w-1/4 rounded-full bg-zinc-600/40" />
-                  </div>
-                </div>
-              </div>
+                )
+              })}
             </div>
           )}
 
@@ -541,7 +565,7 @@ export default function LobbyPage() {
   }, [])
 
   return (
-    <div className="w-full min-h-screen bg-stone-50 flex font-['Inter'] pt-16">
+    <div className="w-full min-h-screen bg-stone-50 flex font-['Inter'] pt-10">
 
       {/* ── Sidebar ── */}
       <aside aria-label="侧边导航" className="w-48 flex-shrink-0 px-4 py-8 bg-stone-100 flex flex-col justify-between items-start min-h-screen">
@@ -605,14 +629,14 @@ export default function LobbyPage() {
         {/* User anchor */}
         <div className="self-stretch px-4 inline-flex justify-start items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-[#C8C9C0] flex-shrink-0 flex items-center justify-center">
-            <span className="text-xs font-bold text-zinc-600">A</span>
+            <span className="text-xs font-bold text-zinc-600">学</span>
           </div>
           <div className="inline-flex flex-col justify-start items-start overflow-hidden">
             <div className="self-stretch flex flex-col justify-start items-start overflow-hidden">
-              <div className="text-zinc-800 text-xs font-bold font-['Inter'] leading-4">Alex Chen</div>
+              <div className="text-zinc-800 text-xs font-bold font-['Inter'] leading-4">同学</div>
             </div>
             <div className="self-stretch h-3.5 relative overflow-hidden">
-              <div className="left-0 top-[-1px] absolute text-slate-600 text-[9.60px] font-normal font-['Inter'] leading-4">Graduate Student</div>
+              <div className="left-0 top-[-1px] absolute text-slate-600 text-[9.60px] font-normal font-['Inter'] leading-4">学生</div>
             </div>
           </div>
         </div>
@@ -709,43 +733,6 @@ export default function LobbyPage() {
             }} />
           )}
 
-          {/* Insight cards */}
-          <div className="self-stretch h-48 pt-2 inline-flex justify-between items-start">
-            <div className="flex justify-start items-start gap-4">
-              <div className="w-64 self-stretch p-8 bg-stone-100 rounded-[32px] inline-flex flex-col justify-start items-start gap-1">
-                <IconVelocity />
-                <div className="self-stretch pt-3 flex flex-col justify-start items-start">
-                  <div className="self-stretch text-zinc-800 text-sm font-bold font-['Inter'] leading-5">Study Velocity</div>
-                </div>
-                <div className="self-stretch flex flex-col justify-start items-start">
-                  <div className="self-stretch text-slate-600 text-xs font-normal font-['Inter'] leading-4">You've averaged 4.2 hours of<br />recording this week. Consistency<br />is key.</div>
-                </div>
-              </div>
-              <div className="w-64 self-stretch p-8 bg-stone-100 rounded-[32px] inline-flex flex-col justify-start items-start gap-1">
-                <IconAI />
-                <div className="self-stretch pt-3 flex flex-col justify-start items-start">
-                  <div className="self-stretch text-zinc-800 text-sm font-bold font-['Inter'] leading-5">AI Insights</div>
-                </div>
-                <div className="self-stretch flex flex-col justify-start items-start">
-                  <div className="self-stretch text-slate-600 text-xs font-normal font-['Inter'] leading-4">3 summaries are ready for review<br />from your recent Predictive<br />Analytics lecture.</div>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="w-96 self-stretch text-left p-8 bg-stone-100 rounded-[32px] inline-flex flex-col justify-start items-start gap-1 cursor-pointer hover:bg-stone-200 transition-colors focus-visible:ring-2 focus-visible:ring-zinc-600 focus-visible:outline-none border-none"
-                onClick={() => navigate('/session/live')}
-                aria-label="进入 LIVE AI Courses"
-              >
-                <IconLive />
-                <div className="self-stretch pt-3 flex flex-col justify-start items-start">
-                  <div className="self-stretch text-zinc-800 text-sm font-bold font-['Inter'] leading-5">LIVE AI Courses</div>
-                </div>
-                <div className="self-stretch flex flex-col justify-start items-start">
-                  <div className="self-stretch text-slate-600 text-xs font-normal font-['Inter'] leading-4">AI with your class</div>
-                </div>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 
