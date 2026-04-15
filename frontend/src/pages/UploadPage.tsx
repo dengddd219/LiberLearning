@@ -50,24 +50,6 @@ function IconAudio() {
   )
 }
 
-function IconCheckCircle() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-      <circle cx="7.5" cy="7.5" r="7" stroke="#5F5E5E" strokeWidth="1.5" />
-      <path d="M4.5 7.5l2 2 4-4" stroke="#5F5E5E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function IconLoadingCircle() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <circle cx="8" cy="8" r="6.5" stroke="rgba(95,94,94,0.3)" strokeWidth="2" />
-      <path d="M8 1.5C4.41 1.5 1.5 4.41 1.5 8" stroke="#5F5E5E" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  )
-}
-
 // ─── Upload Zone ──────────────────────────────────────────────────────────────
 
 interface UploadZoneProps {
@@ -186,184 +168,6 @@ function UploadZone({ label, hint, accept, icon, file, error, onFile, onClear }:
   )
 }
 
-// ─── Processing State (shown while uploading) ─────────────────────────────────
-
-interface ProcessingStateProps {
-  progress: number
-}
-
-function ProcessingState({ progress }: ProcessingStateProps) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', alignSelf: 'stretch' }}>
-      {/* Progress row */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        {/* Text + percentage */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {/* Pulse dot */}
-            <div style={{ position: 'relative', width: '12px', height: '12px' }}>
-              <div
-                style={{
-                  width: '12px',
-                  height: '12px',
-                  borderRadius: '9999px',
-                  backgroundColor: '#5F5E5E',
-                  position: 'absolute',
-                }}
-              />
-            </div>
-            <span
-              style={{
-                fontFamily: 'Inter, system-ui, sans-serif',
-                fontWeight: 500,
-                fontSize: '14px',
-                color: '#2F3331',
-              }}
-            >
-              Synthesis engine is mapping audio to visual anchors...
-            </span>
-          </div>
-          <span
-            style={{
-              fontFamily: 'Inter, system-ui, sans-serif',
-              fontWeight: 900,
-              fontSize: '18px',
-              color: '#2F3331',
-            }}
-          >
-            {progress}%
-          </span>
-        </div>
-
-        {/* Progress bar track */}
-        <div
-          style={{
-            height: '12px',
-            borderRadius: '9999px',
-            backgroundColor: '#E6E9E6',
-            overflow: 'hidden',
-          }}
-        >
-          <div
-            style={{
-              height: '100%',
-              width: `${progress}%`,
-              borderRadius: '9999px',
-              background: 'linear-gradient(90deg, #5F5E5E 0%, #535252 100%)',
-              boxShadow: '0px 0px 20px 0px rgba(95, 94, 94, 0.2)',
-              transition: 'width 0.4s ease',
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Checklist + sub-progress */}
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0',
-          borderTop: '1px solid rgba(175, 179, 176, 0.1)',
-          paddingTop: '16px',
-        }}
-      >
-        {/* Steps list */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Step done */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <IconCheckCircle />
-            <span
-              style={{
-                fontFamily: 'Inter, system-ui, sans-serif',
-                fontWeight: 500,
-                fontSize: '14px',
-                color: '#2F3331',
-              }}
-            >
-              Transcription complete
-            </span>
-          </div>
-
-          {/* Step in-progress */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div className="animate-spin">
-              <IconLoadingCircle />
-            </div>
-            <span
-              style={{
-                fontFamily: 'Inter, system-ui, sans-serif',
-                fontWeight: 400,
-                fontSize: '14px',
-                color: '#556071',
-              }}
-            >
-              Transcription in progress...
-            </span>
-          </div>
-        </div>
-
-        {/* Sub-progress card */}
-        <div
-          style={{
-            marginTop: '16px',
-            borderRadius: '32px',
-            backgroundColor: '#F3F4F1',
-            padding: '16px 16px 20px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'stretch' }}>
-            <span
-              style={{
-                fontFamily: 'Inter, system-ui, sans-serif',
-                fontWeight: 700,
-                fontSize: '11px',
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: '#5F5E5E',
-              }}
-            >
-              PAGE 3/18
-            </span>
-            <span
-              style={{
-                fontFamily: 'Inter, system-ui, sans-serif',
-                fontWeight: 700,
-                fontSize: '11px',
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: '#5F5E5E',
-              }}
-            >
-              GENERATING NOTES...
-            </span>
-          </div>
-          {/* Sub progress bar */}
-          <div
-            style={{
-              height: '4px',
-              borderRadius: '9999px',
-              backgroundColor: '#E0E3E0',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                height: '100%',
-                width: '25%',
-                borderRadius: '9999px',
-                backgroundColor: 'rgba(95,94,94,0.4)',
-              }}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function UploadPage() {
@@ -374,7 +178,6 @@ export default function UploadPage() {
   const [audioError, setAudioError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
-  const [progress] = useState(68)
 
   const handlePpt = useCallback((file: File) => {
     const err = validateFile(file, ['.ppt', '.pptx', '.pdf'])
@@ -529,7 +332,28 @@ export default function UploadPage() {
               </div>
             </div>
           ) : (
-            <ProcessingState progress={progress} />
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '16px',
+                padding: '48px 0',
+                color: '#5F5E5E',
+                fontSize: '14px',
+              }}
+            >
+              <svg
+                width="24" height="24" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" strokeWidth="2"
+                className="animate-spin"
+              >
+                <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+              </svg>
+              <span>上传中，请稍候...</span>
+            </div>
           )}
 
           {/* CTA row — Figma: layout_G94R1R (row, justify flex-end, gap 16px) */}
