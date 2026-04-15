@@ -7,6 +7,10 @@ import { getSession, retryPage } from '../lib/api'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
+import { useHighlights } from '../hooks/useHighlights'
+import HighlightLayer from '../components/HighlightLayer'
+import { useTextAnnotations } from '../hooks/useTextAnnotations'
+import TextAnnotationLayer from '../components/TextAnnotationLayer'
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -429,6 +433,11 @@ export default function NotesPage() {
   const audioRef = useRef<HTMLAudioElement>(null)
   const wheelTimeoutRef = useRef<number | null>(null)
 
+  // Highlight tool state
+  const pageContainerRef = useRef<HTMLDivElement | null>(null)
+  const { addHighlight, removeHighlight, highlightsForPage } = useHighlights(sessionId ?? '')
+  const { addAnnotation, updateAnnotation, removeAnnotation, annotationsForPage } = useTextAnnotations(sessionId ?? '')
+
   // Translation state
   const { enabled: translationEnabled, setEnabled: setTranslationEnabled, targetLang, setTargetLang, translate } = useTranslation()
   const [popoverOpen, setPopoverOpen] = useState(false)
@@ -448,6 +457,7 @@ export default function NotesPage() {
   // Canvas width for react-pdf
   const canvasAreaRef = useRef<HTMLDivElement>(null)
   const [canvasWidth, setCanvasWidth] = useState(800)
+  const [zoomLevel, setZoomLevel] = useState(100)
 
   useEffect(() => {
     if (!canvasAreaRef.current) return
@@ -767,8 +777,12 @@ export default function NotesPage() {
           {/* Canvas area — single page with wheel navigation */}
           <div
             ref={canvasAreaRef}
-            className="flex-1 flex items-center justify-center overflow-hidden"
-            style={{ background: 'rgba(232,231,226,0.6)' }}
+            className="flex-1 flex items-start justify-center"
+            style={{
+              background: 'rgba(232,231,226,0.6)',
+              overflowX: zoomLevel > 100 ? 'auto' : 'hidden',
+              overflowY: 'hidden',
+            }}
             onWheel={handleWheel}
           >
             {currentPageData && (() => {
@@ -779,6 +793,7 @@ export default function NotesPage() {
                   style={{ maxWidth: '100%', maxHeight: '100%' }}
                 >
                   <div
+                    ref={pageContainerRef}
                     className="relative rounded-lg overflow-hidden"
                     style={{
                       background: C.white,
@@ -797,7 +812,7 @@ export default function NotesPage() {
                       >
                         <Page
                           pageNumber={currentPageData.pdf_page_num}
-                          width={canvasWidth}
+                          width={Math.round(canvasWidth * zoomLevel / 100)}
                           renderTextLayer={true}
                           renderAnnotationLayer={false}
                         />
@@ -818,6 +833,25 @@ export default function NotesPage() {
                     >
                       ▶ {formatTime(currentPageData.page_start_time)}
                     </button>
+                    {/* Highlight layer */}
+                    <HighlightLayer
+                      pageContainerRef={pageContainerRef}
+                      pageNum={currentPage}
+                      highlights={highlightsForPage(currentPage)}
+                      highlightToolActive={activeTool === 'highlight'}
+                      eraserToolActive={activeTool === 'eraser'}
+                      highlightColor={highlightColor}
+                      onAdd={(rec) => addHighlight({ ...rec, sessionId: sessionId ?? '' })}
+                      onRemove={removeHighlight}
+                    />
+                    {/* Text annotation layer */}
+                    <TextAnnotationLayer
+                      annotations={annotationsForPage(currentPage)}
+                      textToolActive={activeTool === 'text'}
+                      onPlaceAnnotation={(x, y) => addAnnotation(currentPage, x, y)}
+                      onUpdate={updateAnnotation}
+                      onRemove={removeAnnotation}
+                    />
                     {/* Slide label bottom-right */}
                     <div
                       className="absolute bottom-3 right-3 text-xs px-2 py-0.5 rounded"
