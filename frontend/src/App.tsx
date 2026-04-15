@@ -8,6 +8,7 @@ import UploadPage from './pages/UploadPage'
 import ProcessingPage from './pages/ProcessingPage'
 import NotesPage from './pages/NotesPage'
 import DetailedNotePage from './pages/DetailedNotePage'
+import DiagnosticsPage from './pages/DiagnosticsPage'
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
         <Route path="/processing"              element={<ProcessingPage />} />
         <Route path="/notes/:sessionId"        element={<NotesPage />} />
         <Route path="/notes/detail/:sessionId" element={<DetailedNotePage />} />
+        <Route path="/diagnostics"             element={<DiagnosticsPage />} />
         <Route path="*"                        element={<Navigate to="/" replace />} />
       </Routes>
     </TabsProvider>
