@@ -3,7 +3,7 @@ import { useTabs } from '../context/TabsContext'
 import { useTranslation } from '../context/TranslationContext'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import CanvasToolbar from '../components/CanvasToolbar'
-import { getSession, retryPage } from '../lib/api'
+import { getSession, retryPage, askBullet } from '../lib/api'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
@@ -16,6 +16,55 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
   import.meta.url,
 ).toString()
+
+// ─── IndexedDB：ask_history 持久化 ───
+const DB_NAME = 'liberstudy_ask'
+const STORE_NAME = 'ask_history'
+
+function openAskDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1)
+    req.onupgradeneeded = () => {
+      const db = req.result
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME)
+      }
+    }
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error)
+  })
+}
+
+function askKey(sessionId: string, pageNum: number, bulletIndex: number) {
+  return `${sessionId}:${pageNum}:${bulletIndex}`
+}
+
+async function loadAskHistory(sessionId: string, pageNum: number, bulletIndex: number): Promise<AskMessage[]> {
+  const db = await openAskDB()
+  return new Promise((resolve) => {
+    const tx = db.transaction(STORE_NAME, 'readonly')
+    const req = tx.objectStore(STORE_NAME).get(askKey(sessionId, pageNum, bulletIndex))
+    req.onsuccess = () => resolve(req.result?.messages ?? [])
+    req.onerror = () => resolve([])
+  })
+}
+
+async function saveAskHistory(sessionId: string, pageNum: number, bulletIndex: number, messages: AskMessage[]) {
+  const db = await openAskDB()
+  return new Promise<void>((resolve) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite')
+    tx.objectStore(STORE_NAME).put({ messages }, askKey(sessionId, pageNum, bulletIndex))
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => resolve()
+  })
+}
+
+interface AskMessage {
+  role: 'user' | 'ai'
+  content: string
+  model: string
+  timestamp: number
+}
 
 interface Bullet { ppt_text: string; level: number; ai_comment: string | null; timestamp_start: number; timestamp_end: number; }
 interface AlignedSegment { start: number; end: number; text: string; similarity?: number }
