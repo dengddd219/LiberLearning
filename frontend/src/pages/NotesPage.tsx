@@ -780,6 +780,8 @@ export default function NotesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [noteMode, setNoteMode] = useState<'my' | 'ai' | 'transcript'>('ai')
   const [playingSegIdx, setPlayingSegIdx] = useState<number | null>(null)
+  const [playProgress, setPlayProgress] = useState(0) // 0–1，当前播放段进度
+  const segStartRef = useRef<number | null>(null)
   const segEndRef = useRef<number | null>(null)
   const segTimeUpdateRef = useRef<(() => void) | null>(null)
   const [transcriptClickCount, setTranscriptClickCount] = useState<number>(() => {
@@ -1104,11 +1106,13 @@ export default function NotesPage() {
     if (playingSegIdx === idx) {
       audio.pause()
       segEndRef.current = null
+      segStartRef.current = null
       if (segTimeUpdateRef.current) {
         audio.removeEventListener('timeupdate', segTimeUpdateRef.current)
         segTimeUpdateRef.current = null
       }
       setPlayingSegIdx(null)
+      setPlayProgress(0)
       return
     }
 
@@ -1126,16 +1130,26 @@ export default function NotesPage() {
     })
 
     segEndRef.current = seg.end
+    segStartRef.current = seg.start
     setPlayingSegIdx(idx)
+    setPlayProgress(0)
     audio.currentTime = seg.start
     audio.play()
 
     const onTimeUpdate = () => {
+      const start = segStartRef.current!
+      const end = segEndRef.current!
+      const duration = end - start
+      if (duration > 0) {
+        setPlayProgress(Math.min((audio.currentTime - start) / duration, 1))
+      }
       if (segEndRef.current !== null && audio.currentTime >= segEndRef.current) {
         audio.pause()
         segEndRef.current = null
+        segStartRef.current = null
         segTimeUpdateRef.current = null
         setPlayingSegIdx(null)
+        setPlayProgress(0)
         audio.removeEventListener('timeupdate', onTimeUpdate)
       }
     }
@@ -1578,7 +1592,7 @@ export default function NotesPage() {
                   if (!hasMyNote && !isExpanded && pptAnnotations.length === 0) return null
 
                   return (
-                    <div>
+                    <div style={{ paddingTop: '12px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
                         <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', color: '#72726E' }}>{t('notes_my_notes_heading')}</span>
                         {hasMyNote && (
@@ -1829,7 +1843,7 @@ export default function NotesPage() {
             ) : noteMode === 'transcript' ? (
               /* Transcript mode */
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <div className="mb-3" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="mb-3" style={{ display: 'flex', alignItems: 'center', gap: '8px', height: '20px' }}>
                   <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.muted }}>
                     TRANSCRIPT
                   </span>
@@ -1862,20 +1876,81 @@ export default function NotesPage() {
                         if (playingSegIdx !== i) (e.currentTarget as HTMLDivElement).style.background = 'transparent'
                       }}
                     >
-                      <span
-                        style={{
-                          flexShrink: 0,
-                          fontSize: '11px',
-                          color: playingSegIdx === i ? '#6B7F3A' : '#D0CFC5',
-                          fontWeight: '600',
-                          fontVariantNumeric: 'tabular-nums',
-                          minWidth: '36px',
-                          marginTop: '2px',
-                          lineHeight: 1.6,
-                        }}
-                      >
-                        {formatTime(seg.start)}
-                      </span>
+                      {/* 时间戳胶囊：播放时从左向右绿色填充，文字跟随变白 */}
+                      {playingSegIdx === i ? (
+                        <span
+                          style={{
+                            flexShrink: 0,
+                            position: 'relative',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            fontVariantNumeric: 'tabular-nums',
+                            minWidth: '36px',
+                            height: '20px',
+                            alignSelf: 'flex-start',
+                            marginTop: '2px',
+                            borderRadius: '999px',
+                            border: '1.5px solid #6B7F3A',
+                            padding: '0 6px',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {/* 绿色填充背景 */}
+                          <span
+                            aria-hidden
+                            style={{
+                              position: 'absolute',
+                              top: 0, left: 0, bottom: 0,
+                              width: `${playProgress * 100}%`,
+                              background: '#6B7F3A',
+                              transition: 'width 80ms linear',
+                              borderRadius: '999px',
+                            }}
+                          />
+                          {/* 底层：绿色文字（填充区右侧可见） */}
+                          <span style={{ position: 'relative', color: '#6B7F3A', zIndex: 1 }}>
+                            {formatTime(seg.start)}
+                          </span>
+                          {/* 顶层：白色文字，clip 到填充宽度内 */}
+                          <span
+                            aria-hidden
+                            style={{
+                              position: 'absolute',
+                              top: 0, left: 0, bottom: 0, right: 0,
+                              display: 'flex',
+                              alignItems: 'center',
+                              paddingLeft: '6px',
+                              color: 'white',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              fontVariantNumeric: 'tabular-nums',
+                              clipPath: `inset(0 ${(1 - playProgress) * 100}% 0 0)`,
+                              transition: 'clip-path 80ms linear',
+                              zIndex: 2,
+                              pointerEvents: 'none',
+                            }}
+                          >
+                            {formatTime(seg.start)}
+                          </span>
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            flexShrink: 0,
+                            fontSize: '11px',
+                            color: '#D0CFC5',
+                            fontWeight: '600',
+                            fontVariantNumeric: 'tabular-nums',
+                            minWidth: '36px',
+                            marginTop: '2px',
+                            lineHeight: 1.6,
+                          }}
+                        >
+                          {formatTime(seg.start)}
+                        </span>
+                      )}
                       <p style={{ fontSize: '13px', color: C.fg, lineHeight: '1.6', margin: 0, flex: 1 }}>
                         {seg.text}
                       </p>
