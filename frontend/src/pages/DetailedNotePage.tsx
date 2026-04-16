@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getSession } from '../lib/api'
+import { useTranslation } from '../context/TranslationContext'
 
 interface Bullet { text: string; ai_comment: string; timestamp_start: number; timestamp_end: number }
 interface PageData {
@@ -71,6 +72,7 @@ function loadAnnotationsForSession(sessionId: string): Map<number, string[]> {
 export default function DetailedNotePage() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [session, setSession] = useState<SessionData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -93,7 +95,7 @@ export default function DetailedNotePage() {
         setPptAnnotations(annotations)
         setLoading(false)
       })
-      .catch(() => { setError('无法加载笔记数据'); setLoading(false) })
+      .catch(() => { setError(t('detailed_load_error')); setLoading(false) })
   }, [sessionId])
 
   if (loading) {
@@ -108,9 +110,9 @@ export default function DetailedNotePage() {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#F7F7F2' }}>
         <div className="text-center">
-          <p className="text-sm mb-4" style={{ color: '#72726E' }}>{error ?? '未知错误'}</p>
+          <p className="text-sm mb-4" style={{ color: '#72726E' }}>{error ?? t('detailed_load_error')}</p>
           <button onClick={() => navigate('/')} className="text-sm px-4 py-2 rounded-lg cursor-pointer" style={{ background: '#F2F2EC', color: '#292929' }}>
-            返回首页
+            {t('detailed_back_home')}
           </button>
         </div>
       </div>
@@ -136,7 +138,7 @@ export default function DetailedNotePage() {
         >
           <div className="flex items-center px-4" style={{ height: '48px', borderBottom: '1px solid #E3E3DA' }}>
             <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: '#72726E' }}>
-              NAVIGATION
+              {t('detailed_navigation')}
             </span>
           </div>
           <div className="p-3" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -148,7 +150,7 @@ export default function DetailedNotePage() {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="15 18 9 12 15 6" />
               </svg>
-              返回
+              {t('detailed_back')}
             </button>
             {(noteMode === 'my'
               ? session.pages.filter(p => (myNoteTexts.get(p.page_num) ?? '').trim() || (pptAnnotations.get(p.page_num) ?? []).length > 0)
@@ -160,7 +162,7 @@ export default function DetailedNotePage() {
                 className="px-3 py-2 rounded-lg text-sm cursor-pointer transition-all duration-150 w-full text-left hover:bg-black/5"
                 style={{ color: '#72726E', lineHeight: '1.4' }}
               >
-                第 {page.page_num} 页
+                {t('detailed_page_prefix')} {page.page_num} {t('detailed_session_subtitle_pages')}
               </button>
             ))}
           </div>
@@ -185,7 +187,7 @@ export default function DetailedNotePage() {
                       boxShadow: noteMode === mode ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
                     }}
                   >
-                    {mode === 'my' ? 'My Notes' : 'AI Notes'}
+                    {mode === 'my' ? t('detailed_my_tab') : t('detailed_ai_tab')}
                   </button>
                 ))}
               </div>
@@ -199,7 +201,7 @@ export default function DetailedNotePage() {
               {session.ppt_filename}
             </h1>
             <p className="mb-10" style={{ fontSize: '12px', color: '#D0CFC5' }}>
-              Session {session.session_id} · {session.pages.length} 页 · {Math.floor(session.total_duration / 60)} 分钟
+              Session {session.session_id} · {session.pages.length} {t('detailed_session_subtitle_pages')} · {Math.floor(session.total_duration / 60)} {t('detailed_session_subtitle_minutes')}
             </p>
 
             {/* Content */}
@@ -211,7 +213,7 @@ export default function DetailedNotePage() {
               if (pagesWithContent.length === 0) {
                 return (
                   <div className="py-8 text-center" style={{ color: '#D0CFC5', fontSize: '14px' }}>
-                    该课程暂无用户笔记
+                    {t('detailed_no_user_notes')}
                   </div>
                 )
               }
@@ -223,7 +225,7 @@ export default function DetailedNotePage() {
                     return (
                       <div key={page.page_num} id={`page-${page.page_num}`}>
                         <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#72726E', marginBottom: '12px', paddingBottom: '6px', borderBottom: '1px solid #E3E3DA' }}>
-                          第 {page.page_num} 页
+                          {t('detailed_page_prefix')} {page.page_num} {t('detailed_session_subtitle_pages')}
                         </h3>
                         {myText.trim() && (
                           <p style={{ fontSize: '15px', color: '#292929', lineHeight: '1.8', marginBottom: annotations.length > 0 ? '12px' : '0', whiteSpace: 'pre-wrap' }}>
@@ -232,7 +234,7 @@ export default function DetailedNotePage() {
                         )}
                         {annotations.length > 0 && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.06em', color: '#D0CFC5' }}>PPT 批注</span>
+                            <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.06em', color: '#D0CFC5' }}>{t('detailed_annotation_label')}</span>
                             {annotations.map((text, i) => (
                               <p key={i} style={{
                                 fontSize: '14px', color: '#292929', lineHeight: '1.7', margin: 0,
@@ -263,7 +265,7 @@ export default function DetailedNotePage() {
                         borderBottom: '1px solid #E3E3DA',
                       }}
                     >
-                      第 {page.page_num} 页
+                      {t('detailed_page_prefix')} {page.page_num} {t('detailed_session_subtitle_pages')}
                       {page.ppt_text && (
                         <span style={{ fontSize: '13px', fontWeight: '400', color: '#72726E', marginLeft: '12px' }}>
                           {page.ppt_text.split('\n')[0]?.slice(0, 60)}
@@ -286,7 +288,7 @@ export default function DetailedNotePage() {
                               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                             </svg>
                             <span style={{ fontSize: '9px', fontWeight: '700', letterSpacing: '0.08em', color: '#72726E' }}>
-                              AI CLARIFICATION
+                              {t('detailed_ai_clarification')}
                             </span>
                           </div>
                           <p style={{ fontSize: '14px', color: '#292929', lineHeight: '1.7' }}>
@@ -325,7 +327,7 @@ export default function DetailedNotePage() {
                       >
                         <div className="flex items-center gap-1.5 mb-2">
                           <span style={{ fontSize: '9px', fontWeight: '700', letterSpacing: '0.08em', color: '#72726E' }}>
-                            OFF-SLIDE CONTENT
+                            {t('detailed_off_slide')}
                           </span>
                         </div>
                         <p style={{ fontSize: '14px', color: '#292929', lineHeight: '1.7' }}>
@@ -336,7 +338,7 @@ export default function DetailedNotePage() {
 
                     {/* Empty state */}
                     {!page.active_notes && (!page.passive_notes?.bullets || page.passive_notes.bullets.length === 0) && !page.page_supplement && (
-                      <p style={{ fontSize: '13px', color: '#D0CFC5', fontStyle: 'italic' }}>暂无笔记数据</p>
+                      <p style={{ fontSize: '13px', color: '#D0CFC5', fontStyle: 'italic' }}>{t('detailed_no_data')}</p>
                     )}
                   </div>
                 ))}
