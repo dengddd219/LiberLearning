@@ -1,6 +1,7 @@
 // frontend/src/components/TopBar.tsx
-import { useNavigate, useLocation, useParams } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useTabs } from '../context/TabsContext'
+import { useTranslation } from '../context/TranslationContext'
 
 const C = {
   bg: 'rgba(240,239,234,0.95)',
@@ -27,12 +28,14 @@ function ChromeTab({
   isActive,
   onClick,
   onClose,
+  closeLabel,
 }: {
   label: string
   favicon?: string
   isActive: boolean
   onClick: () => void
   onClose: (e: React.MouseEvent) => void
+  closeLabel: string
 }) {
   return (
     <div
@@ -130,7 +133,7 @@ function ChromeTab({
       {/* 关闭按钮 */}
       <button
         onClick={onClose}
-        aria-label={`关闭 ${label}`}
+        aria-label={closeLabel}
         style={{
           flexShrink: 0,
           width: '18px',
@@ -170,6 +173,7 @@ export default function TopBar() {
   const navigate = useNavigate()
   const location = useLocation()
   const { tabs, activeTabId, closeTab, activateTab } = useTabs()
+  const { t } = useTranslation()
 
   // 从路径解析当前 sessionId（用于 Detailed Note 按钮）
   const notesMatch = location.pathname.match(/^\/notes\/([^/]+)$/)
@@ -248,7 +252,7 @@ export default function TopBar() {
             flexShrink: 0,
           }}
         >
-          Dashboard
+          {t('topbar_dashboard')}
         </button>
       </div>
 
@@ -277,6 +281,7 @@ export default function TopBar() {
               isActive={isActive}
               onClick={() => handleTabClick(tab.sessionId)}
               onClose={(e) => handleTabClose(e, tab.sessionId)}
+              closeLabel={`${t('topbar_close_tab')} ${tab.label}`}
             />
           )
         })}
@@ -298,7 +303,7 @@ export default function TopBar() {
               whiteSpace: 'nowrap',
             }}
           >
-            Detailed Note →
+            {t('topbar_detailed_note')}
           </button>
         </div>
       )}

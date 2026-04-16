@@ -43,11 +43,11 @@ function FormatToolbar({
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '4px',
+        gap: '8px',
         background: '#FAFAF8',
         border: '1px solid rgba(175,179,176,0.5)',
-        borderRadius: '6px',
-        padding: '4px 6px',
+        borderRadius: '8px',
+        padding: '6px 10px',
         boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
         position: 'absolute',
         bottom: 'calc(100% + 6px)',
@@ -57,8 +57,8 @@ function FormatToolbar({
       }}
     >
       {/* 颜色选择 */}
-      <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(100,100,100,0.6)" strokeWidth="2">
+      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(100,100,100,0.6)" strokeWidth="2">
           <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18" />
         </svg>
         {COLORS.map((c) => (
@@ -67,8 +67,8 @@ function FormatToolbar({
             type="button"
             onMouseDown={(e) => { e.preventDefault(); onColorChange(c) }}
             style={{
-              width: '14px',
-              height: '14px',
+              width: '18px',
+              height: '18px',
               borderRadius: '50%',
               background: c,
               border: 'none',
@@ -83,7 +83,7 @@ function FormatToolbar({
       </div>
 
       {/* 分隔 */}
-      <span style={{ width: '1px', height: '16px', background: 'rgba(175,179,176,0.4)', margin: '0 2px' }} />
+      <span style={{ width: '1px', height: '18px', background: 'rgba(175,179,176,0.4)' }} />
 
       {/* 字号选择 */}
       <div ref={sizeRef} style={{ position: 'relative' }}>
@@ -148,7 +148,7 @@ function FormatToolbar({
       </div>
 
       {/* 分隔 */}
-      <span style={{ width: '1px', height: '16px', background: 'rgba(175,179,176,0.4)', margin: '0 2px' }} />
+      <span style={{ width: '1px', height: '18px', background: 'rgba(175,179,176,0.4)' }} />
 
       {/* 删除 */}
       <button

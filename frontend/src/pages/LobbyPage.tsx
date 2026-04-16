@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTabs } from '../context/TabsContext'
 import { uploadFiles, listSessions } from '../lib/api'
+import { useTranslation } from '../context/TranslationContext'
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 
@@ -132,6 +133,7 @@ const THUMB_COLORS = ['#4A6FA5', '#6B8E6B', '#8B7355', '#7B6B8B', '#5E8B8B', '#8
 // ─── Cards ───────────────────────────────────────────────────────────────────
 
 function ProcessingCard() {
+  const { t } = useTranslation()
   return (
     <div className="p-6 relative bg-white rounded-[32px] flex flex-col justify-start items-start gap-4" style={{ width: '224px', minHeight: '288px' }}>
       <div className="w-56 h-72 left-0 top-0 absolute bg-white/0 rounded-[32px] shadow-[0px_40px_40px_-15px_rgba(47,51,49,0.04)]" />
@@ -151,7 +153,7 @@ function ProcessingCard() {
             <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: '#D0CFC5' }} />
             <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: '#D0CFC5' }} />
           </div>
-          <div className="text-[10.40px] font-bold font-['Inter'] uppercase leading-4 tracking-wide" style={{ color: '#72726E' }}>PROCESSING</div>
+          <div className="text-[10.40px] font-bold font-['Inter'] uppercase leading-4 tracking-wide" style={{ color: '#72726E' }}>{t('card_processing')}</div>
         </div>
       </div>
     </div>
@@ -161,6 +163,7 @@ function ProcessingCard() {
 const API_BASE_FOR_THUMB = import.meta.env.VITE_API_BASE_URL || ''
 
 function DoneCard({ card, onClick }: { card: CourseCard; onClick: () => void }) {
+  const { t } = useTranslation()
   const [thumbLoaded, setThumbLoaded] = useState(false)
   const [thumbError, setThumbError] = useState(false)
   const thumbSrc = `${API_BASE_FOR_THUMB}/api/sessions/${card.id}/slide/1.png`
@@ -206,7 +209,7 @@ function DoneCard({ card, onClick }: { card: CourseCard; onClick: () => void }) 
       <div className="w-44 pt-4 left-[25px] top-[239.14px] absolute inline-flex justify-between items-center" style={{ borderTop: '1px solid #E3E3DA' }}>
         <div className="flex justify-start items-center gap-1">
           <div className="w-3.5 h-3.5 relative" style={{ color: '#72726E' }}><IconNotes /></div>
-          <div className="text-xs font-normal font-['Inter'] leading-4" style={{ color: '#72726E' }}>{card.notes} notes</div>
+          <div className="text-xs font-normal font-['Inter'] leading-4" style={{ color: '#72726E' }}>{card.notes} {t('card_notes_suffix')}</div>
         </div>
         <div className="text-[10.40px] font-bold font-['Inter'] uppercase leading-4 tracking-wide" style={{ color: '#72726E' }}>{card.time}</div>
       </div>
@@ -223,6 +226,7 @@ const FOLDER_BADGE: Record<string, { bg: string; text: string }> = {
 }
 
 function ListRow({ card, onClick, isLast }: { card: CourseCard; onClick: () => void; isLast: boolean }) {
+  const { t } = useTranslation()
   const badge = FOLDER_BADGE[card.folderColor]
   const [thumbLoaded, setThumbLoaded] = useState(false)
   const [thumbError, setThumbError] = useState(false)
@@ -283,24 +287,25 @@ function ListRow({ card, onClick, isLast }: { card: CourseCard; onClick: () => v
       {/* Notes */}
       <div className="w-32 pl-6 flex-shrink-0 flex items-center gap-2 text-sm font-medium font-['Inter'] leading-5" style={{ color: '#292929' }}>
         <IconNotes />
-        {card.notes} notes
+        {card.notes} {t('card_notes_suffix')}
       </div>
     </button>
   )
 }
 
 function ListTable({ sessions, onRowClick }: { sessions: CourseCard[]; onRowClick: (id: string) => void }) {
+  const { t } = useTranslation()
   const done = sessions.filter(s => s.status === 'done')
   return (
     <div className="self-stretch rounded-[32px] shadow-[0px_40px_40px_0px_rgba(47,51,49,0.04)] overflow-hidden" style={{ backgroundColor: '#FFFFFF' }}>
       {/* Header */}
       <div className="flex items-start pr-24" style={{ backgroundColor: 'rgba(247,247,242,0.5)' }}>
-        <div className="w-40 px-6 py-4 flex-shrink-0 text-[10px] font-medium font-['Inter'] uppercase tracking-wide" style={{ color: '#72726E' }}>COURSE<br/>THUMBNAIL</div>
-        <div className="w-56 px-6 py-5 flex-shrink-0 text-[10px] font-medium font-['Inter'] uppercase tracking-wide" style={{ color: '#72726E' }}>COURSE NAME &amp; IDENTIFIER</div>
-        <div className="w-48 px-6 py-5 flex-shrink-0 text-[10px] font-medium font-['Inter'] uppercase tracking-wide" style={{ color: '#72726E' }}>FOLDER</div>
-        <div className="w-28 px-6 py-5 flex-shrink-0 text-[10px] font-medium font-['Inter'] uppercase tracking-wide" style={{ color: '#72726E' }}>DATE</div>
-        <div className="w-28 px-6 py-5 flex-shrink-0 text-[10px] font-medium font-['Inter'] uppercase tracking-wide" style={{ color: '#72726E' }}>DURATION</div>
-        <div className="w-32 px-6 py-5 flex-shrink-0 text-[10px] font-medium font-['Inter'] uppercase tracking-wide" style={{ color: '#72726E' }}>NOTES</div>
+        <div className="w-40 px-6 py-4 flex-shrink-0 text-[10px] font-medium font-['Inter'] uppercase tracking-wide" style={{ color: '#72726E' }}>{t('table_thumbnail').split('\n').map((l, i) => <span key={i}>{l}{i === 0 && <br/>}</span>)}</div>
+        <div className="w-56 px-6 py-5 flex-shrink-0 text-[10px] font-medium font-['Inter'] uppercase tracking-wide" style={{ color: '#72726E' }}>{t('table_name')}</div>
+        <div className="w-48 px-6 py-5 flex-shrink-0 text-[10px] font-medium font-['Inter'] uppercase tracking-wide" style={{ color: '#72726E' }}>{t('table_folder')}</div>
+        <div className="w-28 px-6 py-5 flex-shrink-0 text-[10px] font-medium font-['Inter'] uppercase tracking-wide" style={{ color: '#72726E' }}>{t('table_date')}</div>
+        <div className="w-28 px-6 py-5 flex-shrink-0 text-[10px] font-medium font-['Inter'] uppercase tracking-wide" style={{ color: '#72726E' }}>{t('table_duration')}</div>
+        <div className="w-32 px-6 py-5 flex-shrink-0 text-[10px] font-medium font-['Inter'] uppercase tracking-wide" style={{ color: '#72726E' }}>{t('table_notes')}</div>
       </div>
       {/* Rows */}
       {done.map((card, i) => (
@@ -398,6 +403,7 @@ function UploadZone({ label, hint, accept, icon, file, error, onFile, onClear }:
 const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
 
 function NewClassModal({ onClose, onUploaded }: { onClose: () => void; onUploaded: (sessionId: string) => void }) {
+  const { t } = useTranslation()
   const [pptFile, setPptFile] = useState<File | null>(null)
   const [audioFile, setAudioFile] = useState<File | null>(null)
   const [pptError, setPptError] = useState<string | null>(null)
@@ -424,7 +430,7 @@ function NewClassModal({ onClose, onUploaded }: { onClose: () => void; onUploade
       onClose()
     } catch {
       setUploading(false)
-      setUploadError('上传失败，请检查网络后重试')
+      setUploadError(t('modal_upload_error'))
     }
   }, [pptFile, audioFile, onUploaded, onClose])
 
@@ -449,7 +455,7 @@ function NewClassModal({ onClose, onUploaded }: { onClose: () => void; onUploade
           <div className="flex justify-between items-start">
             <div className="flex flex-col gap-2">
               <span className="font-bold text-base uppercase tracking-[0.2em]" style={{ color: 'rgba(95,94,94,0.6)' }}>ACTION CENTER</span>
-              <h2 id="modal-title" className="font-bold text-[36px] leading-[1.11] tracking-[-0.025em] m-0" style={{ color: '#292929' }}>New Class</h2>
+              <h2 id="modal-title" className="font-bold text-[36px] leading-[1.11] tracking-[-0.025em] m-0" style={{ color: '#292929' }}>{t('modal_new_class_title')}</h2>
             </div>
             <button type="button" onClick={onClose} aria-label="关闭对话框" className="flex items-center justify-center flex-shrink-0 cursor-pointer hover:opacity-70 transition-opacity" style={{ width: '40px', height: '40px', borderRadius: '9999px', backgroundColor: '#F2F2EC', color: '#292929', border: 'none' }}>
               <IconModalClose aria-hidden="true" />
@@ -458,8 +464,8 @@ function NewClassModal({ onClose, onUploaded }: { onClose: () => void; onUploade
 
           {/* Upload zones */}
           <div className="flex gap-0 items-stretch">
-            <UploadZone label="PPT/PDF Materials" hint="Drag or click to upload" accept=".ppt,.pptx,.pdf" icon={<IconPPT />} file={pptFile} error={pptError} onFile={handlePpt} onClear={() => { setPptFile(null); setPptError(null) }} />
-            <UploadZone label="Audio Recording" hint="Upload MP3, WAV or AAC" accept=".mp3,.wav,.m4a,.aac" icon={<IconAudioFile />} file={audioFile} error={audioError} onFile={handleAudio} onClear={() => { setAudioFile(null); setAudioError(null) }} />
+            <UploadZone label={t('modal_ppt_label')} hint={t('modal_ppt_hint')} accept=".ppt,.pptx,.pdf" icon={<IconPPT />} file={pptFile} error={pptError} onFile={handlePpt} onClear={() => { setPptFile(null); setPptError(null) }} />
+            <UploadZone label={t('modal_audio_label')} hint={t('modal_audio_hint')} accept=".mp3,.wav,.m4a,.aac" icon={<IconAudioFile />} file={audioFile} error={audioError} onFile={handleAudio} onClear={() => { setAudioFile(null); setAudioError(null) }} />
           </div>
 
           {uploadError && (
@@ -476,7 +482,7 @@ function NewClassModal({ onClose, onUploaded }: { onClose: () => void; onUploade
               className="px-8 py-3 rounded-full font-bold text-base border-none transition-all"
               style={{ backgroundColor: canSubmit ? '#798C00' : 'rgba(121,140,0,0.35)', color: '#FAF7F6', cursor: canSubmit ? 'pointer' : 'not-allowed', boxShadow: canSubmit ? '0px 4px 6px -4px rgba(0,0,0,0.1), 0px 10px 15px -3px rgba(0,0,0,0.1)' : 'none' }}
             >
-              {uploading ? 'Uploading…' : 'Save Workspace'}
+              {uploading ? t('modal_uploading') : t('modal_submit')}
             </button>
           </div>
         </div>
@@ -499,16 +505,17 @@ function ProcessingToast({ toast, onClose, onOpen }: {
   onClose: () => void
   onOpen: () => void
 }) {
+  const { t } = useTranslation()
   const isDone = toast.status === 'ready' || toast.status === 'partial_ready'
   const isError = toast.status === 'error'
 
   const STEP_LABELS: Record<string, string> = {
-    uploading: '上传文件',
-    converting: '音频格式转换',
-    parsing_ppt: 'PPT 解析',
-    transcribing: '语音转录',
-    aligning: '语义对齐',
-    generating: '生成结构化笔记',
+    uploading: t('toast_step_uploading'),
+    converting: t('toast_step_converting'),
+    parsing_ppt: t('toast_step_parsing_ppt'),
+    transcribing: t('toast_step_transcribing'),
+    aligning: t('toast_step_aligning'),
+    generating: t('toast_step_generating'),
   }
 
   return (
@@ -558,13 +565,13 @@ function ProcessingToast({ toast, onClose, onOpen }: {
       {/* Text */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: '13px', fontWeight: 600, color: '#292929', marginBottom: '2px' }}>
-          {isDone ? '笔记已生成完成' : isError ? '处理失败' : '正在处理课堂录音'}
+          {isDone ? t('toast_done_title') : isError ? t('toast_error_title') : t('toast_processing_title')}
         </div>
         <div style={{ fontSize: '11px', color: '#72726E' }}>
           {isDone
-            ? '点击查看笔记'
+            ? t('toast_done_sub')
             : isError
-            ? (toast.errorMsg || '请重新上传或稍后重试')
+            ? (toast.errorMsg || t('toast_default_sub'))
             : (STEP_LABELS[toast.step] ?? '处理中…')}
         </div>
       </div>
@@ -586,7 +593,7 @@ function ProcessingToast({ toast, onClose, onOpen }: {
               whiteSpace: 'nowrap',
             }}
           >
-            查看
+            {t('toast_view')}
           </button>
         )}
         <button
@@ -617,9 +624,60 @@ function ProcessingToast({ toast, onClose, onOpen }: {
 
 
 
+function SettingsPanel() {
+  const { uiLang, setUiLang, t } = useTranslation()
+  return (
+    <div style={{ padding: '48px', fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <div style={{ fontSize: '24px', fontWeight: 900, color: '#292929', marginBottom: '40px' }}>
+        {t('settings_title')}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', maxWidth: '480px' }}>
+        {/* Language row */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: '14px', fontWeight: 500, color: '#292929' }}>
+            {t('settings_language_label')}
+          </span>
+          <div
+            style={{
+              display: 'inline-flex',
+              backgroundColor: '#F2F2EC',
+              borderRadius: '9999px',
+              padding: '4px',
+              gap: '4px',
+            }}
+          >
+            {(['en', 'zh'] as const).map((lang) => (
+              <button
+                key={lang}
+                onClick={() => setUiLang(lang)}
+                style={{
+                  padding: '6px 20px',
+                  borderRadius: '9999px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  fontFamily: 'Inter, system-ui, sans-serif',
+                  backgroundColor: uiLang === lang ? '#FFFFFF' : 'transparent',
+                  color: uiLang === lang ? '#292929' : '#72726E',
+                  boxShadow: uiLang === lang ? '0px 1px 2px rgba(0,0,0,0.08)' : 'none',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {lang === 'en' ? t('settings_lang_en') : t('settings_lang_zh')}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function LobbyPage() {
   const navigate = useNavigate()
   const { openTab } = useTabs()
+  const { t } = useTranslation()
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [activeNav, setActiveNav] = useState<'courses' | 'settings'>('courses')
   const [showModal, setShowModal] = useState(false)
@@ -713,10 +771,10 @@ export default function LobbyPage() {
         <div className="self-stretch pb-10 flex flex-col justify-start items-start">
           <div className="self-stretch px-4 flex flex-col justify-start items-start">
             <div className="self-stretch text-lg font-bold font-['Inter'] leading-7" style={{ color: '#292929' }}>
-              Student<br />Workspace
+              {t('lobby_brand').split('\n').map((line, i) => <span key={i}>{line}{i === 0 && <br />}</span>)}
             </div>
             <div className="self-stretch opacity-60 text-xs font-normal font-['Inter'] uppercase leading-4 tracking-wide mt-1" style={{ color: '#292929' }}>
-              ACADEMIC YEAR 2026
+              {t('lobby_academic_year')}
             </div>
           </div>
         </div>
@@ -729,7 +787,9 @@ export default function LobbyPage() {
             style={{ backgroundColor: '#798C00' }}
           >
             <IconMic />
-            <span className="text-center text-stone-50 text-xs font-semibold font-['Inter'] leading-5 tracking-tight">Upload the<br />record</span>
+            <span className="text-center text-stone-50 text-xs font-semibold font-['Inter'] leading-5 tracking-tight">
+              {t('lobby_new_record').split('\n').map((line, i) => <span key={i}>{line}{i === 0 && <br />}</span>)}
+            </span>
           </button>
         </div>
 
@@ -739,7 +799,7 @@ export default function LobbyPage() {
           <div className="self-stretch px-4 py-2 rounded-md inline-flex justify-between items-center cursor-pointer transition-colors" style={{ backgroundColor: 'rgba(227,227,218,0.3)' }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(227,227,218,0.6)')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'rgba(227,227,218,0.3)')}>
             <div className="flex justify-start items-center gap-3" style={{ color: '#72726E' }}>
               <IconSearch />
-              <span className="text-xs font-medium font-['Inter'] leading-5" style={{ color: '#72726E' }}>Search</span>
+              <span className="text-xs font-medium font-['Inter'] leading-5" style={{ color: '#72726E' }}>{t('lobby_search')}</span>
             </div>
             <div className="px-1.5 pt-px pb-[2.39px] rounded-2xl inline-flex flex-col justify-start items-start" style={{ backgroundColor: '#E3E3DA' }}>
               <span className="text-[9.60px] font-bold font-['IPAGothic'] leading-4" style={{ color: '#72726E' }}>⌘K</span>
@@ -754,7 +814,7 @@ export default function LobbyPage() {
               style={{ borderRight: activeNav === 'courses' ? '2px solid #798C00' : '2px solid transparent' }}
             >
               <span style={{ color: activeNav === 'courses' ? '#292929' : '#72726E' }}><IconCourse /></span>
-              <span className="text-xs font-normal font-['Inter'] uppercase leading-4 tracking-wide" style={{ color: '#292929' }}>MY COURSES</span>
+              <span className="text-xs font-normal font-['Inter'] uppercase leading-4 tracking-wide" style={{ color: '#292929' }}>{t('lobby_nav_courses')}</span>
             </button>
             <button
               onClick={() => setActiveNav('settings')}
@@ -762,7 +822,7 @@ export default function LobbyPage() {
               style={{ borderRight: activeNav === 'settings' ? '2px solid #798C00' : '2px solid transparent' }}
             >
               <span style={{ color: activeNav === 'settings' ? '#292929' : '#72726E' }}><IconSettings /></span>
-              <span className="text-xs font-normal font-['Inter'] uppercase leading-4 tracking-wide" style={{ color: '#292929' }}>SETTINGS</span>
+              <span className="text-xs font-normal font-['Inter'] uppercase leading-4 tracking-wide" style={{ color: '#292929' }}>{t('lobby_nav_settings')}</span>
             </button>
           </div>
         </div>
@@ -790,10 +850,10 @@ export default function LobbyPage() {
         <div className="self-stretch px-12 py-6 backdrop-blur-md inline-flex justify-between items-center sticky top-16 z-10" style={{ backgroundColor: 'rgba(247,247,242,0.85)' }}>
           <div className="inline-flex flex-col justify-start items-start gap-0.5">
             <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="text-2xl font-black font-['Inter'] leading-8" style={{ color: '#292929' }}>Scholarly Workspace</div>
+              <div className="text-2xl font-black font-['Inter'] leading-8" style={{ color: '#292929' }}>{t('lobby_title')}</div>
             </div>
             <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="text-[10.40px] font-normal font-['Inter'] uppercase leading-4 tracking-wide" style={{ color: '#72726E' }}>WELCOME BACK, YOUR RECORDINGS ARE UP TO DATE.</div>
+              <div className="text-[10.40px] font-normal font-['Inter'] uppercase leading-4 tracking-wide" style={{ color: '#72726E' }}>{t('lobby_welcome')}</div>
             </div>
           </div>
           <div className="flex justify-start items-center gap-6">
@@ -805,7 +865,7 @@ export default function LobbyPage() {
                 style={{ backgroundColor: viewMode === 'grid' ? '#FFFFFF' : 'transparent', boxShadow: viewMode === 'grid' ? '0px 1px 2px 0px rgba(0,0,0,0.05)' : 'none' }}
               >
                 <span style={{ color: viewMode === 'grid' ? '#292929' : '#72726E' }}><IconGrid /></span>
-                <span className="text-xs font-bold font-['Inter'] leading-4" style={{ color: viewMode === 'grid' ? '#292929' : '#72726E' }}>Grid</span>
+                <span className="text-xs font-bold font-['Inter'] leading-4" style={{ color: viewMode === 'grid' ? '#292929' : '#72726E' }}>{t('lobby_view_grid')}</span>
               </button>
               <button
                 onClick={() => setViewMode('list')}
@@ -813,13 +873,16 @@ export default function LobbyPage() {
                 style={{ backgroundColor: viewMode === 'list' ? '#FFFFFF' : 'transparent', boxShadow: viewMode === 'list' ? '0px 1px 2px 0px rgba(0,0,0,0.05)' : 'none' }}
               >
                 <span style={{ color: viewMode === 'list' ? '#292929' : '#72726E' }}><IconList /></span>
-                <span className="text-xs font-bold font-['Inter'] leading-4" style={{ color: viewMode === 'list' ? '#292929' : '#72726E' }}>List</span>
+                <span className="text-xs font-bold font-['Inter'] leading-4" style={{ color: viewMode === 'list' ? '#292929' : '#72726E' }}>{t('lobby_view_list')}</span>
               </button>
             </div>
           </div>
         </div>
 
         {/* Content */}
+        {activeNav === 'settings' ? (
+          <SettingsPanel />
+        ) : (
         <div className="w-full max-w-[1400px] px-12 py-8 flex flex-col justify-start items-start gap-24">
 
           {/* Session cards */}
@@ -836,13 +899,13 @@ export default function LobbyPage() {
                 )}
                 {sessions.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-16 w-full">
-                    <p className="text-sm mb-4" style={{ color: '#D0CFC5' }}>还没有任何课程记录</p>
+                    <p className="text-sm mb-4" style={{ color: '#D0CFC5' }}>{t('lobby_empty_hint')}</p>
                     <button
                       onClick={() => setShowModal(true)}
                       className="px-4 py-2 text-white text-sm rounded-full cursor-pointer hover:opacity-85 border-none"
                       style={{ backgroundColor: '#798C00' }}
                     >
-                      开始第一次录音
+                      {t('lobby_start_first')}
                     </button>
                   </div>
                 )}
@@ -857,6 +920,7 @@ export default function LobbyPage() {
           )}
 
         </div>
+        )}
       </div>
 
       {showModal && <NewClassModal onClose={() => setShowModal(false)} onUploaded={(sid) => { handleUploaded(sid); setShowModal(false) }} />}

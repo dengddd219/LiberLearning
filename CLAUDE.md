@@ -346,7 +346,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 | `frontend/src/pages/UploadPage.tsx` | 上传页：PPT + 音频文件上传，调用 `/api/process-mock` |
 | `frontend/src/pages/SessionPage.tsx` | 课中录音页：实时录音 + inline 文字标注 |
 | `frontend/src/pages/ProcessingPage.tsx` | 处理中等待页：流水线进度显示 |
-| `frontend/src/pages/NotesPage.tsx` | 笔记主视图：三栏布局（slide nav + PPT 画布 + 笔记面板）。`AiBulletRow`(L62) / `NotesPage` state(L228) / bullets 渲染(L885) |
+| `frontend/src/pages/NotesPage.tsx` | 笔记主视图：三栏布局（slide nav + PPT 画布 + 笔记面板）。IndexedDB 持久化(L20) / 类型定义(L114) / `RevealText`(L178) / `LineByLineReveal`(L219) / `StreamingExpandText`(L332) / `InlineQA`(L360) / `AiBulletRow`(L532) / `NotesPage` state(L764) / My Notes 状态(L815) / Page Chat 状态(L860) |
 | `frontend/src/pages/DetailedNotePage.tsx` | 单页笔记详情视图 |
 
 #### Components

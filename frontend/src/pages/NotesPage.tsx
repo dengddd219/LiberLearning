@@ -864,6 +864,23 @@ export default function NotesPage() {
   const [pageChatStreamingText, setPageChatStreamingText] = useState('')
   const pageChatBottomRef = useRef<HTMLDivElement>(null)
 
+  // Drawer phase: 'closed' | 'input' | 'full'
+  const [drawerPhase, setDrawerPhase] = useState<'closed' | 'input' | 'full'>('closed')
+  const [drawerHeightPx, setDrawerHeightPx] = useState<number | null>(null) // null = use default %
+  const [drawerModel, setDrawerModel] = useState('Auto')
+  const [drawerModelDDOpen, setDrawerModelDDOpen] = useState(false)
+
+  // 切换页面时收回抽屉
+  const drawerPrevPageRef = useRef(currentPage)
+  useEffect(() => {
+    if (drawerPrevPageRef.current !== currentPage) {
+      setDrawerPhase('closed')
+      setDrawerHeightPx(null)
+      setPageChatInput('')
+      drawerPrevPageRef.current = currentPage
+    }
+  }, [currentPage])
+
   const getPageChat = (page: number): PageChatMessage[] => pageChatMessages.get(page) ?? []
 
   // 切换页面时加载 page chat
@@ -1423,90 +1440,41 @@ export default function NotesPage() {
         {/* Right panel: Notes */}
         <aside
           className="flex-shrink-0 flex flex-col overflow-hidden"
-          style={{ width: `${notesPanelWidth}px`, background: C.white }}
+          style={{ width: `${notesPanelWidth}px`, background: C.white, position: 'relative' }}
         >
-          {/* Pill toggle */}
-          <div className="flex-shrink-0 px-6 pt-4 pb-4">
-            <div
-              role="group"
-              aria-label="笔记模式"
-              className="flex items-center p-1"
-              style={{ background: C.sidebar, borderRadius: '9999px' }}
-            >
-              {/* My Notes */}
-              <button
-                type="button"
-                role="tab"
-                aria-selected={noteMode === 'my'}
-                onClick={() => setNoteMode('my')}
-                className="flex-1 flex items-center justify-center cursor-pointer transition-all duration-150 py-1.5 px-3"
-                style={{
-                  borderRadius: '9999px',
-                  fontWeight: '500',
-                  background: noteMode === 'my' ? C.white : 'transparent',
-                  color: noteMode === 'my' ? C.fg : C.muted,
-                  boxShadow: noteMode === 'my' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
-                  border: 'none',
-                  fontSize: '12px',
-                }}
-              >
-                My Notes
-              </button>
-              {/* AI Notes */}
-              <button
-                type="button"
-                role="tab"
-                aria-selected={noteMode === 'ai'}
-                onClick={() => setNoteMode('ai')}
-                className="flex-1 flex items-center justify-center gap-1.5 cursor-pointer transition-all duration-150 py-1.5 px-3"
-                style={{
-                  borderRadius: '9999px',
-                  fontWeight: noteMode === 'ai' ? '600' : '500',
-                  background: noteMode === 'ai' ? C.white : 'transparent',
-                  color: noteMode === 'ai' ? C.fg : C.muted,
-                  boxShadow: noteMode === 'ai' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
-                  border: 'none',
-                  fontSize: '12px',
-                }}
-              >
-                {/* Left sparkle icon */}
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path
-                    d="M12 2L14.09 8.26L21 9.27L16 13.97L17.18 21L12 17.77L6.82 21L8 13.97L3 9.27L9.91 8.26L12 2Z"
-                    fill={noteMode === 'ai' ? C.fg : C.muted}
-                  />
-                </svg>
-                AI Notes
-                {/* Right sparkle icon — only when active */}
-                {noteMode === 'ai' && (
-                  <svg width="7" height="7" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path
-                      d="M12 2L14.09 8.26L21 9.27L16 13.97L17.18 21L12 17.77L6.82 21L8 13.97L3 9.27L9.91 8.26L12 2Z"
-                      fill={C.fg}
-                    />
-                  </svg>
-                )}
-              </button>
-              {/* Transcript */}
-              <button
-                type="button"
-                role="tab"
-                aria-selected={noteMode === 'transcript'}
-                onClick={() => setNoteMode('transcript')}
-                className="flex-1 flex items-center justify-center cursor-pointer transition-all duration-150 py-1.5 px-3"
-                style={{
-                  borderRadius: '9999px',
-                  fontWeight: '500',
-                  background: noteMode === 'transcript' ? C.white : 'transparent',
-                  color: noteMode === 'transcript' ? C.fg : C.muted,
-                  boxShadow: noteMode === 'transcript' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
-                  border: 'none',
-                  fontSize: '12px',
-                }}
-              >
-                Transcript
-              </button>
-            </div>
+          {/* Tab bar */}
+          <div
+            className="flex-shrink-0 flex items-end"
+            style={{ padding: '14px 18px 0', borderBottom: `1px solid ${C.divider}`, gap: 0 }}
+          >
+            {(['my', 'ai', 'transcript'] as const).map((mode) => {
+              const label = mode === 'my' ? 'My Notes' : mode === 'ai' ? 'AI Notes' : 'Transcript'
+              const active = noteMode === mode
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setNoteMode(mode)}
+                  style={{
+                    padding: '6px 16px 10px',
+                    fontSize: '13px',
+                    fontWeight: active ? '700' : '500',
+                    color: active ? C.fg : C.muted,
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: `2px solid ${active ? '#798C00' : 'transparent'}`,
+                    marginBottom: '-1px',
+                    cursor: 'pointer',
+                    transition: 'color 0.15s',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {label}
+                </button>
+              )
+            })}
           </div>
 
           {/* Notes content area */}
@@ -1514,8 +1482,6 @@ export default function NotesPage() {
 
             {noteMode === 'my' ? (() => {
               const myText = getMyNoteText(currentPage)
-              const pageChat = getPageChat(currentPage)
-              const hasChatHistory = pageChat.length > 0 || pageChatStreaming
               const pptAnnotations = annotationsForPage(currentPage).filter(a => a.text.trim())
 
               return (
@@ -1546,39 +1512,6 @@ export default function NotesPage() {
                           {a.text}
                         </p>
                       ))}
-                    </div>
-                  )}
-
-                  {/* 分隔线 + 聊天记录（有聊天才显示） */}
-                  {hasChatHistory && (
-                    <div style={{ marginTop: '16px' }}>
-                      <div style={{ height: '1px', background: C.divider, marginBottom: '16px' }} />
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {pageChat.map((msg, i) => (
-                          <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                            <div style={{
-                              maxWidth: '85%', padding: '7px 11px', fontSize: '13px', lineHeight: '1.55',
-                              borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-                              background: msg.role === 'user' ? C.fg : C.sidebar,
-                              color: msg.role === 'user' ? C.white : C.fg,
-                              whiteSpace: 'pre-wrap',
-                            }}>
-                              {msg.content}
-                            </div>
-                          </div>
-                        ))}
-                        {pageChatStreaming && pageChatStreamingText && (
-                          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                            <div style={{
-                              maxWidth: '85%', padding: '7px 11px', fontSize: '13px', lineHeight: '1.55',
-                              borderRadius: '12px 12px 12px 2px', background: C.sidebar, color: C.fg, whiteSpace: 'pre-wrap',
-                            }}>
-                              {pageChatStreamingText}<span style={{ opacity: 0.5 }}>▋</span>
-                            </div>
-                          </div>
-                        )}
-                        <div ref={pageChatBottomRef} />
-                      </div>
                     </div>
                   )}
                 </div>
@@ -1845,43 +1778,6 @@ export default function NotesPage() {
                   </div>
                 )}
 
-                {/* Page-level 聊天记录（AI Notes 底部，有记录才显示） */}
-                {(() => {
-                  const pageChat = getPageChat(currentPage)
-                  const hasChatHistory = pageChat.length > 0 || pageChatStreaming
-                  if (!hasChatHistory) return null
-                  return (
-                    <div style={{ marginTop: '8px' }}>
-                      <div style={{ height: '1px', background: C.divider, marginBottom: '16px' }} />
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {pageChat.map((msg, i) => (
-                          <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                            <div style={{
-                              maxWidth: '85%', padding: '7px 11px', fontSize: '13px', lineHeight: '1.55',
-                              borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-                              background: msg.role === 'user' ? C.fg : C.sidebar,
-                              color: msg.role === 'user' ? C.white : C.fg,
-                              whiteSpace: 'pre-wrap',
-                            }}>
-                              {msg.content}
-                            </div>
-                          </div>
-                        ))}
-                        {pageChatStreaming && pageChatStreamingText && (
-                          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                            <div style={{
-                              maxWidth: '85%', padding: '7px 11px', fontSize: '13px', lineHeight: '1.55',
-                              borderRadius: '12px 12px 12px 2px', background: C.sidebar, color: C.fg, whiteSpace: 'pre-wrap',
-                            }}>
-                              {pageChatStreamingText}<span style={{ opacity: 0.5 }}>▋</span>
-                            </div>
-                          </div>
-                        )}
-                        <div ref={pageChatBottomRef} />
-                      </div>
-                    </div>
-                  )
-                })()}
               </div>
             ) : noteMode === 'transcript' ? (
               /* Transcript mode */
@@ -1931,55 +1827,353 @@ export default function NotesPage() {
             ) : null}
           </div>
 
-          {/* Bottom: chat input（My Notes / AI Notes 时显示，Transcript 隐藏） */}
-          {noteMode !== 'transcript' && (
-            <div
-              className="flex-shrink-0 px-4 py-3"
-              style={{ borderTop: `1px solid ${C.divider}` }}
-            >
-              <div style={{
-                display: 'flex', alignItems: 'flex-end', gap: '8px',
-                background: C.sidebar, borderRadius: '12px', padding: '8px 12px',
-              }}>
-                <textarea
-                  rows={1}
-                  value={pageChatInput}
-                  onChange={e => setPageChatInput(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      handlePageChatSend()
-                    }
-                  }}
-                  placeholder="向 AI 提问… (Enter 发送)"
+          {/* Bottom: drawer chat (My Notes / AI Notes) */}
+          {noteMode !== 'transcript' && (() => {
+            const pageChat = getPageChat(currentPage)
+            const drawerHeight = drawerPhase === 'full'
+              ? (drawerHeightPx != null ? `${drawerHeightPx}px` : '80%')
+              : drawerPhase === 'input' ? '210px' : '0px'
+            const models = [
+              { id: 'Auto', label: 'Auto', logo: '✦', cls: 'logo-auto' },
+              { id: 'Sonnet 4.6', label: 'Sonnet 4.6', logo: '✦', cls: 'logo-claude' },
+              { id: 'Opus 4.6', label: 'Opus 4.6', logo: '✦', cls: 'logo-claude' },
+              { id: 'Gemini 3.1 Pro', label: 'Gemini 3.1 Pro', logo: 'G', cls: 'logo-gemini' },
+              { id: 'GPT-5.2', label: 'GPT-5.2', logo: 'G', cls: 'logo-gpt' },
+              { id: 'GPT-5.4', label: 'GPT-5.4', logo: 'G', cls: 'logo-gpt' },
+            ]
+            return (
+              <>
+                {/* Overlay: click to collapse drawer — relative to <aside> */}
+                {drawerPhase !== 'closed' && (
+                  <div
+                    style={{
+                      position: 'absolute', inset: 0, zIndex: 25,
+                      cursor: 'default',
+                    }}
+                    onClick={() => setDrawerPhase('closed')}
+                  />
+                )}
+
+                {/* Drawer panel — relative to <aside> */}
+                <div
                   style={{
-                    flex: 1, resize: 'none', border: 'none', outline: 'none',
-                    background: 'transparent', fontSize: '13px', lineHeight: '1.5',
-                    color: C.fg, fontFamily: 'inherit', maxHeight: '80px', overflowY: 'auto',
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={handlePageChatSend}
-                  disabled={pageChatStreaming || !pageChatInput.trim()}
-                  style={{
-                    flexShrink: 0, width: '28px', height: '28px',
-                    borderRadius: '50%', border: 'none',
-                    background: pageChatStreaming || !pageChatInput.trim() ? C.divider : C.fg,
-                    color: C.white,
-                    cursor: pageChatStreaming || !pageChatInput.trim() ? 'default' : 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    position: 'absolute',
+                    left: 0, right: 0, bottom: 0,
+                    background: C.white,
+                    borderRadius: '14px 14px 0 0',
+                    boxShadow: drawerPhase !== 'closed' ? `0 -1px 0 ${C.divider}, 0 -10px 36px rgba(0,0,0,0.07)` : 'none',
+                    zIndex: 30,
+                    height: drawerHeight,
+                    overflow: 'hidden',
+                    display: 'flex',
                     flexDirection: 'column',
+                    transition: 'height 0.42s cubic-bezier(0.32, 0.72, 0, 1), box-shadow 0.2s ease',
                   }}
                 >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="19" x2="12" y2="5" />
-                    <polyline points="5 12 12 5 19 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          )}
+                  {/* Drag handle — resize drawer height */}
+                  <div
+                    style={{
+                      flexShrink: 0, height: '14px', cursor: 'ns-resize',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      const startY = e.clientY
+                      const aside = e.currentTarget.closest('aside') as HTMLElement | null
+                      const asideH = aside?.getBoundingClientRect().height ?? 600
+                      const startH = drawerHeightPx ?? (asideH * 0.8)
+                      const onMove = (ev: MouseEvent) => {
+                        const delta = startY - ev.clientY
+                        const next = Math.min(Math.max(startH + delta, 180), asideH - 52)
+                        setDrawerHeightPx(next)
+                      }
+                      const onUp = () => {
+                        document.removeEventListener('mousemove', onMove)
+                        document.removeEventListener('mouseup', onUp)
+                      }
+                      document.addEventListener('mousemove', onMove)
+                      document.addEventListener('mouseup', onUp)
+                    }}
+                  >
+                    <div style={{
+                      width: '32px', height: '3px', borderRadius: '2px',
+                      background: '#D0CFC5',
+                    }} />
+                  </div>
+                  {/* Drawer top bar */}
+                  <div style={{
+                    flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '10px 14px 9px',
+                    borderBottom: `1px solid ${C.divider}`,
+                    opacity: drawerPhase !== 'closed' ? 1 : 0,
+                    transition: 'opacity 0.18s ease 0.1s',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '13px', fontWeight: '600', color: C.fg }}>
+                      AI Chat
+                      <span style={{
+                        fontSize: '10px', fontWeight: '600', color: C.secondary,
+                        background: C.sidebar, border: `1px solid ${C.divider}`,
+                        borderRadius: '4px', padding: '1px 6px',
+                      }}>
+                        Page {currentPage}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setDrawerPhase('closed') }}
+                      style={{
+                        width: '26px', height: '26px', borderRadius: '6px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: 'none', background: 'transparent', cursor: 'pointer', color: C.secondary,
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Chat history (only in full phase) */}
+                  <div
+                    ref={pageChatBottomRef}
+                    style={{
+                      flex: 1, overflowY: 'auto', padding: '12px 14px',
+                      display: 'flex', flexDirection: 'column', gap: '8px',
+                      opacity: drawerPhase === 'full' ? 1 : 0,
+                      transition: 'opacity 0.22s ease',
+                    }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {pageChat.map((msg, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                        <div style={{
+                          maxWidth: '86%', padding: '7px 11px', fontSize: '13px', lineHeight: '1.55',
+                          borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                          background: msg.role === 'user' ? C.fg : C.sidebar,
+                          color: msg.role === 'user' ? C.white : C.fg,
+                          whiteSpace: 'pre-wrap',
+                        }}>
+                          {msg.content}
+                        </div>
+                      </div>
+                    ))}
+                    {pageChatStreaming && pageChatStreamingText && (
+                      <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                        <div style={{
+                          maxWidth: '86%', padding: '7px 11px', fontSize: '13px', lineHeight: '1.55',
+                          borderRadius: '12px 12px 12px 2px', background: C.sidebar, color: C.fg, whiteSpace: 'pre-wrap',
+                        }}>
+                          {pageChatStreamingText}<span style={{ opacity: 0.5 }}>▋</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Input area */}
+                  <div
+                    style={{
+                      flexShrink: 0,
+                      padding: '10px 14px 14px',
+                      opacity: drawerPhase !== 'closed' ? 1 : 0,
+                      transform: drawerPhase !== 'closed' ? 'translateY(0)' : 'translateY(5px)',
+                      transition: 'opacity 0.2s ease 0.14s, transform 0.2s ease 0.14s',
+                    }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {/* Context tag */}
+                    <div style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '4px',
+                      background: C.sidebar, border: `1px solid ${C.divider}`,
+                      borderRadius: '5px', padding: '2px 7px', fontSize: '11px', color: C.secondary,
+                      marginBottom: '7px',
+                    }}>
+                      📄 Page {currentPage}
+                    </div>
+
+                    {/* Input box */}
+                    <div style={{
+                      border: `1.5px solid ${C.divider}`,
+                      borderRadius: '10px',
+                      padding: '8px 11px 6px',
+                    }}>
+                      <textarea
+                        rows={1}
+                        value={pageChatInput}
+                        onChange={e => setPageChatInput(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault()
+                            if (pageChatInput.trim()) {
+                              handlePageChatSend()
+                              setDrawerPhase('full')
+                            }
+                          }
+                        }}
+                        placeholder="Ask AI about this page… (Enter to send)"
+                        style={{
+                          width: '100%', resize: 'none', border: 'none', outline: 'none',
+                          background: 'transparent', fontSize: '13px', lineHeight: '1.5',
+                          color: C.fg, fontFamily: 'inherit', maxHeight: '80px', overflowY: 'auto',
+                          caretColor: '#798C00', display: 'block', minHeight: '34px',
+                        }}
+                      />
+
+                      {/* Toolbar */}
+                      <div style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        paddingTop: '6px', borderTop: `1px solid ${C.divider}`, marginTop: '4px',
+                      }}>
+                        {/* Left: model picker */}
+                        <div style={{ position: 'relative' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setDrawerModelDDOpen(v => !v) }}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '4px',
+                              padding: '3px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: '500',
+                              color: C.secondary, background: C.sidebar, border: `1px solid ${C.divider}`,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {drawerModel}
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                              <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                          </button>
+                          {drawerModelDDOpen && (
+                            <div
+                              onClick={e => e.stopPropagation()}
+                              style={{
+                                position: 'absolute', bottom: 'calc(100% + 6px)', left: 0,
+                                width: '220px', background: C.white,
+                                borderRadius: '10px',
+                                boxShadow: '0 4px 20px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.06)',
+                                padding: '5px 0', zIndex: 300,
+                              }}
+                            >
+                              {models.map((m, idx) => (
+                                <div key={m.id}>
+                                  {idx === 1 && <div style={{ height: '1px', background: C.divider, margin: '3px 0' }} />}
+                                  <div
+                                    style={{
+                                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                      padding: '8px 12px', cursor: 'pointer',
+                                    }}
+                                    onClick={() => { setDrawerModel(m.id); setDrawerModelDDOpen(false) }}
+                                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = C.sidebar}
+                                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+                                      <div style={{
+                                        width: '20px', height: '20px', borderRadius: '50%',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        fontSize: m.cls === 'logo-gemini' || m.cls === 'logo-gpt' ? '9px' : '11px',
+                                        fontWeight: '700', color: '#fff',
+                                        background: m.cls === 'logo-auto'
+                                          ? 'linear-gradient(135deg,#EAE9E0,#D0CFC5)'
+                                          : m.cls === 'logo-claude' ? '#d97757'
+                                          : m.cls === 'logo-gemini' ? 'linear-gradient(135deg,#4285f4,#ea4335,#fbbc05,#34a853)'
+                                          : '#10a37f',
+                                        ...(m.cls === 'logo-auto' ? { color: '#798C00' } : {}),
+                                      }}>
+                                        {m.logo}
+                                      </div>
+                                      <span style={{ fontSize: '13px', color: C.fg }}>
+                                        {m.label}
+                                        {idx > 0 && (
+                                          <span style={{
+                                            fontSize: '10px', color: '#798C00',
+                                            background: 'rgba(121,140,0,0.10)',
+                                            borderRadius: '4px', padding: '1px 5px', marginLeft: '5px', fontWeight: '500',
+                                          }}>Beta</span>
+                                        )}
+                                      </span>
+                                    </div>
+                                    {drawerModel === m.id && (
+                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#798C00" strokeWidth="2.5" strokeLinecap="round">
+                                        <polyline points="20 6 9 17 4 12"/>
+                                      </svg>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Right: mic + send */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <button type="button" style={{
+                            width: '26px', height: '26px', borderRadius: '5px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            border: 'none', background: 'transparent', cursor: 'pointer', color: C.muted,
+                          }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                              <rect x="9" y="2" width="6" height="11" rx="3"/>
+                              <path d="M5 10a7 7 0 0 0 14 0"/>
+                              <line x1="12" y1="19" x2="12" y2="22"/>
+                              <line x1="9" y1="22" x2="15" y2="22"/>
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (pageChatInput.trim()) {
+                                handlePageChatSend()
+                                setDrawerPhase('full')
+                              }
+                            }}
+                            disabled={pageChatStreaming || !pageChatInput.trim()}
+                            style={{
+                              width: '26px', height: '26px', borderRadius: '50%', border: 'none',
+                              background: pageChatStreaming || !pageChatInput.trim() ? C.muted : '#798C00',
+                              color: C.white,
+                              cursor: pageChatStreaming || !pageChatInput.trim() ? 'default' : 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              transition: 'background 0.15s',
+                            }}
+                          >
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Collapsed capsule — bottom bar, always in flow */}
+                <div
+                  style={{
+                    flexShrink: 0,
+                    borderTop: `1px solid ${C.divider}`,
+                    padding: '10px 14px 16px',
+                    opacity: drawerPhase === 'closed' ? 1 : 0,
+                    pointerEvents: drawerPhase === 'closed' ? 'auto' : 'none',
+                    transition: 'opacity 0.15s ease',
+                  }}
+                >
+                  <div
+                    onClick={() => setDrawerPhase('input')}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '9px',
+                      background: C.sidebar, border: `1px solid ${C.divider}`,
+                      borderRadius: '14px', padding: '9px 14px', cursor: 'text',
+                    }}
+                  >
+                    <div style={{
+                      width: '17px', height: '17px', borderRadius: '50%', flexShrink: 0,
+                      background: 'conic-gradient(from 0deg, #798C00, #b5c833, #798C00)',
+                    }} />
+                    <span style={{ fontSize: '13px', color: C.muted }}>Ask AI about this page…</span>
+                  </div>
+                </div>
+              </>
+            )
+          })()}
         </aside>
       </div>
 

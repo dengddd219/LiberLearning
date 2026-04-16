@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Page Chat Input — LiberStudy</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg:        #F7F7F2;
+    --sidebar:   #F2F2EC;
+    --base:      #EAE9E0;
+    --divider:   #E3E3DA;
+    --warm-gray: #D0CFC5;
+    --olive:     #798C00;
+    --fg:        #292929;
+    --secondary: #72726E;
+    --white:     #FFFFFF;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: var(--base);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 40px;
+    padding: 40px;
+  }
+
+  .notes-panel {
+    width: 420px;
+    height: 640px;
+    background: var(--white);
+    border-radius: 12px;
+    box-shadow: 0 4px 32px rgba(0,0,0,0.10);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .panel-tabs {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 12px 16px 0;
+    border-bottom: 1px solid var(--divider);
+  }
+  .tab {
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--secondary);
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+  }
+  .tab.active { color: var(--fg); border-bottom-color: var(--olive); font-weight: 600; }
+
+  .panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .msg-row { display: flex; }
+  .msg-row.user { justify-content: flex-end; }
+  .msg-row.ai   { justify-content: flex-start; }
+  .bubble {
+    max-width: 85%;
+    padding: 7px 11px;
+    font-size: 13px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+  }
+  .bubble.user { background: var(--fg); color: var(--white); border-radius: 12px 12px 2px 12px; }
+  .bubble.ai   { background: var(--sidebar); color: var(--fg); border-radius: 12px 12px 12px 2px; }
+
+  .empty-hint {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 8px;
+    color: var(--warm-gray);
+    font-size: 13px;
+  }
+
+  /* ── Bottom chat ── */
+  .chat-bottom {
+    flex-shrink: 0;
+    padding: 10px 14px 14px;
+    border-top: 1px solid var(--divider);
+    position: relative;
+  }
+
+  /* 收起态 */
+  .input-collapsed {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    background: var(--sidebar);
+    border: 1px solid var(--divider);
+    border-radius: 14px;
+    padding: 10px 14px;
+    cursor: text;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+  .input-collapsed.hiding { opacity: 0; transform: scale(0.97); pointer-events: none; }
+
+  .orb {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: conic-gradient(from 0deg, #798C00, #b5c833, #798C00);
+    flex-shrink: 0;
+  }
+  .collapsed-placeholder { flex: 1; font-size: 13px; color: var(--warm-gray); }
+
+  /* 展开面板 */
+  .panel-expanded {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: var(--white);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -1px 0 var(--divider), 0 -6px 24px rgba(0,0,0,0.06);
+    transform: translateY(100%);
+    opacity: 0;
+    transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.18s ease;
+    z-index: 10;
+  }
+  .panel-expanded.open { transform: translateY(0); opacity: 1; }
+
+  /* 顶部导航 */
+  .exp-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 14px 9px;
+    border-bottom: 1px solid var(--divider);
+    opacity: 0;
+    transition: opacity 0.2s ease 0.08s;
+  }
+  .panel-expanded.open .exp-nav { opacity: 1; }
+
+  .exp-nav-left { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--fg); }
+  .page-badge {
+    font-size: 10px; font-weight: 600; color: var(--secondary);
+    background: var(--sidebar); border: 1px solid var(--divider);
+    border-radius: 4px; padding: 1px 6px; letter-spacing: 0.03em;
+  }
+  .exp-nav-right { display: flex; align-items: center; gap: 4px; }
+
+  .nav-btn {
+    width: 26px; height: 26px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--secondary);
+    border: none; background: transparent;
+    transition: background 0.1s;
+  }
+  .nav-btn:hover { background: var(--sidebar); }
+
+  /* 输入区 */
+  .exp-input-wrap {
+    padding: 10px 14px 6px;
+    opacity: 0; transform: translateY(4px);
+    transition: opacity 0.2s ease 0.12s, transform 0.2s ease 0.12s;
+  }
+  .panel-expanded.open .exp-input-wrap { opacity: 1; transform: translateY(0); }
+
+  .context-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--sidebar); border: 1px solid var(--divider);
+    border-radius: 5px; padding: 2px 7px; font-size: 11px; color: var(--secondary);
+    margin-bottom: 7px;
+  }
+
+  .exp-input-box {
+    border: 1.5px solid var(--divider);
+    border-radius: 10px;
+    padding: 8px 11px 6px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .exp-input-box.focused {
+    border-color: var(--olive);
+    box-shadow: 0 0 0 3px rgba(121,140,0,0.10);
+  }
+
+  .exp-textarea {
+    width: 100%; font-size: 13px; color: var(--fg);
+    font-family: inherit; line-height: 1.5;
+    resize: none; border: none; outline: none; background: transparent;
+    min-height: 38px; max-height: 100px; overflow-y: auto; display: block;
+    caret-color: var(--olive);
+  }
+  .exp-textarea::placeholder { color: var(--warm-gray); }
+
+  /* 工具栏 */
+  .toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-top: 6px; border-top: 1px solid var(--divider); margin-top: 4px;
+  }
+  .tb-left { display: flex; gap: 0; align-items: center; }
+  .tb-right { display: flex; align-items: center; gap: 4px; }
+
+  .tb-btn {
+    width: 26px; height: 26px; border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--warm-gray);
+    border: none; background: transparent; transition: background 0.1s, color 0.1s;
+  }
+  .tb-btn:hover { background: var(--sidebar); color: var(--secondary); }
+
+  /* ── 模型选择按钮（在工具栏左侧） ── */
+  .model-select-btn {
+    display: flex; align-items: center; gap: 4px;
+    padding: 3px 8px; border-radius: 6px;
+    font-size: 12px; font-weight: 500; color: var(--secondary);
+    background: var(--sidebar); border: 1px solid var(--divider);
+    cursor: pointer; transition: background 0.12s;
+    position: relative;
+  }
+  .model-select-btn:hover { background: var(--base); }
+  .model-select-btn svg { width: 10px; height: 10px; color: var(--warm-gray); }
+
+  /* ── 模型下拉菜单 ── */
+  .model-dropdown {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    width: 230px;
+    background: var(--white);
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.06);
+    padding: 5px 0;
+    z-index: 100;
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    transform-origin: bottom left;
+  }
+  .model-dropdown.open {
+    opacity: 1; transform: translateY(0) scale(1); pointer-events: auto;
+  }
+
+  .model-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px; cursor: pointer;
+    transition: background 0.08s;
+  }
+  .model-item:hover { background: var(--sidebar); }
+
+  .model-item-left { display: flex; align-items: center; gap: 9px; }
+
+  .model-logo {
+    width: 20px; height: 20px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 11px; font-weight: 700;
+  }
+  .logo-auto    { background: linear-gradient(135deg, var(--base), var(--divider)); color: var(--olive); }
+  .logo-claude  { background: #d97757; color: #fff; font-size: 9px; }
+  .logo-gemini  { background: linear-gradient(135deg,#4285f4,#ea4335,#fbbc05,#34a853); color: #fff; font-size: 9px; }
+  .logo-gpt     { background: #10a37f; color: #fff; font-size: 9px; }
+
+  .model-name { font-size: 13px; color: var(--fg); }
+  .model-tag {
+    font-size: 10px; color: var(--olive);
+    background: rgba(121,140,0,0.10);
+    border-radius: 4px; padding: 1px 5px; margin-left: 5px; font-weight: 500;
+  }
+  .model-check { color: var(--olive); }
+  .model-check svg { width: 13px; height: 13px; }
+
+  .dropdown-sep { height: 1px; background: var(--divider); margin: 3px 0; }
+
+  .send-btn {
+    width: 26px; height: 26px; border-radius: 50%; border: none;
+    background: var(--warm-gray); color: var(--white);
+    display: flex; align-items: center; justify-content: center;
+    cursor: default; transition: background 0.15s;
+  }
+  .send-btn.active { background: var(--olive); cursor: pointer; }
+  .send-btn.active:hover { background: #697a00; }
+
+  /* 遮罩 */
+  .chat-overlay {
+    position: absolute; inset: 0;
+    background: rgba(41,41,41,0.04);
+    border-radius: 12px;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s; z-index: 9;
+  }
+  .chat-overlay.visible { opacity: 1; pointer-events: auto; }
+
+  .label {
+    font-size: 11px; font-weight: 600; color: var(--secondary);
+    letter-spacing: 0.06em; margin-bottom: 8px; text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── 面板 1：交互演示 ── -->
+<div>
+  <div class="label">交互演示（点击输入框展开）</div>
+  <div class="notes-panel">
+    <div class="panel-tabs">
+      <div class="tab active">我的笔记</div>
+      <div class="tab">AI 笔记</div>
+      <div class="tab">原文</div>
+    </div>
+
+    <div class="panel-content" id="contentArea">
+      <div class="msg-row ai">
+        <div class="bubble ai">这一页的核心是「语义对齐」——用 embedding 余弦相似度把 ASR 片段映射到对应 PPT 页面。</div>
+      </div>
+      <div class="msg-row user">
+        <div class="bubble user">为什么不直接用时间轴排序？</div>
+      </div>
+      <div class="msg-row ai">
+        <div class="bubble ai">因为老师讲课经常跳回前页，时间顺序不等于 PPT 顺序，语义相似度更可靠。</div>
+      </div>
+    </div>
+
+    <div class="chat-bottom" id="chatBottom">
+      <div class="chat-overlay" id="overlay" onclick="collapse()"></div>
+
+      <!-- 收起态 -->
+      <div class="input-collapsed" id="collapsed" onclick="expand()">
+        <div class="orb"></div>
+        <div class="collapsed-placeholder">继续提问…</div>
+      </div>
+
+      <!-- 展开面板 -->
+      <div class="panel-expanded" id="expandedPanel">
+        <!-- 顶部导航 -->
+        <div class="exp-nav">
+          <div class="exp-nav-left">
+            AI 对话
+            <span class="page-badge">第 3 页</span>
+          </div>
+          <div class="exp-nav-right">
+            <button class="nav-btn" onclick="collapse()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- 输入区 -->
+        <div class="exp-input-wrap">
+          <div class="context-tag">
+            <span>📄</span>
+            <span>第 3 页 · 语义对齐算法</span>
+          </div>
+          <div class="exp-input-box" id="inputBox">
+            <textarea
+              class="exp-textarea"
+              id="mainTextarea"
+              placeholder="向 AI 提问… (Enter 发送)"
+              oninput="onInput(this)"
+              onkeydown="onKeyDown(event)"
+            ></textarea>
+            <!-- 工具栏 -->
+            <div class="toolbar">
+              <div class="tb-left" style="gap:4px; position:relative;">
+                <!-- 模型选择按钮 -->
+                <div class="model-select-btn" id="modelBtn" onclick="toggleDropdown(event)">
+                  <span id="modelLabel">自动</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+
+                  <!-- 下拉菜单 -->
+                  <div class="model-dropdown" id="modelDropdown" onclick="event.stopPropagation()">
+                    <div class="model-item" onclick="selectModel('自动','auto')">
+                      <div class="model-item-left">
+                        <div class="model-logo logo-auto">✦</div>
+                        <span class="model-name">自动</span>
+                      </div>
+                      <div class="model-check" id="check-auto">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      </div>
+                    </div>
+                    <div class="dropdown-sep"></div>
+                    <div class="model-item" onclick="selectModel('Sonnet 4.6','claude-sonnet')">
+                      <div class="model-item-left">
+                        <div class="model-logo logo-claude">✦</div>
+                        <span class="model-name">Sonnet 4.6 <span class="model-tag">测试版</span></span>
+                      </div>
+                      <div class="model-check" style="opacity:0" id="check-claude-sonnet">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      </div>
+                    </div>
+                    <div class="model-item" onclick="selectModel('Opus 4.6','claude-opus')">
+                      <div class="model-item-left">
+                        <div class="model-logo logo-claude">✦</div>
+                        <span class="model-name">Opus 4.6 <span class="model-tag">测试版</span></span>
+                      </div>
+                      <div class="model-check" style="opacity:0" id="check-claude-opus">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      </div>
+                    </div>
+                    <div class="model-item" onclick="selectModel('Gemini 3.1 Pro','gemini')">
+                      <div class="model-item-left">
+                        <div class="model-logo logo-gemini" style="font-size:9px;">G</div>
+                        <span class="model-name">Gemini 3.1 Pro <span class="model-tag">测试版</span></span>
+                      </div>
+                      <div class="model-check" style="opacity:0" id="check-gemini">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      </div>
+                    </div>
+                    <div class="model-item" onclick="selectModel('GPT-5.2','gpt52')">
+                      <div class="model-item-left">
+                        <div class="model-logo logo-gpt" style="font-size:9px;">G</div>
+                        <span class="model-name">GPT-5.2 <span class="model-tag">测试版</span></span>
+                      </div>
+                      <div class="model-check" style="opacity:0" id="check-gpt52">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      </div>
+                    </div>
+                    <div class="model-item" onclick="selectModel('GPT-5.4','gpt54')">
+                      <div class="model-item-left">
+                        <div class="model-logo logo-gpt" style="font-size:9px;">G</div>
+                        <span class="model-name">GPT-5.4 <span class="model-tag">测试版</span></span>
+                      </div>
+                      <div class="model-check" style="opacity:0" id="check-gpt54">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 附件按钮 -->
+                <button class="tb-btn" title="附件">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14">
+                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                </button>
+              </div>
+
+              <div class="tb-right">
+                <!-- 麦克风 -->
+                <button class="tb-btn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="14" height="14">
+                    <rect x="9" y="2" width="6" height="11" rx="3"/>
+                    <path d="M5 10a7 7 0 0 0 14 0"/>
+                    <line x1="12" y1="19" x2="12" y2="22"/>
+                    <line x1="9" y1="22" x2="15" y2="22"/>
+                  </svg>
+                </button>
+                <!-- 发送 -->
+                <button class="send-btn" id="sendBtn" onclick="handleSend()">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="10" height="10">
+                    <line x1="12" y1="19" x2="12" y2="5"/>
+                    <polyline points="5 12 12 5 19 12"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 面板 2：展开态静态预览 ── -->
+<div>
+  <div class="label">展开态静态预览</div>
+  <div class="notes-panel">
+    <div class="panel-tabs">
+      <div class="tab active">我的笔记</div>
+      <div class="tab">AI 笔记</div>
+      <div class="tab">原文</div>
+    </div>
+    <div class="panel-content">
+      <div class="empty-hint">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#D0CFC5" stroke-width="1.5">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span>向 AI 提问，了解这一页内容</span>
+      </div>
+    </div>
+    <div class="chat-bottom" style="padding:0; border-top:none;">
+      <div class="panel-expanded open" style="position:relative; transform:none; opacity:1; box-shadow:0 -1px 0 var(--divider);">
+        <div class="exp-nav" style="opacity:1;">
+          <div class="exp-nav-left">
+            AI 对话
+            <span class="page-badge">第 3 页</span>
+          </div>
+          <div class="exp-nav-right">
+            <button class="nav-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="exp-input-wrap" style="opacity:1; transform:none;">
+          <div class="context-tag">
+            <span>📄</span>
+            <span>第 3 页 · 语义对齐算法</span>
+          </div>
+          <div class="exp-input-box focused">
+            <textarea class="exp-textarea" placeholder="向 AI 提问… (Enter 发送)" style="min-height:32px;"></textarea>
+            <div class="toolbar">
+              <div class="tb-left" style="gap:4px;">
+                <div class="model-select-btn" style="pointer-events:none;">
+                  <span>自动</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="10" height="10">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                <button class="tb-btn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14">
+                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="tb-right">
+                <button class="tb-btn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="14" height="14">
+                    <rect x="9" y="2" width="6" height="11" rx="3"/>
+                    <path d="M5 10a7 7 0 0 0 14 0"/>
+                    <line x1="12" y1="19" x2="12" y2="22"/>
+                    <line x1="9" y1="22" x2="15" y2="22"/>
+                  </svg>
+                </button>
+                <button class="send-btn active">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="10" height="10">
+                    <line x1="12" y1="19" x2="12" y2="5"/>
+                    <polyline points="5 12 12 5 19 12"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let isOpen = false
+  let dropdownOpen = false
+  let currentModelId = 'auto'
+
+  function expand() {
+    if (isOpen) return
+    isOpen = true
+    document.getElementById('collapsed').classList.add('hiding')
+    document.getElementById('overlay').classList.add('visible')
+    setTimeout(() => {
+      document.getElementById('expandedPanel').classList.add('open')
+      setTimeout(() => document.getElementById('mainTextarea').focus(), 260)
+    }, 40)
+  }
+
+  function collapse() {
+    if (!isOpen) return
+    isOpen = false
+    closeDropdown()
+    document.getElementById('expandedPanel').classList.remove('open')
+    document.getElementById('overlay').classList.remove('visible')
+    setTimeout(() => {
+      document.getElementById('collapsed').classList.remove('hiding')
+    }, 280)
+  }
+
+  function toggleDropdown(e) {
+    e.stopPropagation()
+    dropdownOpen = !dropdownOpen
+    document.getElementById('modelDropdown').classList.toggle('open', dropdownOpen)
+  }
+
+  function closeDropdown() {
+    dropdownOpen = false
+    document.getElementById('modelDropdown').classList.remove('open')
+  }
+
+  function selectModel(label, id) {
+    document.querySelectorAll('.model-check').forEach(c => c.style.opacity = '0')
+    const el = document.getElementById('check-' + id)
+    if (el) el.style.opacity = '1'
+    currentModelId = id
+    document.getElementById('modelLabel').textContent = label
+    closeDropdown()
+  }
+
+  function onInput(el) {
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 100) + 'px'
+    document.getElementById('sendBtn').classList.toggle('active', el.value.trim().length > 0)
+  }
+
+  function onKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
+    if (e.key === 'Escape') { if (dropdownOpen) closeDropdown(); else collapse() }
+  }
+
+  function handleSend() {
+    const ta = document.getElementById('mainTextarea')
+    const text = ta.value.trim()
+    if (!text) return
+    const content = document.getElementById('contentArea')
+    const row = document.createElement('div')
+    row.className = 'msg-row user'
+    row.innerHTML = `<div class="bubble user">${text.replace(/</g,'&lt;')}</div>`
+    content.appendChild(row)
+    content.scrollTop = content.scrollHeight
+    ta.value = ''; ta.style.height = 'auto'
+    document.getElementById('sendBtn').classList.remove('active')
+    collapse()
+    setTimeout(() => {
+      const aiRow = document.createElement('div')
+      aiRow.className = 'msg-row ai'
+      aiRow.innerHTML = `<div class="bubble ai">（模拟回复）收到你的问题，正在处理…</div>`
+      content.appendChild(aiRow)
+      content.scrollTop = content.scrollHeight
+    }, 600)
+  }
+
+  // focus 样式
+  document.getElementById('mainTextarea').addEventListener('focus', () => {
+    document.getElementById('inputBox').classList.add('focused')
+  })
+  document.getElementById('mainTextarea').addEventListener('blur', () => {
+    document.getElementById('inputBox').classList.remove('focused')
+  })
+
+  // 点击外部关闭下拉
+  document.addEventListener('click', (e) => {
+    if (dropdownOpen && !document.getElementById('modelBtn').contains(e.target)) {
+      closeDropdown()
+    }
+  })
+</script>
+</body>
+</html>

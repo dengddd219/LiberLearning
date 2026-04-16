@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Page Chat v3 — LiberStudy</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg:        #F7F7F2;
+  --sidebar:   #F2F2EC;
+  --base:      #EAE9E0;
+  --divider:   #E3E3DA;
+  --warm-gray: #D0CFC5;
+  --olive:     #798C00;
+  --fg:        #292929;
+  --secondary: #72726E;
+  --white:     #FFFFFF;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', sans-serif;
+  background: var(--base);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 48px;
+  padding: 48px;
+}
+
+.col { display:flex; flex-direction:column; align-items:center; gap:10px; }
+.col-label {
+  font-size:10px; font-weight:600; letter-spacing:.08em;
+  color:var(--secondary); text-transform:uppercase;
+}
+
+/* ── Notes Panel shell ── */
+.notes-panel {
+  width: 400px;
+  height: 620px;
+  background: var(--white);
+  border-radius: 14px;
+  box-shadow: 0 2px 24px rgba(0,0,0,.09), 0 0 0 1px rgba(0,0,0,.05);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── Tabs (image style: plain text, active = bold + olive underline) ── */
+.panel-tabs {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  padding: 14px 18px 0;
+  border-bottom: 1px solid var(--divider);
+}
+.tab {
+  padding: 6px 14px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--warm-gray);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color .15s;
+  white-space: nowrap;
+}
+.tab:hover { color: var(--secondary); }
+.tab.active {
+  color: var(--fg);
+  font-weight: 700;
+  border-bottom-color: var(--olive);
+}
+
+/* ── Notes content ── */
+.panel-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 18px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  transition: opacity .25s ease;
+}
+.panel-content.dimmed { opacity: .28; pointer-events: none; }
+
+.note-line {
+  font-size: 13px;
+  color: var(--fg);
+  line-height: 1.75;
+}
+.note-muted {
+  font-size: 13px;
+  color: var(--warm-gray);
+  line-height: 1.75;
+}
+
+/* ── Bottom collapsed capsule ── */
+.chat-bottom {
+  flex-shrink: 0;
+  padding: 10px 14px 16px;
+  border-top: 1px solid var(--divider);
+  position: relative;
+  z-index: 20;
+  transition: opacity .2s ease;
+}
+.chat-bottom.hidden-below { opacity:0; pointer-events:none; }
+
+.input-collapsed {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--sidebar);
+  border: 1px solid var(--divider);
+  border-radius: 14px;
+  padding: 9px 14px;
+  cursor: text;
+  transition: border-color .15s, box-shadow .15s;
+}
+.input-collapsed:hover {
+  border-color: var(--warm-gray);
+}
+
+.orb {
+  width: 17px; height: 17px; border-radius: 50%; flex-shrink: 0;
+  background: conic-gradient(from 0deg, #798C00 0%, #b5c833 50%, #798C00 100%);
+}
+.capsule-text { flex:1; font-size: 13px; color: var(--warm-gray); }
+
+/* ── Drawer (absolute, sits above content) ── */
+.chat-drawer {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  background: var(--white);
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 -1px 0 var(--divider), 0 -10px 36px rgba(0,0,0,.07);
+  z-index: 30;
+
+  /* default: hidden below */
+  height: 200px; /* input-only height */
+  transform: translateY(100%);
+  opacity: 0;
+  transition:
+    transform .38s cubic-bezier(.32,.72,0,1),
+    opacity   .2s ease,
+    height    .42s cubic-bezier(.32,.72,0,1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chat-drawer.phase-input {
+  transform: translateY(0);
+  opacity: 1;
+}
+.chat-drawer.phase-full {
+  transform: translateY(0);
+  opacity: 1;
+  /* cover content area: panel height minus tab bar (~50px) minus bottom bar (~76px) */
+  height: calc(100% - 52px);
+}
+
+/* Drawer top bar */
+.drawer-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 9px;
+  border-bottom: 1px solid var(--divider);
+  opacity: 0;
+  transition: opacity .18s ease .1s;
+}
+.chat-drawer.phase-input .drawer-bar,
+.chat-drawer.phase-full  .drawer-bar { opacity: 1; }
+
+.drawer-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.page-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--secondary);
+  background: var(--sidebar);
+  border: 1px solid var(--divider);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.icon-btn {
+  width: 26px; height: 26px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--secondary);
+  border: none; background: transparent;
+  transition: background .1s;
+}
+.icon-btn:hover { background: var(--sidebar); }
+
+/* Chat history (visible only in full phase) */
+.chat-history {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  opacity: 0;
+  transition: opacity .22s ease;
+}
+.chat-drawer.phase-full .chat-history { opacity: 1; }
+
+.msg-row { display: flex; }
+.msg-row.user { justify-content: flex-end; }
+.msg-row.ai   { justify-content: flex-start; }
+.bubble {
+  max-width: 86%;
+  padding: 7px 11px;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+.bubble.user {
+  background: var(--fg);
+  color: var(--white);
+  border-radius: 12px 12px 2px 12px;
+}
+.bubble.ai {
+  background: var(--sidebar);
+  color: var(--fg);
+  border-radius: 12px 12px 12px 2px;
+}
+
+/* streaming cursor */
+.cursor {
+  display: inline-block;
+  width: 2px; height: 13px;
+  background: var(--secondary);
+  border-radius: 1px;
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: blink .75s step-end infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* Input area */
+.drawer-input-area {
+  flex-shrink: 0;
+  padding: 10px 14px 14px;
+  opacity: 0;
+  transform: translateY(5px);
+  transition: opacity .2s ease .14s, transform .2s ease .14s;
+}
+.chat-drawer.phase-input .drawer-input-area,
+.chat-drawer.phase-full  .drawer-input-area {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.ctx-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--sidebar);
+  border: 1px solid var(--divider);
+  border-radius: 5px;
+  padding: 2px 7px;
+  font-size: 11px;
+  color: var(--secondary);
+  margin-bottom: 7px;
+}
+
+.input-box {
+  border: 1.5px solid var(--divider);
+  border-radius: 10px;
+  padding: 8px 11px 6px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.input-box.focused {
+  border-color: var(--olive);
+  box-shadow: 0 0 0 3px rgba(121,140,0,.09);
+}
+
+.exp-textarea {
+  width: 100%;
+  font-size: 13px;
+  color: var(--fg);
+  font-family: inherit;
+  line-height: 1.5;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  min-height: 34px;
+  max-height: 100px;
+  overflow-y: auto;
+  display: block;
+  caret-color: var(--olive);
+}
+.exp-textarea::placeholder { color: var(--warm-gray); }
+
+/* Toolbar */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 6px;
+  border-top: 1px solid var(--divider);
+  margin-top: 4px;
+}
+.tb-left  { display: flex; align-items: center; gap: 4px; position: relative; }
+.tb-right { display: flex; align-items: center; gap: 4px; }
+
+.tb-btn {
+  width: 26px; height: 26px; border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--warm-gray);
+  border: none; background: transparent;
+  transition: background .1s, color .1s;
+}
+.tb-btn:hover { background: var(--sidebar); color: var(--secondary); }
+
+/* Model picker button */
+.model-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--secondary);
+  background: var(--sidebar);
+  border: 1px solid var(--divider);
+  cursor: pointer;
+  transition: background .12s;
+  position: relative;
+  user-select: none;
+}
+.model-btn:hover { background: var(--base); }
+.model-btn svg { width:10px; height:10px; }
+
+/* Model dropdown */
+.model-dd {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  width: 234px;
+  background: var(--white);
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.12), 0 0 0 1px rgba(0,0,0,.06);
+  padding: 5px 0;
+  z-index: 200;
+  opacity: 0;
+  transform: translateY(6px) scale(.97);
+  pointer-events: none;
+  transition: opacity .15s ease, transform .15s ease;
+  transform-origin: bottom left;
+}
+.model-dd.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.dd-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background .08s;
+}
+.dd-item:hover { background: var(--sidebar); }
+.dd-item-left { display: flex; align-items: center; gap: 9px; }
+
+.m-logo {
+  width: 20px; height: 20px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-size: 10px; font-weight: 700; color: #fff;
+}
+.logo-auto   { background: linear-gradient(135deg, var(--base), var(--warm-gray)); color: var(--olive); font-size: 12px; }
+.logo-claude { background: #d97757; }
+.logo-gemini { background: linear-gradient(135deg,#4285f4,#ea4335,#fbbc05,#34a853); font-size: 9px; }
+.logo-gpt    { background: #10a37f; font-size: 9px; }
+
+.m-name { font-size: 13px; color: var(--fg); }
+.m-tag  {
+  font-size: 10px; color: var(--olive);
+  background: rgba(121,140,0,.10);
+  border-radius: 4px; padding: 1px 5px;
+  margin-left: 5px; font-weight: 500;
+}
+.m-check { color: var(--olive); }
+.m-check svg { width:13px; height:13px; }
+.dd-sep { height:1px; background:var(--divider); margin:3px 0; }
+
+/* Send button */
+.send-btn {
+  width: 26px; height: 26px; border-radius: 50%; border: none;
+  background: var(--warm-gray); color: var(--white);
+  display: flex; align-items: center; justify-content: center;
+  cursor: default; transition: background .15s;
+}
+.send-btn.active { background: var(--olive); cursor: pointer; }
+.send-btn.active:hover { background: #697a00; }
+
+/* Overlay: click to dismiss drawer */
+.drawer-overlay {
+  position: absolute; inset: 0; z-index: 25;
+  opacity: 0; pointer-events: none;
+  cursor: pointer;
+}
+.drawer-overlay.on { opacity: 1; pointer-events: auto; }
+</style>
+</head>
+<body>
+
+<!-- ── Interactive demo ── -->
+<div class="col">
+  <div class="col-label">Interactive Demo</div>
+
+  <div class="notes-panel" id="panel">
+
+    <!-- Tabs -->
+    <div class="panel-tabs">
+      <div class="tab active" onclick="switchTab(this)">My Notes</div>
+      <div class="tab" onclick="switchTab(this)">AI Notes</div>
+      <div class="tab" onclick="switchTab(this)">Transcript</div>
+    </div>
+
+    <!-- Notes content -->
+    <div class="panel-content" id="noteContent">
+      <p class="note-line">The core of this page is semantic alignment — using embedding cosine similarity to map ASR transcript segments onto the corresponding PPT slides.</p>
+      <p class="note-line" style="margin-top:10px;">Main logic: embed each ASR chunk and each slide's text, compute a similarity matrix, then apply K=3 debouncing to prevent rapid page flipping.</p>
+      <p class="note-muted" style="margin-top:10px;">Continue writing your notes here…</p>
+    </div>
+
+    <!-- Overlay (click to collapse drawer) -->
+    <div class="drawer-overlay" id="drawerOverlay" onclick="collapseDrawer()"></div>
+
+    <!-- Chat drawer -->
+    <div class="chat-drawer" id="chatDrawer">
+
+      <!-- Top bar -->
+      <div class="drawer-bar">
+        <div class="drawer-bar-left">
+          AI Chat
+          <span class="page-badge">Page 3</span>
+        </div>
+        <button class="icon-btn" onclick="collapseDrawer()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Chat history -->
+      <div class="chat-history" id="chatHistory"></div>
+
+      <!-- Input area -->
+      <div class="drawer-input-area">
+        <div class="ctx-tag">📄 Page 3 · Semantic Alignment</div>
+        <div class="input-box" id="inputBox">
+          <textarea
+            class="exp-textarea"
+            id="mainTA"
+            placeholder="Ask AI about this page… (Enter to send)"
+            oninput="onTAInput(this)"
+            onkeydown="onTAKey(event)"
+          ></textarea>
+          <div class="toolbar">
+            <div class="tb-left">
+              <!-- Model picker -->
+              <div class="model-btn" id="modelBtn" onclick="toggleDD(event)">
+                <span id="modelLabel">Auto</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+
+                <!-- Dropdown -->
+                <div class="model-dd" id="modelDD" onclick="event.stopPropagation()">
+                  <div class="dd-item" onclick="pickModel('Auto','auto')">
+                    <div class="dd-item-left">
+                      <div class="m-logo logo-auto">✦</div>
+                      <span class="m-name">Auto</span>
+                    </div>
+                    <div class="m-check" id="chk-auto">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                  </div>
+                  <div class="dd-sep"></div>
+                  <div class="dd-item" onclick="pickModel('Sonnet 4.6','sonnet')">
+                    <div class="dd-item-left">
+                      <div class="m-logo logo-claude">✦</div>
+                      <span class="m-name">Sonnet 4.6 <span class="m-tag">Beta</span></span>
+                    </div>
+                    <div class="m-check" style="opacity:0" id="chk-sonnet">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                  </div>
+                  <div class="dd-item" onclick="pickModel('Opus 4.6','opus')">
+                    <div class="dd-item-left">
+                      <div class="m-logo logo-claude">✦</div>
+                      <span class="m-name">Opus 4.6 <span class="m-tag">Beta</span></span>
+                    </div>
+                    <div class="m-check" style="opacity:0" id="chk-opus">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                  </div>
+                  <div class="dd-item" onclick="pickModel('Gemini 3.1 Pro','gemini')">
+                    <div class="dd-item-left">
+                      <div class="m-logo logo-gemini">G</div>
+                      <span class="m-name">Gemini 3.1 Pro <span class="m-tag">Beta</span></span>
+                    </div>
+                    <div class="m-check" style="opacity:0" id="chk-gemini">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                  </div>
+                  <div class="dd-item" onclick="pickModel('GPT-5.2','gpt52')">
+                    <div class="dd-item-left">
+                      <div class="m-logo logo-gpt">G</div>
+                      <span class="m-name">GPT-5.2 <span class="m-tag">Beta</span></span>
+                    </div>
+                    <div class="m-check" style="opacity:0" id="chk-gpt52">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                  </div>
+                  <div class="dd-item" onclick="pickModel('GPT-5.4','gpt54')">
+                    <div class="dd-item-left">
+                      <div class="m-logo logo-gpt">G</div>
+                      <span class="m-name">GPT-5.4 <span class="m-tag">Beta</span></span>
+                    </div>
+                    <div class="m-check" style="opacity:0" id="chk-gpt54">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Attach -->
+              <button class="tb-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+              </button>
+            </div>
+
+            <div class="tb-right">
+              <!-- Mic -->
+              <button class="tb-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                  <rect x="9" y="2" width="6" height="11" rx="3"/>
+                  <path d="M5 10a7 7 0 0 0 14 0"/>
+                  <line x1="12" y1="19" x2="12" y2="22"/>
+                  <line x1="9" y1="22" x2="15" y2="22"/>
+                </svg>
+              </button>
+              <!-- Send -->
+              <button class="send-btn" id="sendBtn" onclick="handleSend()">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /chat-drawer -->
+
+    <!-- Bottom collapsed capsule -->
+    <div class="chat-bottom" id="chatBottom">
+      <div class="input-collapsed" onclick="openInput()">
+        <div class="orb"></div>
+        <div class="capsule-text">Ask AI about this page…</div>
+      </div>
+    </div>
+
+  </div><!-- /notes-panel -->
+</div>
+
+<!-- ── Static: full drawer open ── -->
+<div class="col">
+  <div class="col-label">Drawer Expanded — Static</div>
+
+  <div class="notes-panel">
+    <div class="panel-tabs">
+      <div class="tab active">My Notes</div>
+      <div class="tab">AI Notes</div>
+      <div class="tab">Transcript</div>
+    </div>
+
+    <!-- dimmed notes -->
+    <div class="panel-content dimmed">
+      <p class="note-line">The core of this page is semantic alignment…</p>
+    </div>
+
+    <!-- Full drawer (static) -->
+    <div class="chat-drawer phase-full" style="transition:none;">
+      <div class="drawer-bar" style="opacity:1;">
+        <div class="drawer-bar-left">
+          AI Chat
+          <span class="page-badge">Page 3</span>
+        </div>
+        <button class="icon-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="chat-history" style="opacity:1;">
+        <div class="msg-row user"><div class="bubble user">Why not just sort by timeline?</div></div>
+        <div class="msg-row ai"><div class="bubble ai">Because teachers often jump back to previous slides or leave the PPT entirely. Timeline order doesn't equal slide order — semantic similarity is far more reliable.</div></div>
+        <div class="msg-row user"><div class="bubble user">What does K=3 debouncing mean?</div></div>
+        <div class="msg-row ai"><div class="bubble ai">It means three consecutive ASR chunks must point to the same slide before we actually switch pages — preventing one-off similarity spikes from causing jittery page jumps.</div></div>
+      </div>
+
+      <div class="drawer-input-area" style="opacity:1; transform:none;">
+        <div class="ctx-tag">📄 Page 3 · Semantic Alignment</div>
+        <div class="input-box focused">
+          <textarea class="exp-textarea" placeholder="Ask AI about this page… (Enter to send)" style="min-height:34px;"></textarea>
+          <div class="toolbar">
+            <div class="tb-left" style="gap:4px;">
+              <div class="model-btn" style="pointer-events:none;">
+                <span>Auto</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="10" height="10"><polyline points="6 9 12 15 18 9"/></svg>
+              </div>
+              <button class="tb-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              </button>
+            </div>
+            <div class="tb-right">
+              <button class="tb-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                  <rect x="9" y="2" width="6" height="11" rx="3"/>
+                  <path d="M5 10a7 7 0 0 0 14 0"/>
+                  <line x1="12" y1="19" x2="12" y2="22"/>
+                  <line x1="9" y1="22" x2="15" y2="22"/>
+                </svg>
+              </button>
+              <button class="send-btn active">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- bottom bar shown below drawer -->
+    <div class="chat-bottom">
+      <div class="input-collapsed" style="opacity:.4; pointer-events:none;">
+        <div class="orb"></div>
+        <div class="capsule-text">Ask AI about this page…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──
+// phase: 'closed' | 'input' | 'full'
+let phase = 'closed'
+let ddOpen = false
+
+const drawer      = document.getElementById('chatDrawer')
+const chatBottom  = document.getElementById('chatBottom')
+const drawerOvl   = document.getElementById('drawerOverlay')
+const noteContent = document.getElementById('noteContent')
+const chatHistory = document.getElementById('chatHistory')
+const mainTA      = document.getElementById('mainTA')
+const sendBtn     = document.getElementById('sendBtn')
+const inputBox    = document.getElementById('inputBox')
+
+// ── Open input phase (capsule → input drawer floats up) ──
+function openInput() {
+  if (phase !== 'closed') return
+  phase = 'input'
+  chatBottom.classList.add('hidden-below')
+  drawerOvl.classList.add('on')
+  requestAnimationFrame(() => {
+    drawer.classList.add('phase-input')
+    setTimeout(() => mainTA.focus(), 300)
+  })
+}
+
+// ── First send → expand to full drawer ──
+function expandFull() {
+  if (phase === 'full') return
+  phase = 'full'
+  drawer.classList.remove('phase-input')
+  drawer.classList.add('phase-full')
+  noteContent.classList.add('dimmed')
+}
+
+// ── Collapse ──
+function collapseDrawer() {
+  if (phase === 'closed') return
+  closeDD()
+  phase = 'closed'
+  drawer.classList.remove('phase-input', 'phase-full')
+  noteContent.classList.remove('dimmed')
+  drawerOvl.classList.remove('on')
+  setTimeout(() => {
+    chatBottom.classList.remove('hidden-below')
+  }, 340)
+}
+
+// ── Send ──
+const aiReplies = [
+  "Because teachers often jump back to earlier slides or leave the PPT for live coding. Time order ≠ slide order — semantic similarity is far more reliable.",
+  "K=3 debouncing means three consecutive chunks must agree on the same slide before we switch. This prevents one-off spikes from causing jittery page flipping.",
+  "Low-confidence segments go into page_supplement rather than being force-mapped to any slide, keeping each page's notes accurate.",
+]
+let replyIdx = 0
+
+function handleSend() {
+  const text = mainTA.value.trim()
+  if (!text) return
+
+  // Append user bubble
+  appendBubble('user', text)
+  mainTA.value = ''
+  mainTA.style.height = 'auto'
+  sendBtn.classList.remove('active')
+
+  // Expand on first message
+  expandFull()
+
+  // Simulate streaming AI reply
+  setTimeout(() => streamReply(), 420)
+}
+
+function appendBubble(role, text) {
+  const row = document.createElement('div')
+  row.className = 'msg-row ' + role
+  const b = document.createElement('div')
+  b.className = 'bubble ' + role
+  b.textContent = text
+  row.appendChild(b)
+  chatHistory.appendChild(row)
+  chatHistory.scrollTop = chatHistory.scrollHeight
+}
+
+function streamReply() {
+  const row = document.createElement('div')
+  row.className = 'msg-row ai'
+  const b = document.createElement('div')
+  b.className = 'bubble ai'
+  row.appendChild(b)
+  chatHistory.appendChild(row)
+
+  const full = aiReplies[replyIdx % aiReplies.length]
+  replyIdx++
+
+  const cur = document.createElement('span')
+  cur.className = 'cursor'
+  b.appendChild(cur)
+
+  let i = 0
+  const iv = setInterval(() => {
+    cur.before(document.createTextNode(full[i]))
+    i++
+    chatHistory.scrollTop = chatHistory.scrollHeight
+    if (i >= full.length) { clearInterval(iv); cur.remove() }
+  }, 16)
+}
+
+// ── Input auto-resize + send btn ──
+function onTAInput(el) {
+  el.style.height = 'auto'
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px'
+  sendBtn.classList.toggle('active', el.value.trim().length > 0)
+}
+
+function onTAKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
+  if (e.key === 'Escape') { ddOpen ? closeDD() : collapseDrawer() }
+}
+
+// ── Model dropdown ──
+function toggleDD(e) {
+  e.stopPropagation()
+  ddOpen = !ddOpen
+  document.getElementById('modelDD').classList.toggle('open', ddOpen)
+}
+function closeDD() {
+  ddOpen = false
+  document.getElementById('modelDD').classList.remove('open')
+}
+function pickModel(label, id) {
+  document.querySelectorAll('.m-check').forEach(c => c.style.opacity = '0')
+  const el = document.getElementById('chk-' + id)
+  if (el) el.style.opacity = '1'
+  document.getElementById('modelLabel').textContent = label
+  closeDD()
+}
+
+// ── Focus ring ──
+mainTA.addEventListener('focus', () => inputBox.classList.add('focused'))
+mainTA.addEventListener('blur',  () => inputBox.classList.remove('focused'))
+
+// ── Click outside to close dropdown ──
+document.addEventListener('click', e => {
+  if (ddOpen && !document.getElementById('modelBtn').contains(e.target)) closeDD()
+})
+
+// ── Tab switch (cosmetic) ──
+function switchTab(el) {
+  el.closest('.panel-tabs').querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+  el.classList.add('active')
+}
+</script>
+</body>
+</html>
