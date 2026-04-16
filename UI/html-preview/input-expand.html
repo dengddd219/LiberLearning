@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Input Expand Demo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', sans-serif;
+    background: #e8e8e8;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+  }
+
+  /* ---- 手机外壳 ---- */
+  .phone {
+    width: 390px;
+    height: 700px;
+    background: linear-gradient(160deg, #f0c0d0 0%, #d4aadf 45%, #b0c8e8 100%);
+    border-radius: 48px;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.22), 0 0 0 1px rgba(0,0,0,0.06);
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  /* 页面中心标题 */
+  .page-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -60%);
+    text-align: center;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+  .page-center.hidden { opacity: 0; }
+  .page-title { font-size: 26px; font-weight: 700; color: rgba(40,20,60,0.82); margin-bottom: 6px; }
+  .page-sub { font-size: 14px; color: rgba(60,30,80,0.48); }
+
+  /* ---- 底部收起态 ---- */
+  .bottom-area {
+    width: 100%;
+    padding: 0 20px 34px;
+    position: relative;
+    z-index: 10;
+  }
+  .input-collapsed {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.78);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border: 1px solid rgba(255,255,255,0.65);
+    border-radius: 16px;
+    padding: 12px 16px;
+    cursor: text;
+    box-shadow: 0 2px 16px rgba(160,100,200,0.14), 0 1px 3px rgba(0,0,0,0.05);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+  }
+  .input-collapsed.hiding { opacity: 0; transform: scale(0.98); pointer-events: none; }
+  .orb {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: conic-gradient(from 0deg, #f08ca0, #c890d4, #8ab4e0, #f08ca0);
+    flex-shrink: 0;
+  }
+  .collapsed-placeholder { flex: 1; font-size: 14px; color: rgba(80,50,110,0.36); }
+
+  /* ---- 遮罩 ---- */
+  .panel-overlay {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.06);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease;
+    border-radius: 48px;
+  }
+  .panel-overlay.visible { opacity: 1; pointer-events: auto; }
+
+  /* ---- 展开面板 ---- */
+  .panel {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: #ffffff;
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -1px 0 rgba(0,0,0,0.07), 0 -4px 24px rgba(0,0,0,0.07);
+    transform: translateY(100%);
+    opacity: 0;
+    transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease;
+  }
+  .panel.open { transform: translateY(0); opacity: 1; }
+
+  /* 顶部导航 */
+  .panel-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 13px 16px 11px;
+    opacity: 0; transition: opacity 0.22s ease 0.08s;
+  }
+  .panel.open .panel-nav { opacity: 1; }
+  .panel-nav-title {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 14px; font-weight: 500; color: #1a1a1a;
+    cursor: pointer;
+  }
+  .panel-nav-title svg { width: 13px; height: 13px; color: #999; }
+  .panel-nav-actions { display: flex; gap: 2px; }
+  .nav-btn {
+    width: 28px; height: 28px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: #777;
+    transition: background 0.12s;
+  }
+  .nav-btn:hover { background: rgba(0,0,0,0.05); }
+  .nav-btn svg { width: 15px; height: 15px; }
+
+  .nav-divider { height: 1px; background: #f0f0f0; }
+
+  /* 面板主体 */
+  .panel-body { padding: 0 16px 32px; }
+
+  /* "今天任务"标题 */
+  .panel-header {
+    font-size: 15px; font-weight: 600; color: #1a1a1a;
+    margin: 18px 0 4px;
+    opacity: 0; transform: translateY(5px);
+    transition: opacity 0.25s ease 0.13s, transform 0.25s ease 0.13s;
+  }
+  .panel.open .panel-header { opacity: 1; transform: translateY(0); }
+
+  /* 建议列表 */
+  .suggestions {
+    display: flex; flex-direction: column;
+    margin-bottom: 14px;
+    opacity: 0; transform: translateY(6px);
+    transition: opacity 0.25s ease 0.18s, transform 0.25s ease 0.18s;
+  }
+  .panel.open .suggestions { opacity: 1; transform: translateY(0); }
+
+  .sug-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 6px; border-radius: 8px; cursor: pointer;
+    transition: background 0.12s;
+  }
+  .sug-item:hover { background: rgba(0,0,0,0.03); }
+  .sug-icon {
+    width: 20px; height: 20px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #555;
+  }
+  .sug-icon svg { width: 17px; height: 17px; }
+  .sug-icon.text-icon { font-size: 11px; font-weight: 700; color: #555; letter-spacing: -0.5px; }
+  .sug-label { font-size: 14px; color: #1a1a1a; }
+
+  /* ---- 展开态输入框 ---- */
+  .input-expanded {
+    background: #fff;
+    border: 1.5px solid #3b82f6;
+    border-radius: 10px;
+    padding: 9px 12px 7px;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.08);
+    opacity: 0; transform: translateY(5px);
+    transition: opacity 0.25s ease 0.24s, transform 0.25s ease 0.24s;
+    position: relative;
+  }
+  .panel.open .input-expanded { opacity: 1; transform: translateY(0); }
+
+  .context-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #f3f4f6; border-radius: 5px;
+    padding: 2px 7px; font-size: 12px; color: #555;
+    margin-bottom: 5px;
+  }
+
+  .fake-input {
+    width: 100%; font-size: 14px; color: #999; line-height: 1.5;
+    outline: none; background: transparent; border: none;
+    caret-color: #3b82f6; font-family: inherit;
+    margin-bottom: 2px;
+  }
+  .fake-input:focus { color: #1a1a1a; }
+
+  .toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-top: 7px; border-top: 1px solid #f0f0f0; margin-top: 4px;
+  }
+  .tb-left { display: flex; gap: 0; align-items: center; }
+  .tb-right { display: flex; align-items: center; gap: 4px; }
+
+  .tb-btn {
+    width: 28px; height: 28px; border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: #888;
+    transition: background 0.12s;
+  }
+  .tb-btn:hover { background: rgba(0,0,0,0.05); }
+  .tb-btn svg { width: 15px; height: 15px; }
+
+  /* 模型选择按钮 */
+  .model-btn {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 12px; color: #555; font-weight: 500;
+    padding: 4px 8px; border-radius: 6px;
+    background: #f3f4f6; cursor: pointer;
+    transition: background 0.12s;
+  }
+  .model-btn:hover { background: #e9eaf0; }
+  .model-btn svg { width: 11px; height: 11px; color: #999; }
+
+  /* 发送按钮 */
+  .send-btn {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: #e5e7eb;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .send-btn:hover { background: #d1d5db; }
+  .send-btn svg { width: 12px; height: 12px; }
+
+  /* ---- 模型下拉菜单（挂在 .panel 根节点）---- */
+  .model-dropdown {
+    position: absolute;
+    width: 240px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.13), 0 0 0 1px rgba(0,0,0,0.06);
+    padding: 6px 0;
+    z-index: 200;
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    transform-origin: bottom right;
+  }
+  .model-dropdown.open {
+    opacity: 1; transform: translateY(0) scale(1); pointer-events: auto;
+  }
+
+  .model-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; cursor: pointer;
+    transition: background 0.1s;
+  }
+  .model-item:hover { background: rgba(0,0,0,0.03); }
+  .model-item-left { display: flex; align-items: center; gap: 10px; }
+
+  .model-logo {
+    width: 20px; height: 20px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 13px;
+  }
+  /* 各模型颜色 */
+  .logo-auto { background: linear-gradient(135deg,#e0c8ff,#c8e0ff); }
+  .logo-claude { background: #d97757; }
+  .logo-gemini { background: linear-gradient(135deg,#4285f4,#ea4335,#fbbc05,#34a853); }
+  .logo-gpt { background: #10a37f; }
+  .logo-qianwen { background: #6366f1; }
+  .logo-doubao { background: #1a56db; }
+
+  .model-logo svg { width: 12px; height: 12px; }
+  .logo-text { font-size: 10px; font-weight: 700; color: #fff; }
+
+  .model-name { font-size: 14px; color: #1a1a1a; }
+  .model-tag {
+    font-size: 10px; color: #3b82f6; background: rgba(59,130,246,0.1);
+    border-radius: 4px; padding: 1px 5px; margin-left: 6px;
+    font-weight: 500;
+  }
+  .model-check { color: #3b82f6; }
+  .model-check svg { width: 14px; height: 14px; }
+
+  .dropdown-divider { height: 1px; background: #f0f0f0; margin: 4px 0; }
+
+  /* 提示标签 */
+  .tip {
+    position: absolute; top: 22px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.5); color: #fff; font-size: 12px;
+    padding: 5px 14px; border-radius: 20px; white-space: nowrap;
+    pointer-events: none; transition: opacity 0.3s;
+  }
+  .tip.hidden { opacity: 0; }
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <div class="tip" id="tip">点击输入框查看展开动画</div>
+
+  <div class="page-center" id="pageCenter">
+    <div class="page-title">创建回忆影片</div>
+    <div class="page-sub">简短描述</div>
+  </div>
+
+  <!-- 遮罩 -->
+  <div class="panel-overlay" id="overlay" onclick="collapse()"></div>
+
+  <!-- 展开面板 -->
+  <div class="panel" id="panel">
+    <!-- 顶部导航 -->
+    <div class="panel-nav">
+      <div class="panel-nav-title">
+        新建 AI 对话
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="panel-nav-actions">
+        <div class="nav-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </div>
+        <div class="nav-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+        </div>
+        <div class="nav-btn" onclick="collapse()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </div>
+      </div>
+    </div>
+    <div class="nav-divider"></div>
+
+    <div class="panel-body">
+      <div class="panel-header">我们今天的任务是什么？</div>
+
+      <div class="suggestions">
+        <div class="sug-item">
+          <div class="sug-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          </div>
+          <div class="sug-label">个性化你的 Notion AI</div>
+        </div>
+        <div class="sug-item">
+          <div class="sug-icon text-icon">A文</div>
+          <div class="sug-label">翻译此页面</div>
+        </div>
+        <div class="sug-item">
+          <div class="sug-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+          </div>
+          <div class="sug-label">深度剖析</div>
+        </div>
+        <div class="sug-item">
+          <div class="sug-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <div class="sug-label">创建任务跟踪器</div>
+        </div>
+      </div>
+
+      <!-- 展开态输入框 -->
+      <div class="input-expanded" id="inputExpanded">
+        <div class="context-tag">
+          <span>📄</span>
+          <span>7. 物品冷启动</span>
+        </div>
+        <input class="fake-input" id="mainInput" placeholder="使用 AI 处理各种任务…" />
+        <div class="toolbar">
+          <div class="tb-left">
+            <div class="tb-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </div>
+            <div class="tb-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="16" cy="6" r="2.5" fill="white" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="12" r="2.5" fill="white" stroke="currentColor" stroke-width="1.8"/><circle cx="14" cy="18" r="2.5" fill="white" stroke="currentColor" stroke-width="1.8"/></svg>
+            </div>
+          </div>
+          <div class="tb-right">
+            <!-- 模型选择按钮 -->
+            <div class="model-btn" id="modelBtn" onclick="toggleModel(event)">
+              <span id="modelLabel">自动</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+
+            <!-- 麦克风 -->
+            <div class="tb-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="9" y1="22" x2="15" y2="22"/></svg>
+            </div>
+            <!-- 发送 -->
+            <div class="send-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="19" x2="12" y2="5"/>
+                <polyline points="5 12 12 5 19 12"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 模型下拉菜单（panel 直接子级，避免被 overflow 裁掉）-->
+    <div class="model-dropdown" id="modelDropdown" onclick="event.stopPropagation()">
+      <div class="model-item" onclick="selectModel('自动')">
+        <div class="model-item-left">
+          <div class="model-logo logo-auto">✦</div>
+          <span class="model-name">自动</span>
+        </div>
+        <div class="model-check" id="check-自动">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+      </div>
+      <div class="dropdown-divider"></div>
+      <div class="model-item" onclick="selectModel('Sonnet 4.6')">
+        <div class="model-item-left">
+          <div class="model-logo logo-claude"><span class="logo-text">✦</span></div>
+          <span class="model-name">Sonnet 4.6 <span class="model-tag">测试版</span></span>
+        </div>
+        <div class="model-check" style="opacity:0" id="check-Sonnet 4.6">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+      </div>
+      <div class="model-item" onclick="selectModel('Opus 4.6')">
+        <div class="model-item-left">
+          <div class="model-logo logo-claude"><span class="logo-text">✦</span></div>
+          <span class="model-name">Opus 4.6 <span class="model-tag">测试版</span></span>
+        </div>
+        <div class="model-check" style="opacity:0" id="check-Opus 4.6">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+      </div>
+      <div class="model-item" onclick="selectModel('Gemini 3.1 Pro')">
+        <div class="model-item-left">
+          <div class="model-logo logo-gemini"><span class="logo-text" style="font-size:9px">G</span></div>
+          <span class="model-name">Gemini 3.1 Pro <span class="model-tag">测试版</span></span>
+        </div>
+        <div class="model-check" style="opacity:0" id="check-Gemini 3.1 Pro">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+      </div>
+      <div class="model-item" onclick="selectModel('通义千问')">
+        <div class="model-item-left">
+          <div class="model-logo logo-qianwen"><span class="logo-text" style="font-size:9px">通</span></div>
+          <span class="model-name">通义千问 <span class="model-tag">测试版</span></span>
+        </div>
+        <div class="model-check" style="opacity:0" id="check-通义千问">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+      </div>
+      <div class="model-item" onclick="selectModel('豆包')">
+        <div class="model-item-left">
+          <div class="model-logo logo-doubao"><span class="logo-text" style="font-size:9px">豆</span></div>
+          <span class="model-name">豆包 <span class="model-tag">测试版</span></span>
+        </div>
+        <div class="model-check" style="opacity:0" id="check-豆包">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部收起态输入框 -->
+  <div class="bottom-area">
+    <div class="input-collapsed" id="collapsed" onclick="expand()">
+      <div class="orb"></div>
+      <div class="collapsed-placeholder">描述回忆…</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let isOpen = false;
+  let modelOpen = false;
+  let currentModel = '自动';
+
+  function expand() {
+    if (isOpen) return;
+    isOpen = true;
+    document.getElementById('tip').classList.add('hidden');
+    document.getElementById('pageCenter').classList.add('hidden');
+    document.getElementById('collapsed').classList.add('hiding');
+    document.getElementById('overlay').classList.add('visible');
+    setTimeout(() => {
+      document.getElementById('panel').classList.add('open');
+      setTimeout(() => document.getElementById('mainInput').focus(), 280);
+    }, 60);
+  }
+
+  function collapse() {
+    if (!isOpen) return;
+    isOpen = false;
+    closeModel();
+    document.getElementById('panel').classList.remove('open');
+    document.getElementById('overlay').classList.remove('visible');
+    setTimeout(() => {
+      document.getElementById('collapsed').classList.remove('hiding');
+      document.getElementById('pageCenter').classList.remove('hidden');
+    }, 300);
+  }
+
+  function toggleModel(e) {
+    e.stopPropagation();
+    modelOpen = !modelOpen;
+    const dd = document.getElementById('modelDropdown');
+    if (modelOpen) {
+      // 计算 modelBtn 相对 panel 的位置，菜单贴在按钮上方
+      const btn = document.getElementById('modelBtn');
+      const panel = document.getElementById('panel');
+      const btnRect = btn.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+      const bottomFromPanel = panelRect.bottom - btnRect.top + 6; // 距面板底部
+      const rightFromPanel = panelRect.right - btnRect.right;
+      dd.style.bottom = bottomFromPanel + 'px';
+      dd.style.right = rightFromPanel + 'px';
+    }
+    dd.classList.toggle('open', modelOpen);
+  }
+
+  function closeModel() {
+    modelOpen = false;
+    document.getElementById('modelDropdown').classList.remove('open');
+  }
+
+  function selectModel(name) {
+    document.querySelectorAll('.model-check').forEach(c => c.style.opacity = '0');
+    const checkEl = document.getElementById('check-' + name);
+    if (checkEl) checkEl.style.opacity = '1';
+    currentModel = name;
+    document.getElementById('modelLabel').textContent = name;
+    closeModel();
+  }
+
+  // 点击外部关闭下拉
+  document.addEventListener('click', (e) => {
+    if (modelOpen && !document.getElementById('modelBtn').contains(e.target)) {
+      closeModel();
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (modelOpen) closeModel();
+      else collapse();
+    }
+  });
+</script>
+</body>
+</html>

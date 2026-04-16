@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>底部输入区设计方案</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', sans-serif;
+    background: #1a1a1e;
+    color: #fff;
+    min-height: 100vh;
+    padding: 32px 24px 48px;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #fff;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 14px;
+    color: rgba(255,255,255,0.45);
+    margin-bottom: 36px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  .card {
+    border-radius: 20px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.2s, transform 0.15s;
+    position: relative;
+  }
+  .card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.2); }
+  .card.selected { border-color: #0A84FF; }
+
+  .card-label {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(8px);
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    z-index: 10;
+    letter-spacing: 0.5px;
+  }
+
+  /* -------- Phone shell -------- */
+  .phone {
+    background: #0a0a0f;
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+    padding-bottom: 0;
+  }
+
+  /* gradient bg */
+  .phone-bg {
+    height: 260px;
+    width: 100%;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .phone-bg-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 1px 12px rgba(0,0,0,0.3);
+  }
+  .phone-bg-sub {
+    font-size: 12px;
+    color: rgba(255,255,255,0.6);
+  }
+
+  /* ===== DESIGN A: Apple Image Playground 风格 ===== */
+  .bg-a {
+    background: linear-gradient(160deg, #c17e9a 0%, #a07bc0 40%, #8ba8d8 100%);
+  }
+  .bottom-a {
+    background: rgba(28,28,32,0.95);
+    backdrop-filter: blur(20px);
+    padding: 14px 14px 20px;
+  }
+  .chips-a {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .chip-a {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.85);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .input-a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 14px;
+    padding: 10px 14px;
+  }
+  .input-a-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, #ff6b6b, #ffd93d, #6bcb77, #4d96ff, #ff6b6b);
+    flex-shrink: 0;
+  }
+  .input-a-text {
+    flex: 1;
+    font-size: 14px;
+    color: rgba(255,255,255,0.35);
+  }
+  .input-a-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .input-a-btn svg { opacity: 0.5; }
+
+  /* ===== DESIGN B: Frosted glass 半透明悬浮 ===== */
+  .bg-b {
+    background: linear-gradient(145deg, #e8a0bf 0%, #ba90c6 45%, #9bb5e0 100%);
+  }
+  .bottom-b {
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border-top: 1px solid rgba(255,255,255,0.15);
+    padding: 14px 14px 20px;
+  }
+  .chips-b {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .chip-b {
+    background: rgba(255,255,255,0.2);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 13px;
+    color: #fff;
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.25);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .input-b {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 999px;
+    padding: 10px 16px;
+    backdrop-filter: blur(20px);
+  }
+  .orb-b {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: conic-gradient(from 180deg, #ff8fab, #ffb347, #7ec8e3, #ff8fab);
+    animation: spin 4s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .input-b-text {
+    flex: 1;
+    font-size: 14px;
+    color: rgba(255,255,255,0.5);
+  }
+  .send-b {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ===== DESIGN C: 深色极简 Apple Siri 风格 ===== */
+  .bg-c {
+    background: linear-gradient(155deg, #c9a0c8 0%, #9f93c9 50%, #93b4d8 100%);
+  }
+  .bottom-c {
+    background: #111115;
+    padding: 16px 14px 22px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .chips-c {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .chip-c {
+    background: #2c2c30;
+    border-radius: 12px;
+    padding: 7px 14px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.75);
+    border: 1px solid rgba(255,255,255,0.08);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .input-c {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #1c1c20;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 11px 14px;
+  }
+  .ring-c {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2.5px solid transparent;
+    background: conic-gradient(from 0deg, #bf5af2, #5e5ce6, #32ade6, #34c759, #ff9f0a, #ff375f, #bf5af2) border-box;
+    -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: destination-out;
+    mask-composite: exclude;
+    flex-shrink: 0;
+  }
+  .input-c-text {
+    flex: 1;
+    font-size: 14px;
+    color: rgba(255,255,255,0.3);
+  }
+
+  /* ===== DESIGN D: 暖白毛玻璃 日系清新 ===== */
+  .bg-d {
+    background: linear-gradient(160deg, #f0c0d0 0%, #d4aadf 45%, #b0c8e8 100%);
+  }
+  .bottom-d {
+    background: rgba(255,252,248,0.88);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border-top: 1px solid rgba(255,255,255,0.6);
+    padding: 14px 14px 22px;
+  }
+  .chips-d {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .chip-d {
+    background: rgba(255,255,255,0.9);
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-size: 13px;
+    color: #333;
+    font-weight: 500;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.1);
+    border: 1px solid rgba(255,255,255,0.8);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .input-d {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.85);
+    border: 1px solid rgba(200,180,210,0.4);
+    border-radius: 16px;
+    padding: 10px 14px;
+    box-shadow: 0 2px 12px rgba(180,130,200,0.12);
+  }
+  .orb-d {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, #f08ca0, #c890d4, #8ab4e0, #f08ca0);
+    flex-shrink: 0;
+  }
+  .input-d-text {
+    flex: 1;
+    font-size: 14px;
+    color: rgba(80,60,100,0.4);
+  }
+
+  /* selection overlay */
+  .card.selected::after {
+    content: '✓ 已选择';
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    background: #0A84FF;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    z-index: 20;
+  }
+
+  .desc {
+    padding: 10px 14px 14px;
+    background: #111115;
+  }
+  .desc-a { background: rgba(28,28,32,0.98); }
+  .desc-d { background: rgba(240,235,245,0.95); }
+  .desc-d .desc-name { color: #3a2d4a; }
+  .desc-d .desc-note { color: rgba(60,40,80,0.55); }
+
+  .desc-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 2px;
+  }
+  .desc-note {
+    font-size: 12px;
+    color: rgba(255,255,255,0.4);
+    line-height: 1.4;
+  }
+
+  /* send arrow */
+  .arrow { width: 14px; height: 14px; display: block; }
+</style>
+<script>
+  function select(el) {
+    document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    const choice = el.dataset.choice;
+    // record event
+    try {
+      fetch('/__select', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({type:'click', choice, text: el.querySelector('.desc-name').textContent})
+      });
+    } catch(e){}
+  }
+</script>
+</head>
+<body>
+<h1>底部输入区设计方案</h1>
+<p class="subtitle">参考 Apple 质感，4 种风格方向 · 点击选择你喜欢的</p>
+
+<div class="grid">
+
+  <!-- A -->
+  <div class="card" data-choice="A" onclick="select(this)">
+    <span class="card-label">A</span>
+    <div class="phone">
+      <div class="phone-bg bg-a">
+        <div class="phone-bg-title">创建回忆影片</div>
+        <div class="phone-bg-sub">简短描述</div>
+      </div>
+      <div class="bottom-a">
+        <div class="chips-a">
+          <div class="chip-a">深圳市的冬</div>
+          <div class="chip-a">2026年旅程</div>
+          <div class="chip-a">朋友聚会</div>
+        </div>
+        <div class="input-a">
+          <div class="input-a-icon"></div>
+          <div class="input-a-text">描述回忆…</div>
+          <div class="input-a-btn">
+            <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          </div>
+        </div>
+      </div>
+      <div class="desc desc-a">
+        <div class="desc-name">深色面板 + 彩色圆 Icon</div>
+        <div class="desc-note">深色底 · 模糊玻璃 · 接近 Apple Image Playground 原版</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- B -->
+  <div class="card" data-choice="B" onclick="select(this)">
+    <span class="card-label">B</span>
+    <div class="phone">
+      <div class="phone-bg bg-b">
+        <div class="phone-bg-title">创建回忆影片</div>
+        <div class="phone-bg-sub">简短描述</div>
+      </div>
+      <div class="bottom-b">
+        <div class="chips-b">
+          <div class="chip-b">深圳市的冬</div>
+          <div class="chip-b">2026年旅程</div>
+          <div class="chip-b">朋友聚会</div>
+        </div>
+        <div class="input-b">
+          <div class="orb-b"></div>
+          <div class="input-b-text">描述回忆…</div>
+          <div class="send-b">
+            <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          </div>
+        </div>
+      </div>
+      <div class="desc">
+        <div class="desc-name">全透明毛玻璃悬浮</div>
+        <div class="desc-note">底栏完全透明 · 背景渐变透过 · 胶囊输入框 + 旋转彩环</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- C -->
+  <div class="card" data-choice="C" onclick="select(this)">
+    <span class="card-label">C</span>
+    <div class="phone">
+      <div class="phone-bg bg-c">
+        <div class="phone-bg-title">创建回忆影片</div>
+        <div class="phone-bg-sub">简短描述</div>
+      </div>
+      <div class="bottom-c">
+        <div class="chips-c">
+          <div class="chip-c">深圳市的冬</div>
+          <div class="chip-c">2026年旅程</div>
+          <div class="chip-c">朋友聚会</div>
+        </div>
+        <div class="input-c">
+          <div class="ring-c"></div>
+          <div class="input-c-text">描述回忆…</div>
+        </div>
+      </div>
+      <div class="desc">
+        <div class="desc-name">纯黑极简 + 彩虹边框环</div>
+        <div class="desc-note">Siri 风格 · 纯黑底 · 输入框左侧彩色圆环 · 无发送按钮</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- D -->
+  <div class="card" data-choice="D" onclick="select(this)">
+    <span class="card-label">D</span>
+    <div class="phone">
+      <div class="phone-bg bg-d">
+        <div class="phone-bg-title" style="color:#2a1a3a;">创建回忆影片</div>
+        <div class="phone-bg-sub" style="color:rgba(50,30,70,0.6);">简短描述</div>
+      </div>
+      <div class="bottom-d">
+        <div class="chips-d">
+          <div class="chip-d">深圳市的冬</div>
+          <div class="chip-d">2026年旅程</div>
+          <div class="chip-d">朋友聚会</div>
+        </div>
+        <div class="input-d">
+          <div class="orb-d"></div>
+          <div class="input-d-text">描述回忆…</div>
+          <div style="width:26px;height:26px;border-radius:50%;background:rgba(180,130,210,0.2);display:flex;align-items:center;justify-content:center;">
+            <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="rgba(120,80,160,0.7)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          </div>
+        </div>
+      </div>
+      <div class="desc desc-d">
+        <div class="desc-name">暖白毛玻璃 · 日系轻柔</div>
+        <div class="desc-note">白色半透明底 · 渐变色微透出 · 标签卡片感强</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p style="text-align:center;margin-top:28px;font-size:13px;color:rgba(255,255,255,0.3);">点击卡片选择方案，也可以在终端告诉我你的偏好</p>
+</body>
+</html>

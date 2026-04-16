@@ -135,23 +135,23 @@ function ProcessingCard() {
   return (
     <div className="p-6 relative bg-white rounded-[32px] flex flex-col justify-start items-start gap-4" style={{ width: '224px', minHeight: '288px' }}>
       <div className="w-56 h-72 left-0 top-0 absolute bg-white/0 rounded-[32px] shadow-[0px_40px_40px_-15px_rgba(47,51,49,0.04)]" />
-      <div className="self-stretch py-7 bg-stone-100 rounded-md inline-flex justify-center items-center overflow-hidden">
+      <div className="self-stretch py-7 rounded-md inline-flex justify-center items-center overflow-hidden" style={{ backgroundColor: '#F2F2EC' }}>
         <div className="inline-flex flex-col justify-start items-start">
-          <div className="w-8 h-6 bg-zinc-400 animate-pulse rounded" />
+          <div className="w-8 h-6 animate-pulse rounded" style={{ backgroundColor: '#D0CFC5' }} />
         </div>
       </div>
       <div className="self-stretch flex flex-col justify-start items-start gap-3">
-        <div className="w-32 h-4 bg-stone-100 rounded-2xl animate-pulse" />
-        <div className="w-20 h-3 bg-stone-100 rounded-2xl animate-pulse" />
+        <div className="w-32 h-4 rounded-2xl animate-pulse" style={{ backgroundColor: '#F2F2EC' }} />
+        <div className="w-20 h-3 rounded-2xl animate-pulse" style={{ backgroundColor: '#F2F2EC' }} />
       </div>
       <div className="self-stretch h-20 min-h-8 pt-12 flex flex-col justify-end items-start">
-        <div className="self-stretch pt-4 border-t border-zinc-400/10 inline-flex justify-between items-center">
+        <div className="self-stretch pt-4 inline-flex justify-between items-center" style={{ borderTop: '1px solid #E3E3DA' }}>
           <div className="flex justify-start items-start gap-1">
-            <div className="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-pulse" />
-            <div className="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-pulse" />
-            <div className="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-pulse" />
+            <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: '#D0CFC5' }} />
+            <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: '#D0CFC5' }} />
+            <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: '#D0CFC5' }} />
           </div>
-          <div className="text-zinc-600 text-[10.40px] font-bold font-['Inter'] uppercase leading-4 tracking-wide">PROCESSING</div>
+          <div className="text-[10.40px] font-bold font-['Inter'] uppercase leading-4 tracking-wide" style={{ color: '#72726E' }}>PROCESSING</div>
         </div>
       </div>
     </div>
@@ -175,7 +175,7 @@ function DoneCard({ card, onClick }: { card: CourseCard; onClick: () => void }) 
     >
       <div className="w-56 h-72 left-0 top-0 absolute bg-white/0 rounded-[32px] shadow-[0px_40px_40px_-15px_rgba(47,51,49,0.04)]" />
       {/* Thumbnail */}
-      <div className="w-44 left-[25px] top-[25px] absolute bg-stone-100 rounded-md inline-flex flex-col justify-center items-start overflow-hidden">
+      <div className="w-44 left-[25px] top-[25px] absolute rounded-md inline-flex flex-col justify-center items-start overflow-hidden" style={{ backgroundColor: '#F2F2EC' }}>
         <div className="self-stretch h-24 relative overflow-hidden" style={{ backgroundColor: card.thumbColor, opacity: thumbLoaded ? 1 : 0.85 }}>
           {!thumbError && (
             <img
@@ -189,26 +189,26 @@ function DoneCard({ card, onClick }: { card: CourseCard; onClick: () => void }) 
             />
           )}
         </div>
-        <div className="px-2 py-1 absolute bg-zinc-800/90 rounded-2xl" style={{ right: '8px', bottom: '8px' }}>
+        <div className="px-2 py-1 absolute rounded-2xl" style={{ right: '8px', bottom: '8px', backgroundColor: 'rgba(41,41,41,0.85)' }}>
           <div className="text-white text-[10.40px] font-normal font-['Liberation_Mono'] leading-4">{card.duration}</div>
         </div>
       </div>
       {/* Info */}
       <div className="w-44 left-[25px] top-[136.65px] absolute inline-flex flex-col justify-start items-start gap-1">
         <div className="self-stretch pb-[0.69px] flex flex-col justify-start items-start">
-          <div className="self-stretch text-zinc-800 text-base font-bold font-['Inter'] leading-6 truncate">{card.course}</div>
+          <div className="self-stretch text-base font-bold font-['Inter'] leading-6 truncate" style={{ color: '#292929' }}>{card.course}</div>
         </div>
         <div className="self-stretch flex flex-col justify-start items-start">
-          <div className="self-stretch text-slate-600 text-xs font-medium font-['Inter'] leading-4 truncate">{card.lecture}</div>
+          <div className="self-stretch text-xs font-medium font-['Inter'] leading-4 truncate" style={{ color: '#72726E' }}>{card.lecture}</div>
         </div>
       </div>
       {/* Footer */}
-      <div className="w-44 pt-4 left-[25px] top-[239.14px] absolute border-t border-zinc-400/10 inline-flex justify-between items-center">
+      <div className="w-44 pt-4 left-[25px] top-[239.14px] absolute inline-flex justify-between items-center" style={{ borderTop: '1px solid #E3E3DA' }}>
         <div className="flex justify-start items-center gap-1">
-          <div className="w-3.5 h-3.5 relative text-slate-600"><IconNotes /></div>
-          <div className="text-slate-600 text-xs font-normal font-['Inter'] leading-4">{card.notes} notes</div>
+          <div className="w-3.5 h-3.5 relative" style={{ color: '#72726E' }}><IconNotes /></div>
+          <div className="text-xs font-normal font-['Inter'] leading-4" style={{ color: '#72726E' }}>{card.notes} notes</div>
         </div>
-        <div className="text-neutral-500 text-[10.40px] font-bold font-['Inter'] uppercase leading-4 tracking-wide">{card.time}</div>
+        <div className="text-[10.40px] font-bold font-['Inter'] uppercase leading-4 tracking-wide" style={{ color: '#72726E' }}>{card.time}</div>
       </div>
     </button>
   )
@@ -217,9 +217,9 @@ function DoneCard({ card, onClick }: { card: CourseCard; onClick: () => void }) 
 // ─── List View ───────────────────────────────────────────────────────────────
 
 const FOLDER_BADGE: Record<string, { bg: string; text: string }> = {
-  blue:    { bg: '#DBEAFE', text: '#4B5563' },
-  slate:   { bg: '#DBEAFE', text: '#475569' },
-  neutral: { bg: '#E5E5E5', text: '#52525B' },
+  blue:    { bg: '#F2F2EC', text: '#72726E' },
+  slate:   { bg: '#F2F2EC', text: '#72726E' },
+  neutral: { bg: '#E3E3DA', text: '#72726E' },
 }
 
 function ListRow({ card, onClick, isLast }: { card: CourseCard; onClick: () => void; isLast: boolean }) {
@@ -233,11 +233,12 @@ function ListRow({ card, onClick, isLast }: { card: CourseCard; onClick: () => v
       type="button"
       onClick={onClick}
       aria-label={`打开课程：${card.course}`}
-      className={`w-full text-left flex items-center cursor-pointer hover:bg-stone-50/60 transition-colors${isLast ? '' : ' border-b border-gray-200'}`}
+      className={`w-full text-left flex items-center cursor-pointer hover:bg-[#F2F2EC]/60 transition-colors${isLast ? '' : ' border-b'}`}
+      style={isLast ? {} : { borderColor: '#E3E3DA' }}
     >
       {/* Thumbnail */}
       <div className="w-40 px-6 py-7 flex-shrink-0">
-        <div className="w-16 h-10 rounded-2xl outline outline-1 outline-offset-[-1px] outline-zinc-400/10 overflow-hidden relative" style={{ backgroundColor: card.thumbColor, opacity: 0.8 }}>
+        <div className="w-16 h-10 rounded-2xl outline outline-1 outline-offset-[-1px] overflow-hidden relative" style={{ backgroundColor: card.thumbColor, opacity: 0.8, outlineColor: '#E3E3DA' }}>
           {!thumbError && (
             <img
               src={thumbSrc}
@@ -254,8 +255,8 @@ function ListRow({ card, onClick, isLast }: { card: CourseCard; onClick: () => v
 
       {/* Course name & subtitle */}
       <div className="w-56 pl-6 flex-shrink-0 flex flex-col gap-0.5">
-        <div className="text-zinc-800 text-sm font-semibold font-['Inter'] leading-5">{card.course}</div>
-        <div className="text-slate-600 text-xs font-normal font-['Inter'] leading-4">{card.lecture}</div>
+        <div className="text-sm font-semibold font-['Inter'] leading-5" style={{ color: '#292929' }}>{card.course}</div>
+        <div className="text-xs font-normal font-['Inter'] leading-4" style={{ color: '#72726E' }}>{card.lecture}</div>
       </div>
 
       {/* Folder badge */}
@@ -270,17 +271,17 @@ function ListRow({ card, onClick, isLast }: { card: CourseCard; onClick: () => v
       </div>
 
       {/* Date */}
-      <div className="w-28 px-6 py-7 flex-shrink-0 text-slate-600 text-sm font-normal font-['Inter'] leading-5">
+      <div className="w-28 px-6 py-7 flex-shrink-0 text-sm font-normal font-['Inter'] leading-5" style={{ color: '#72726E' }}>
         {card.date}
       </div>
 
       {/* Duration */}
-      <div className="w-28 px-6 py-7 flex-shrink-0 text-slate-600 text-sm font-normal font-['Inter'] leading-5">
+      <div className="w-28 px-6 py-7 flex-shrink-0 text-sm font-normal font-['Inter'] leading-5" style={{ color: '#72726E' }}>
         {card.duration}
       </div>
 
       {/* Notes */}
-      <div className="w-32 pl-6 flex-shrink-0 flex items-center gap-2 text-zinc-800 text-sm font-medium font-['Inter'] leading-5">
+      <div className="w-32 pl-6 flex-shrink-0 flex items-center gap-2 text-sm font-medium font-['Inter'] leading-5" style={{ color: '#292929' }}>
         <IconNotes />
         {card.notes} notes
       </div>
@@ -291,15 +292,15 @@ function ListRow({ card, onClick, isLast }: { card: CourseCard; onClick: () => v
 function ListTable({ sessions, onRowClick }: { sessions: CourseCard[]; onRowClick: (id: string) => void }) {
   const done = sessions.filter(s => s.status === 'done')
   return (
-    <div className="self-stretch bg-white rounded-[32px] shadow-[0px_40px_40px_0px_rgba(47,51,49,0.04)] overflow-hidden">
+    <div className="self-stretch rounded-[32px] shadow-[0px_40px_40px_0px_rgba(47,51,49,0.04)] overflow-hidden" style={{ backgroundColor: '#FFFFFF' }}>
       {/* Header */}
-      <div className="flex items-start bg-stone-100/50 pr-24">
-        <div className="w-40 px-6 py-4 flex-shrink-0 text-slate-600 text-[10px] font-medium font-['Inter'] uppercase tracking-wide">COURSE<br/>THUMBNAIL</div>
-        <div className="w-56 px-6 py-5 flex-shrink-0 text-slate-600 text-[10px] font-medium font-['Inter'] uppercase tracking-wide">COURSE NAME &amp; IDENTIFIER</div>
-        <div className="w-48 px-6 py-5 flex-shrink-0 text-slate-600 text-[10px] font-medium font-['Inter'] uppercase tracking-wide">FOLDER</div>
-        <div className="w-28 px-6 py-5 flex-shrink-0 text-slate-600 text-[10px] font-medium font-['Inter'] uppercase tracking-wide">DATE</div>
-        <div className="w-28 px-6 py-5 flex-shrink-0 text-slate-600 text-[10px] font-medium font-['Inter'] uppercase tracking-wide">DURATION</div>
-        <div className="w-32 px-6 py-5 flex-shrink-0 text-slate-600 text-[10px] font-medium font-['Inter'] uppercase tracking-wide">NOTES</div>
+      <div className="flex items-start pr-24" style={{ backgroundColor: 'rgba(247,247,242,0.5)' }}>
+        <div className="w-40 px-6 py-4 flex-shrink-0 text-[10px] font-medium font-['Inter'] uppercase tracking-wide" style={{ color: '#72726E' }}>COURSE<br/>THUMBNAIL</div>
+        <div className="w-56 px-6 py-5 flex-shrink-0 text-[10px] font-medium font-['Inter'] uppercase tracking-wide" style={{ color: '#72726E' }}>COURSE NAME &amp; IDENTIFIER</div>
+        <div className="w-48 px-6 py-5 flex-shrink-0 text-[10px] font-medium font-['Inter'] uppercase tracking-wide" style={{ color: '#72726E' }}>FOLDER</div>
+        <div className="w-28 px-6 py-5 flex-shrink-0 text-[10px] font-medium font-['Inter'] uppercase tracking-wide" style={{ color: '#72726E' }}>DATE</div>
+        <div className="w-28 px-6 py-5 flex-shrink-0 text-[10px] font-medium font-['Inter'] uppercase tracking-wide" style={{ color: '#72726E' }}>DURATION</div>
+        <div className="w-32 px-6 py-5 flex-shrink-0 text-[10px] font-medium font-['Inter'] uppercase tracking-wide" style={{ color: '#72726E' }}>NOTES</div>
       </div>
       {/* Rows */}
       {done.map((card, i) => (
@@ -331,10 +332,10 @@ function IconModalClose() {
 function IconPPT() {
   return (
     <svg width="32" height="40" viewBox="0 0 32 40" fill="none">
-      <rect x="1" y="1" width="22" height="30" rx="3" stroke="#AFB3B0" strokeWidth="1.5" />
-      <path d="M7 9h12M7 14h12M7 19h8" stroke="#AFB3B0" strokeWidth="1.5" strokeLinecap="round" />
-      <rect x="14" y="22" width="17" height="17" rx="3" fill="#F3F4F1" stroke="#AFB3B0" strokeWidth="1.5" />
-      <path d="M18 30h5M18 33h3" stroke="#AFB3B0" strokeWidth="1.5" strokeLinecap="round" />
+      <rect x="1" y="1" width="22" height="30" rx="3" stroke="#D0CFC5" strokeWidth="1.5" />
+      <path d="M7 9h12M7 14h12M7 19h8" stroke="#D0CFC5" strokeWidth="1.5" strokeLinecap="round" />
+      <rect x="14" y="22" width="17" height="17" rx="3" fill="#F2F2EC" stroke="#D0CFC5" strokeWidth="1.5" />
+      <path d="M18 30h5M18 33h3" stroke="#D0CFC5" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   )
 }
@@ -342,9 +343,9 @@ function IconPPT() {
 function IconAudioFile() {
   return (
     <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-      <rect x="12" y="4" width="12" height="18" rx="6" stroke="#AFB3B0" strokeWidth="1.5" />
-      <path d="M6 18c0 6.627 5.373 12 12 12s12-5.373 12-12" stroke="#AFB3B0" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M18 30v4M14 34h8" stroke="#AFB3B0" strokeWidth="1.5" strokeLinecap="round" />
+      <rect x="12" y="4" width="12" height="18" rx="6" stroke="#D0CFC5" strokeWidth="1.5" />
+      <path d="M6 18c0 6.627 5.373 12 12 12s12-5.373 12-12" stroke="#D0CFC5" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M18 30v4M14 34h8" stroke="#D0CFC5" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   )
 }
@@ -376,16 +377,16 @@ function UploadZone({ label, hint, accept, icon, file, error, onFile, onClear }:
       <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f) }} />
       <div className="pb-4">{icon}</div>
       <div className="pb-1">
-        <span className="font-bold text-sm text-zinc-800">{isSuccess ? file!.name : label}</span>
+        <span className="font-bold text-sm" style={{ color: '#292929' }}>{isSuccess ? file!.name : label}</span>
       </div>
-      <span className="font-normal text-[11px] uppercase tracking-[0.05em]" style={{ color: error ? 'rgba(224,92,64,0.8)' : '#556071' }}>
+      <span className="font-normal text-[11px] uppercase tracking-[0.05em]" style={{ color: error ? 'rgba(224,92,64,0.8)' : '#72726E' }}>
         {error ?? (isSuccess ? 'Click to replace' : hint)}
       </span>
       {isSuccess && (
         <button
           onClick={(e) => { e.stopPropagation(); onClear() }}
           className="absolute top-3 right-3 flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity"
-          style={{ width: '24px', height: '24px', borderRadius: '9999px', backgroundColor: 'rgba(175,179,176,0.15)', color: '#5F5E5E', border: 'none' }}
+          style={{ width: '24px', height: '24px', borderRadius: '9999px', backgroundColor: 'rgba(175,179,176,0.15)', color: '#292929', border: 'none' }}
         >
           <IconModalClose />
         </button>
@@ -448,9 +449,9 @@ function NewClassModal({ onClose, onUploaded }: { onClose: () => void; onUploade
           <div className="flex justify-between items-start">
             <div className="flex flex-col gap-2">
               <span className="font-bold text-base uppercase tracking-[0.2em]" style={{ color: 'rgba(95,94,94,0.6)' }}>ACTION CENTER</span>
-              <h2 id="modal-title" className="font-bold text-[36px] leading-[1.11] tracking-[-0.025em] text-zinc-800 m-0">New Class</h2>
+              <h2 id="modal-title" className="font-bold text-[36px] leading-[1.11] tracking-[-0.025em] m-0" style={{ color: '#292929' }}>New Class</h2>
             </div>
-            <button type="button" onClick={onClose} aria-label="关闭对话框" className="flex items-center justify-center flex-shrink-0 cursor-pointer hover:opacity-70 transition-opacity" style={{ width: '40px', height: '40px', borderRadius: '9999px', backgroundColor: '#F3F4F1', color: '#5F5E5E', border: 'none' }}>
+            <button type="button" onClick={onClose} aria-label="关闭对话框" className="flex items-center justify-center flex-shrink-0 cursor-pointer hover:opacity-70 transition-opacity" style={{ width: '40px', height: '40px', borderRadius: '9999px', backgroundColor: '#F2F2EC', color: '#292929', border: 'none' }}>
               <IconModalClose aria-hidden="true" />
             </button>
           </div>
@@ -467,13 +468,13 @@ function NewClassModal({ onClose, onUploaded }: { onClose: () => void; onUploade
 
           {/* CTA */}
           <div className="flex justify-end gap-4 items-center">
-            <button onClick={onClose} className="cursor-pointer hover:opacity-70 transition-opacity font-bold text-sm uppercase tracking-[0.1em] text-slate-600 bg-transparent border-none" style={{ padding: '13.5px 24px 14.5px' }}>
+            <button onClick={onClose} className="cursor-pointer hover:opacity-70 transition-opacity font-bold text-sm uppercase tracking-[0.1em] bg-transparent border-none" style={{ color: '#72726E', padding: '13.5px 24px 14.5px' }}>
               CANCEL
             </button>
             <button
               onClick={handleSubmit} disabled={!canSubmit}
               className="px-8 py-3 rounded-full font-bold text-base border-none transition-all"
-              style={{ backgroundColor: canSubmit ? '#5F5E5E' : 'rgba(95,94,94,0.35)', color: '#FAF7F6', cursor: canSubmit ? 'pointer' : 'not-allowed', boxShadow: canSubmit ? '0px 4px 6px -4px rgba(0,0,0,0.1), 0px 10px 15px -3px rgba(0,0,0,0.1)' : 'none' }}
+              style={{ backgroundColor: canSubmit ? '#798C00' : 'rgba(121,140,0,0.35)', color: '#FAF7F6', cursor: canSubmit ? 'pointer' : 'not-allowed', boxShadow: canSubmit ? '0px 4px 6px -4px rgba(0,0,0,0.1), 0px 10px 15px -3px rgba(0,0,0,0.1)' : 'none' }}
             >
               {uploading ? 'Uploading…' : 'Save Workspace'}
             </button>
@@ -536,8 +537,8 @@ function ProcessingToast({ toast, onClose, onOpen }: {
       <div style={{ flexShrink: 0, paddingTop: '2px' }}>
         {isDone ? (
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <circle cx="9" cy="9" r="8.25" stroke="#5F5E5E" strokeWidth="1.5" fill="none" />
-            <path d="M5.5 9l2.5 2.5 4.5-4.5" stroke="#5F5E5E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx="9" cy="9" r="8.25" stroke="#292929" strokeWidth="1.5" fill="none" />
+            <path d="M5.5 9l2.5 2.5 4.5-4.5" stroke="#292929" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         ) : isError ? (
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -548,7 +549,7 @@ function ProcessingToast({ toast, onClose, onOpen }: {
           <div className="animate-spin" style={{ width: '18px', height: '18px' }}>
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
               <circle cx="9" cy="9" r="7.5" stroke="rgba(95,94,94,0.2)" strokeWidth="2" />
-              <path d="M9 1.5C4.86 1.5 1.5 4.86 1.5 9" stroke="#5F5E5E" strokeWidth="2" strokeLinecap="round" />
+              <path d="M9 1.5C4.86 1.5 1.5 4.86 1.5 9" stroke="#292929" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </div>
         )}
@@ -556,10 +557,10 @@ function ProcessingToast({ toast, onClose, onOpen }: {
 
       {/* Text */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: '13px', fontWeight: 600, color: '#2F3331', marginBottom: '2px' }}>
+        <div style={{ fontSize: '13px', fontWeight: 600, color: '#292929', marginBottom: '2px' }}>
           {isDone ? '笔记已生成完成' : isError ? '处理失败' : '正在处理课堂录音'}
         </div>
-        <div style={{ fontSize: '11px', color: '#556071' }}>
+        <div style={{ fontSize: '11px', color: '#72726E' }}>
           {isDone
             ? '点击查看笔记'
             : isError
@@ -577,7 +578,7 @@ function ProcessingToast({ toast, onClose, onOpen }: {
               fontSize: '11px',
               fontWeight: 700,
               color: '#FFFFFF',
-              background: '#5F5E5E',
+              background: '#798C00',
               border: 'none',
               borderRadius: '9999px',
               padding: '4px 12px',
@@ -599,7 +600,7 @@ function ProcessingToast({ toast, onClose, onOpen }: {
             height: '20px',
             borderRadius: '9999px',
             backgroundColor: 'rgba(175,179,176,0.15)',
-            color: '#5F5E5E',
+            color: '#292929',
             border: 'none',
             cursor: 'pointer',
             flexShrink: 0,
@@ -704,17 +705,17 @@ export default function LobbyPage() {
   }, [])
 
   return (
-    <div className="w-full min-h-screen bg-stone-50 flex font-['Inter'] pt-10">
+    <div className="w-full min-h-screen flex font-['Inter'] pt-10" style={{ backgroundColor: '#F7F7F2' }}>
 
       {/* ── Sidebar ── */}
-      <aside aria-label="侧边导航" className="w-48 flex-shrink-0 px-4 py-8 bg-stone-100 flex flex-col justify-between items-start min-h-screen">
+      <aside aria-label="侧边导航" className="w-48 flex-shrink-0 px-4 py-8 flex flex-col justify-between items-start min-h-screen" style={{ backgroundColor: '#F2F2EC' }}>
         {/* Brand */}
         <div className="self-stretch pb-10 flex flex-col justify-start items-start">
           <div className="self-stretch px-4 flex flex-col justify-start items-start">
-            <div className="self-stretch text-zinc-800 text-lg font-bold font-['Inter'] leading-7">
+            <div className="self-stretch text-lg font-bold font-['Inter'] leading-7" style={{ color: '#292929' }}>
               Student<br />Workspace
             </div>
-            <div className="self-stretch opacity-60 text-zinc-800 text-xs font-normal font-['Inter'] uppercase leading-4 tracking-wide mt-1">
+            <div className="self-stretch opacity-60 text-xs font-normal font-['Inter'] uppercase leading-4 tracking-wide mt-1" style={{ color: '#292929' }}>
               ACADEMIC YEAR 2026
             </div>
           </div>
@@ -724,7 +725,8 @@ export default function LobbyPage() {
         <div className="self-stretch px-2 pb-8 flex flex-col justify-start items-start">
           <button
             onClick={() => setShowModal(true)}
-            className="self-stretch px-4 py-3 bg-zinc-600 rounded-full shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] inline-flex justify-center items-center gap-2 cursor-pointer hover:opacity-85 transition-opacity border-none"
+            className="self-stretch px-4 py-3 rounded-full shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] inline-flex justify-center items-center gap-2 cursor-pointer hover:opacity-85 transition-opacity border-none"
+            style={{ backgroundColor: '#798C00' }}
           >
             <IconMic />
             <span className="text-center text-stone-50 text-xs font-semibold font-['Inter'] leading-5 tracking-tight">Upload the<br />record</span>
@@ -734,13 +736,13 @@ export default function LobbyPage() {
         {/* Nav */}
         <div className="self-stretch flex-1 flex flex-col justify-start items-start gap-4">
           {/* Search */}
-          <div className="self-stretch px-4 py-2 bg-neutral-200/20 rounded-md inline-flex justify-between items-center cursor-pointer hover:bg-neutral-200/40 transition-colors">
-            <div className="flex justify-start items-center gap-3 text-slate-600">
+          <div className="self-stretch px-4 py-2 rounded-md inline-flex justify-between items-center cursor-pointer transition-colors" style={{ backgroundColor: 'rgba(227,227,218,0.3)' }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(227,227,218,0.6)')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'rgba(227,227,218,0.3)')}>
+            <div className="flex justify-start items-center gap-3" style={{ color: '#72726E' }}>
               <IconSearch />
-              <span className="text-slate-600 text-xs font-medium font-['Inter'] leading-5">Search</span>
+              <span className="text-xs font-medium font-['Inter'] leading-5" style={{ color: '#72726E' }}>Search</span>
             </div>
-            <div className="px-1.5 pt-px pb-[2.39px] bg-neutral-200 rounded-2xl inline-flex flex-col justify-start items-start">
-              <span className="text-neutral-500 text-[9.60px] font-bold font-['IPAGothic'] leading-4">⌘K</span>
+            <div className="px-1.5 pt-px pb-[2.39px] rounded-2xl inline-flex flex-col justify-start items-start" style={{ backgroundColor: '#E3E3DA' }}>
+              <span className="text-[9.60px] font-bold font-['IPAGothic'] leading-4" style={{ color: '#72726E' }}>⌘K</span>
             </div>
           </div>
 
@@ -749,89 +751,70 @@ export default function LobbyPage() {
             <button
               onClick={() => setActiveNav('courses')}
               className="self-stretch px-4 py-3 inline-flex justify-start items-center gap-3 cursor-pointer border-none bg-transparent transition-all"
-              style={{ borderRight: activeNav === 'courses' ? '2px solid #5F5E5E' : '2px solid transparent' }}
+              style={{ borderRight: activeNav === 'courses' ? '2px solid #798C00' : '2px solid transparent' }}
             >
-              <span style={{ color: activeNav === 'courses' ? '#2F3331' : '#556071' }}><IconCourse /></span>
-              <span className="text-zinc-800 text-xs font-normal font-['Inter'] uppercase leading-4 tracking-wide">MY COURSES</span>
+              <span style={{ color: activeNav === 'courses' ? '#292929' : '#72726E' }}><IconCourse /></span>
+              <span className="text-xs font-normal font-['Inter'] uppercase leading-4 tracking-wide" style={{ color: '#292929' }}>MY COURSES</span>
             </button>
             <button
               onClick={() => setActiveNav('settings')}
               className="self-stretch px-4 py-3 inline-flex justify-start items-center gap-3 cursor-pointer border-none bg-transparent transition-all"
-              style={{ borderRight: activeNav === 'settings' ? '2px solid #5F5E5E' : '2px solid transparent' }}
+              style={{ borderRight: activeNav === 'settings' ? '2px solid #798C00' : '2px solid transparent' }}
             >
-              <span style={{ color: activeNav === 'settings' ? '#2F3331' : '#556071' }}><IconSettings /></span>
-              <span className="text-zinc-800 text-xs font-normal font-['Inter'] uppercase leading-4 tracking-wide">SETTINGS</span>
+              <span style={{ color: activeNav === 'settings' ? '#292929' : '#72726E' }}><IconSettings /></span>
+              <span className="text-xs font-normal font-['Inter'] uppercase leading-4 tracking-wide" style={{ color: '#292929' }}>SETTINGS</span>
             </button>
           </div>
         </div>
 
         {/* User anchor */}
         <div className="self-stretch px-4 inline-flex justify-start items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-[#C8C9C0] flex-shrink-0 flex items-center justify-center">
-            <span className="text-xs font-bold text-zinc-600">学</span>
+          <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: '#D0CFC5' }}>
+            <span className="text-xs font-bold" style={{ color: '#72726E' }}>学</span>
           </div>
           <div className="inline-flex flex-col justify-start items-start overflow-hidden">
             <div className="self-stretch flex flex-col justify-start items-start overflow-hidden">
-              <div className="text-zinc-800 text-xs font-bold font-['Inter'] leading-4">同学</div>
+              <div className="text-xs font-bold font-['Inter'] leading-4" style={{ color: '#292929' }}>同学</div>
             </div>
             <div className="self-stretch h-3.5 relative overflow-hidden">
-              <div className="left-0 top-[-1px] absolute text-slate-600 text-[9.60px] font-normal font-['Inter'] leading-4">学生</div>
+              <div className="left-0 top-[-1px] absolute text-[9.60px] font-normal font-['Inter'] leading-4" style={{ color: '#72726E' }}>学生</div>
             </div>
           </div>
         </div>
       </aside>
 
       {/* ── Main Area ── */}
-      <div className="flex-1 min-w-0 min-h-screen bg-stone-50 flex flex-col justify-start items-start">
+      <div className="flex-1 min-w-0 min-h-screen flex flex-col justify-start items-start" style={{ backgroundColor: '#F7F7F2' }}>
 
         {/* Header */}
-        <div className="self-stretch px-12 py-6 bg-stone-50/80 backdrop-blur-md inline-flex justify-between items-center sticky top-16 z-10">
+        <div className="self-stretch px-12 py-6 backdrop-blur-md inline-flex justify-between items-center sticky top-16 z-10" style={{ backgroundColor: 'rgba(247,247,242,0.85)' }}>
           <div className="inline-flex flex-col justify-start items-start gap-0.5">
             <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="text-zinc-800 text-2xl font-black font-['Inter'] leading-8">Scholarly Workspace</div>
+              <div className="text-2xl font-black font-['Inter'] leading-8" style={{ color: '#292929' }}>Scholarly Workspace</div>
             </div>
             <div className="self-stretch flex flex-col justify-start items-start">
-              <div className="text-slate-600 text-[10.40px] font-normal font-['Inter'] uppercase leading-4 tracking-wide">WELCOME BACK, YOUR RECORDINGS ARE UP TO DATE.</div>
+              <div className="text-[10.40px] font-normal font-['Inter'] uppercase leading-4 tracking-wide" style={{ color: '#72726E' }}>WELCOME BACK, YOUR RECORDINGS ARE UP TO DATE.</div>
             </div>
           </div>
           <div className="flex justify-start items-center gap-6">
             {/* Grid/List toggle */}
-            <div className="p-1 bg-stone-100 rounded-full flex justify-start items-start gap-1">
+            <div className="p-1 rounded-full flex justify-start items-start gap-1" style={{ backgroundColor: '#F2F2EC' }}>
               <button
                 onClick={() => setViewMode('grid')}
                 className="px-4 py-1.5 rounded-full inline-flex justify-start items-center gap-2 cursor-pointer border-none transition-all"
                 style={{ backgroundColor: viewMode === 'grid' ? '#FFFFFF' : 'transparent', boxShadow: viewMode === 'grid' ? '0px 1px 2px 0px rgba(0,0,0,0.05)' : 'none' }}
               >
-                <span style={{ color: viewMode === 'grid' ? '#2F3331' : '#556071' }}><IconGrid /></span>
-                <span className="text-xs font-bold font-['Inter'] leading-4" style={{ color: viewMode === 'grid' ? '#2F3331' : '#556071' }}>Grid</span>
+                <span style={{ color: viewMode === 'grid' ? '#292929' : '#72726E' }}><IconGrid /></span>
+                <span className="text-xs font-bold font-['Inter'] leading-4" style={{ color: viewMode === 'grid' ? '#292929' : '#72726E' }}>Grid</span>
               </button>
               <button
                 onClick={() => setViewMode('list')}
                 className="px-4 py-1.5 rounded-full inline-flex justify-start items-center gap-2 cursor-pointer border-none transition-all"
                 style={{ backgroundColor: viewMode === 'list' ? '#FFFFFF' : 'transparent', boxShadow: viewMode === 'list' ? '0px 1px 2px 0px rgba(0,0,0,0.05)' : 'none' }}
               >
-                <span style={{ color: viewMode === 'list' ? '#2F3331' : '#556071' }}><IconList /></span>
-                <span className="text-xs font-bold font-['Inter'] leading-4" style={{ color: viewMode === 'list' ? '#2F3331' : '#556071' }}>List</span>
+                <span style={{ color: viewMode === 'list' ? '#292929' : '#72726E' }}><IconList /></span>
+                <span className="text-xs font-bold font-['Inter'] leading-4" style={{ color: viewMode === 'list' ? '#292929' : '#72726E' }}>List</span>
               </button>
-            </div>
-            {/* Bell + Avatar */}
-            <div className="flex justify-start items-center gap-4">
-              <div className="inline-flex flex-col justify-center items-center">
-                <div className="inline-flex justify-center items-start">
-                  <button type="button" aria-label="通知" className="w-3 h-4 flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity border-none bg-transparent text-slate-600">
-                    <IconBell aria-hidden="true" />
-                  </button>
-                </div>
-              </div>
-              <div className="inline-flex flex-col justify-center items-center">
-                <div className="inline-flex justify-center items-start">
-                  <button type="button" aria-label="用户设置" className="w-4 h-4 flex items-center justify-center cursor-pointer border-none bg-transparent p-0">
-                    <div className="w-8 h-8 rounded-full bg-[#C8C9C0] flex items-center justify-center">
-                      <span className="text-xs font-bold text-zinc-600">A</span>
-                    </div>
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -853,10 +836,11 @@ export default function LobbyPage() {
                 )}
                 {sessions.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-16 w-full">
-                    <p className="text-sm text-zinc-400 mb-4">还没有任何课程记录</p>
+                    <p className="text-sm mb-4" style={{ color: '#D0CFC5' }}>还没有任何课程记录</p>
                     <button
                       onClick={() => setShowModal(true)}
-                      className="px-4 py-2 bg-zinc-600 text-white text-sm rounded-full cursor-pointer hover:opacity-85 border-none"
+                      className="px-4 py-2 text-white text-sm rounded-full cursor-pointer hover:opacity-85 border-none"
+                      style={{ backgroundColor: '#798C00' }}
                     >
                       开始第一次录音
                     </button>

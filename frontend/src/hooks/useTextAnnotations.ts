@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 
 export interface TextAnnotation {
   id: string
@@ -24,10 +24,13 @@ export function useTextAnnotations(sessionId: string) {
   const [annotations, setAnnotations] = useState<TextAnnotation[]>(() =>
     load().filter((a) => a.sessionId === sessionId)
   )
+  // 记住本次会话中用户最后一次设置的颜色和字号，新建标注时复用
+  const lastFormatRef = useRef<{ color: string; fontSize: number }>({ color: '#1A1916', fontSize: 14 })
 
   const addAnnotation = useCallback((pageNum: number, x: number, y: number) => {
     const id = crypto.randomUUID()
-    const record: TextAnnotation = { id, sessionId, pageNum, x, y, text: '', color: '#1A1916', fontSize: 14 }
+    const { color, fontSize } = lastFormatRef.current
+    const record: TextAnnotation = { id, sessionId, pageNum, x, y, text: '', color, fontSize }
     const next = [...load(), record]
     save(next)
     setAnnotations(next.filter((a) => a.sessionId === sessionId))
@@ -35,6 +38,9 @@ export function useTextAnnotations(sessionId: string) {
   }, [sessionId])
 
   const updateAnnotation = useCallback((id: string, text: string, color?: string, fontSize?: number) => {
+    // 用户改了颜色或字号时，记住最新配置供下次新建使用
+    if (color !== undefined) lastFormatRef.current.color = color
+    if (fontSize !== undefined) lastFormatRef.current.fontSize = fontSize
     const next = load().map((a) => a.id === id ? { ...a, text, ...(color !== undefined ? { color } : {}), ...(fontSize !== undefined ? { fontSize } : {}) } : a)
     save(next)
     setAnnotations(next.filter((a) => a.sessionId === sessionId))

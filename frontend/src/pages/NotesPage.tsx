@@ -17,17 +17,25 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url,
 ).toString()
 
-// ─── IndexedDB：ask_history 持久化 ───
+// ─── IndexedDB：持久化（ask_history / my_notes / page_chat） ───
 const DB_NAME = 'liberstudy_ask'
 const STORE_NAME = 'ask_history'
+const MY_NOTES_STORE = 'my_notes'
+const PAGE_CHAT_STORE = 'page_chat'
 
 function openAskDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1)
+    const req = indexedDB.open(DB_NAME, 2)
     req.onupgradeneeded = () => {
       const db = req.result
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME)
+      }
+      if (!db.objectStoreNames.contains(MY_NOTES_STORE)) {
+        db.createObjectStore(MY_NOTES_STORE)
+      }
+      if (!db.objectStoreNames.contains(PAGE_CHAT_STORE)) {
+        db.createObjectStore(PAGE_CHAT_STORE)
       }
     }
     req.onsuccess = () => resolve(req.result)
@@ -37,6 +45,50 @@ function openAskDB(): Promise<IDBDatabase> {
 
 function askKey(sessionId: string, pageNum: number, bulletIndex: number) {
   return `${sessionId}:${pageNum}:${bulletIndex}`
+}
+
+function myNoteKey(sessionId: string, pageNum: number) {
+  return `${sessionId}:${pageNum}`
+}
+
+async function loadMyNote(sessionId: string, pageNum: number): Promise<string> {
+  const db = await openAskDB()
+  return new Promise((resolve) => {
+    const tx = db.transaction(MY_NOTES_STORE, 'readonly')
+    const req = tx.objectStore(MY_NOTES_STORE).get(myNoteKey(sessionId, pageNum))
+    req.onsuccess = () => resolve(req.result?.text ?? '')
+    req.onerror = () => resolve('')
+  })
+}
+
+async function saveMyNote(sessionId: string, pageNum: number, text: string) {
+  const db = await openAskDB()
+  return new Promise<void>((resolve) => {
+    const tx = db.transaction(MY_NOTES_STORE, 'readwrite')
+    tx.objectStore(MY_NOTES_STORE).put({ text }, myNoteKey(sessionId, pageNum))
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => resolve()
+  })
+}
+
+async function loadPageChat(sessionId: string, pageNum: number): Promise<PageChatMessage[]> {
+  const db = await openAskDB()
+  return new Promise((resolve) => {
+    const tx = db.transaction(PAGE_CHAT_STORE, 'readonly')
+    const req = tx.objectStore(PAGE_CHAT_STORE).get(myNoteKey(sessionId, pageNum))
+    req.onsuccess = () => resolve(req.result?.messages ?? [])
+    req.onerror = () => resolve([])
+  })
+}
+
+async function savePageChat(sessionId: string, pageNum: number, messages: PageChatMessage[]) {
+  const db = await openAskDB()
+  return new Promise<void>((resolve) => {
+    const tx = db.transaction(PAGE_CHAT_STORE, 'readwrite')
+    tx.objectStore(PAGE_CHAT_STORE).put({ messages }, myNoteKey(sessionId, pageNum))
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => resolve()
+  })
 }
 
 async function loadAskHistory(sessionId: string, pageNum: number, bulletIndex: number): Promise<AskMessage[]> {
@@ -63,6 +115,12 @@ interface AskMessage {
   role: 'user' | 'ai'
   content: string
   model: string
+  timestamp: number
+}
+
+interface PageChatMessage {
+  role: 'user' | 'ai'
+  content: string
   timestamp: number
 }
 
@@ -96,14 +154,14 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
 
 const FONT_SERIF = "Inter, 'PingFang SC', 'Microsoft YaHei', sans-serif"
 const C = {
-  bg: '#F0EFEA',
-  sidebar: '#E8E7E2',
-  fg: '#1A1916',
-  secondary: '#6B6A64',
-  muted: '#9B9A94',
-  dark: '#3D3B35',
-  white: '#FAFAF8',
-  divider: '#E4E3DE',
+  bg: '#F7F7F2',       // 次级背景（主内容区）
+  sidebar: '#F2F2EC',  // 辅助背景（侧边栏）
+  fg: '#292929',       // 主文本色
+  secondary: '#72726E',// 次要文本色
+  muted: '#D0CFC5',    // 禁用/占位符
+  dark: '#292929',     // 深色（与fg一致）
+  white: '#FFFFFF',    // 顶层卡片
+  divider: '#E3E3DA',  // 分割线
 }
 
 function formatTime(seconds: number): string {
@@ -143,7 +201,7 @@ function RevealText({
     const t = setTimeout(() => {
       el.classList.remove('shimmer-text')
       el.classList.add('color-settle')
-      el.style.color = highlight ? '#92400e' : muted ? '#9ca3af' : '#111827'
+      el.style.color = highlight ? '#92400e' : muted ? '#D0CFC5' : '#292929'
       settledRef.current = true
     }, 500)
 
@@ -259,7 +317,7 @@ function LineRevealSpan({ text, revealed }: { text: string; revealed: boolean })
     const t = setTimeout(() => {
       el.classList.remove('shimmer-text')
       el.classList.add('color-settle')
-      el.style.color = '#6B6A64'
+      el.style.color = '#72726E'
       settledRef.current = true
     }, 300)
     return () => clearTimeout(t)
@@ -581,12 +639,12 @@ function AiBulletRow({
             ...(pptExiting ? { animation: 'swipe-up 0.32s ease-in forwards' } : {}),
           }}
         >
-          <span style={{ color: '#AFB3B0', flexShrink: 0, marginTop: '2px', fontSize: '14px' }}>
+          <span style={{ color: '#D0CFC5', flexShrink: 0, marginTop: '2px', fontSize: '14px' }}>
             {bullet.level === 0 ? '' : '•'}
           </span>
           <span style={{
             fontSize: '14px',
-            color: '#1A1916', lineHeight: '1.625',
+            color: '#292929', lineHeight: '1.625',
             fontWeight: '400',
             opacity: !expanded
               ? (translationEnabled && !translatedPptText ? 0.4 : (hasComment ? 1 : 0.5))
@@ -597,7 +655,7 @@ function AiBulletRow({
           </span>
           {!expanded && hasComment && (
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"
-              style={{ flexShrink: 0, marginTop: '4px', color: '#9B9A94' }}>
+              style={{ flexShrink: 0, marginTop: '4px', color: '#D0CFC5' }}>
               <polyline points="6 9 12 15 18 9" />
             </svg>
           )}
@@ -606,12 +664,12 @@ function AiBulletRow({
         {/* reveal 层：swipe-up 完成后接管显示 */}
         {pptSwipedAway && (
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '4px 0' }}>
-            <span style={{ color: '#AFB3B0', flexShrink: 0, marginTop: '2px', fontSize: '14px' }}>
+            <span style={{ color: '#D0CFC5', flexShrink: 0, marginTop: '2px', fontSize: '14px' }}>
               {bullet.level === 0 ? '' : '•'}
             </span>
             <p style={{ fontSize: '14px', lineHeight: '1.625', fontWeight: '400', margin: 0, minHeight: '1.4em' }}>
               {animationDone
-                ? <span style={{ color: '#1A1916' }}>{pptText}</span>
+                ? <span style={{ color: '#292929' }}>{pptText}</span>
                 : <RevealText revealed={pptRevealed} muted={false} highlight={false}>{pptText}</RevealText>
               }
             </p>
@@ -625,11 +683,11 @@ function AiBulletRow({
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minHeight: '1.4em' }}>
             <RevealText revealed={labelRevealed} muted={false} highlight={false}>
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ display: 'inline', transform: 'translateY(1px)' }}>
-                <path d="M12 2L14.09 8.26L21 9.27L16 13.97L17.18 21L12 17.77L6.82 21L8 13.97L3 9.27L9.91 8.26L12 2Z" fill="#556071" />
+                <path d="M12 2L14.09 8.26L21 9.27L16 13.97L17.18 21L12 17.77L6.82 21L8 13.97L3 9.27L9.91 8.26L12 2Z" fill="#72726E" />
               </svg>
             </RevealText>
             <RevealText revealed={labelRevealed} muted={false} highlight={false}>
-              <span style={{ fontSize: '9px', fontWeight: '700', letterSpacing: '0.08em', color: '#556071', textTransform: 'uppercase' }}>
+              <span style={{ fontSize: '9px', fontWeight: '700', letterSpacing: '0.08em', color: '#72726E', textTransform: 'uppercase' }}>
                 AI Clarification
               </span>
             </RevealText>
@@ -637,7 +695,7 @@ function AiBulletRow({
               <RevealText revealed={labelRevealed} muted={false} highlight={false}>
                 <button type="button"
                   onClick={(e) => { e.stopPropagation(); onTimestampClick(bullet.timestamp_start) }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '9px', color: '#AFB3B0', fontWeight: '700', padding: 0, marginLeft: '4px' }}>
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '9px', color: '#D0CFC5', fontWeight: '700', padding: 0, marginLeft: '4px' }}>
                   {String(Math.floor(bullet.timestamp_start / 60)).padStart(2, '0')}:
                   {String(Math.floor(bullet.timestamp_start % 60)).padStart(2, '0')}
                 </button>
@@ -650,9 +708,9 @@ function AiBulletRow({
             position: 'relative',
           }}>
             {translationEnabled && translatedAiComment
-              ? <p style={{ fontSize: '14px', lineHeight: '1.625', fontWeight: '400', margin: 0, userSelect: 'text', color: '#6B6A64' }}>{translatedAiComment}</p>
+              ? <p style={{ fontSize: '14px', lineHeight: '1.625', fontWeight: '400', margin: 0, userSelect: 'text', color: '#72726E' }}>{translatedAiComment}</p>
               : animationDone
-                ? <p style={{ fontSize: '14px', lineHeight: '1.625', fontWeight: '400', margin: 0, userSelect: 'text', color: '#6B6A64' }}>{bullet.ai_comment}</p>
+                ? <p style={{ fontSize: '14px', lineHeight: '1.625', fontWeight: '400', margin: 0, userSelect: 'text', color: '#72726E' }}>{bullet.ai_comment}</p>
                 : <LineByLineReveal
                     text={bullet.ai_comment as string}
                     startReveal={startAiLineReveal}
@@ -754,25 +812,39 @@ export default function NotesPage() {
   type Provider = typeof PROVIDERS[number]
   const [provider, setProvider] = useState<Provider>('中转站')
 
-  // My Notes 状态：idle 编辑空闲 | editing 正在编辑
-  // AI 扩写状态通过 myNoteExpandStates 独立管理
-  type MyNoteState = { input: string; status: 'idle' | 'editing' }
-  const [myNoteStates, setMyNoteStates] = useState<Map<number, MyNoteState>>(new Map())
+  // My Notes：key=pageNum，值为文本（从 IndexedDB 加载，onChange 时 debounce 保存）
+  const [myNoteTexts, setMyNoteTexts] = useState<Map<number, string>>(new Map())
+  const myNoteSaveTimerRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map())
+
+  const getMyNoteText = (page: number) => myNoteTexts.get(page) ?? ''
+
+  const handleMyNoteChange = useCallback((page: number, text: string) => {
+    setMyNoteTexts(prev => { const m = new Map(prev); m.set(page, text); return m })
+    // debounce 500ms 保存
+    const timers = myNoteSaveTimerRef.current
+    const old = timers.get(page)
+    if (old) clearTimeout(old)
+    const t = setTimeout(() => {
+      if (sessionId) saveMyNote(sessionId, page, text)
+      timers.delete(page)
+    }, 500)
+    timers.set(page, t)
+  }, [sessionId])
+
+  // 切换页面时从 IndexedDB 加载 my note
+  useEffect(() => {
+    if (!sessionId) return
+    loadMyNote(sessionId, currentPage).then(text => {
+      setMyNoteTexts(prev => {
+        if (prev.has(currentPage)) return prev
+        const m = new Map(prev); m.set(currentPage, text); return m
+      })
+    })
+  }, [sessionId, currentPage])
 
   // AI 扩写状态：idle | expanding（扩写中）| expanded（扩写完成）
   type MyNoteExpandState = { userNote: string; aiText: string; status: 'idle' | 'expanding' | 'expanded' }
   const [myNoteExpandStates, setMyNoteExpandStates] = useState<Map<number, MyNoteExpandState>>(new Map())
-
-  const getMyNoteState = (page: number): MyNoteState =>
-    myNoteStates.get(page) ?? { input: '', status: 'idle' }
-
-  const patchMyNoteState = useCallback((page: number, patch: Partial<MyNoteState>) =>
-    setMyNoteStates(prev => {
-      const current = prev.get(page) ?? { input: '', status: 'idle' as const }
-      const next = new Map(prev)
-      next.set(page, { ...current, ...patch })
-      return next
-    }), [])
 
   const getMyNoteExpandState = (page: number): MyNoteExpandState =>
     myNoteExpandStates.get(page) ?? { userNote: '', aiText: '', status: 'idle' }
@@ -784,6 +856,68 @@ export default function NotesPage() {
       next.set(page, { ...current, ...patch })
       return next
     }), [])
+
+  // Page-level chat（My Notes / AI Notes 底部共用，key=pageNum）
+  const [pageChatMessages, setPageChatMessages] = useState<Map<number, PageChatMessage[]>>(new Map())
+  const [pageChatInput, setPageChatInput] = useState('')
+  const [pageChatStreaming, setPageChatStreaming] = useState(false)
+  const [pageChatStreamingText, setPageChatStreamingText] = useState('')
+  const pageChatBottomRef = useRef<HTMLDivElement>(null)
+
+  const getPageChat = (page: number): PageChatMessage[] => pageChatMessages.get(page) ?? []
+
+  // 切换页面时加载 page chat
+  useEffect(() => {
+    if (!sessionId) return
+    loadPageChat(sessionId, currentPage).then(msgs => {
+      setPageChatMessages(prev => {
+        if (prev.has(currentPage)) return prev
+        const m = new Map(prev); m.set(currentPage, msgs); return m
+      })
+    })
+  }, [sessionId, currentPage])
+
+  useEffect(() => {
+    pageChatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [pageChatMessages, pageChatStreamingText])
+
+  const handlePageChatSend = useCallback(async () => {
+    const q = pageChatInput.trim()
+    if (!q || pageChatStreaming || !sessionId) return
+    const userMsg: PageChatMessage = { role: 'user', content: q, timestamp: Date.now() }
+    const currentMsgs = pageChatMessages.get(currentPage) ?? []
+    const newMsgs = [...currentMsgs, userMsg]
+    setPageChatMessages(prev => { const m = new Map(prev); m.set(currentPage, newMsgs); return m })
+    setPageChatInput('')
+    setPageChatStreaming(true)
+    setPageChatStreamingText('')
+
+    try {
+      const pageData = session?.pages.find(p => p.page_num === currentPage)
+      const context = [
+        getMyNoteText(currentPage) ? `用户笔记：${getMyNoteText(currentPage)}` : '',
+        pageData?.passive_notes?.bullets?.map(b => b.ppt_text).join('\n') ?? '',
+      ].filter(Boolean).join('\n\n')
+
+      let full = ''
+      await askBullet(sessionId, currentPage, -1, context, '', q, '中转站', (chunk) => {
+        full += chunk
+        setPageChatStreamingText(full)
+      })
+      const aiMsg: PageChatMessage = { role: 'ai', content: full, timestamp: Date.now() }
+      const finalMsgs = [...newMsgs, aiMsg]
+      setPageChatMessages(prev => { const m = new Map(prev); m.set(currentPage, finalMsgs); return m })
+      await savePageChat(sessionId, currentPage, finalMsgs)
+    } catch (err) {
+      const errMsg: PageChatMessage = { role: 'ai', content: `出错了：${err instanceof Error ? err.message : '未知错误'}`, timestamp: Date.now() }
+      const finalMsgs = [...newMsgs, errMsg]
+      setPageChatMessages(prev => { const m = new Map(prev); m.set(currentPage, finalMsgs); return m })
+      await savePageChat(sessionId, currentPage, finalMsgs)
+    } finally {
+      setPageChatStreaming(false)
+      setPageChatStreamingText('')
+    }
+  }, [pageChatInput, pageChatStreaming, sessionId, currentPage, pageChatMessages, session, myNoteTexts])
 
   // Resizable panel state
   const [notesPanelWidth, setNotesPanelWidth] = useState(500)
@@ -968,7 +1102,7 @@ export default function NotesPage() {
 
   const handleExpandMyNote = useCallback(async (pageNum: number) => {
     if (!sessionId) return
-    const userNote = myNoteStates.get(pageNum)?.input ?? ''
+    const userNote = myNoteTexts.get(pageNum) ?? ''
     if (!userNote.trim()) return
     const pptText = session?.pages.find(p => p.page_num === pageNum)?.ppt_text ?? ''
     patchMyNoteExpandState(pageNum, { userNote, aiText: '', status: 'expanding' })
@@ -986,7 +1120,7 @@ export default function NotesPage() {
     } catch {
       patchMyNoteExpandState(pageNum, { status: 'idle' })
     }
-  }, [sessionId, session, provider, myNoteStates, patchMyNoteExpandState])
+  }, [sessionId, session, provider, myNoteTexts, patchMyNoteExpandState])
 
   const handleRetryPage = useCallback(async (pageNum: number) => {
     if (!sessionId || retrying !== null) return
@@ -1379,74 +1513,71 @@ export default function NotesPage() {
           <div className="flex-1 overflow-y-auto px-6 pb-4" onWheel={(e) => e.stopPropagation()}>
 
             {noteMode === 'my' ? (() => {
-              const mnState = getMyNoteState(currentPage)
-              const isEditing = mnState.status === 'editing'
-              const isIdle = mnState.status === 'idle'
-              const hasContent = mnState.input.trim().length > 0
+              const myText = getMyNoteText(currentPage)
+              const pageChat = getPageChat(currentPage)
+              const hasChatHistory = pageChat.length > 0 || pageChatStreaming
+              const pptAnnotations = annotationsForPage(currentPage).filter(a => a.text.trim())
 
               return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {isIdle && !hasContent ? (
-                    /* 空状态 */
-                    <button
-                      type="button"
-                      onClick={() => patchMyNoteState(currentPage, { status: 'editing' })}
-                      style={{
-                        width: '100%', textAlign: 'left', padding: '12px 14px',
-                        borderRadius: '8px', border: `1.5px dashed ${C.divider}`,
-                        background: 'transparent', cursor: 'text', color: C.muted,
-                        fontSize: '13px', lineHeight: '1.6', fontFamily: 'inherit',
-                      }}
-                    >
-                      + 点击记录这一页的理解或困惑...
-                    </button>
-                  ) : isIdle && hasContent ? (
-                    /* 只读展示 */
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
-                      <p style={{ fontSize: '13px', color: C.fg, lineHeight: '1.6', margin: 0, flex: 1 }}>
-                        {mnState.input}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => patchMyNoteState(currentPage, { status: 'editing' })}
-                        style={{
-                          flexShrink: 0, padding: '2px 8px', borderRadius: '4px',
-                          border: `1px solid ${C.divider}`, background: 'transparent',
-                          color: C.muted, fontSize: '11px', cursor: 'pointer',
-                        }}
-                      >
-                        编辑
-                      </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+                  {/* 始终可见的 textarea，像 Word 打字 */}
+                  <textarea
+                    value={myText}
+                    onChange={e => handleMyNoteChange(currentPage, e.target.value)}
+                    placeholder="在这里记录你的理解、困惑或关键词…"
+                    style={{
+                      width: '100%', resize: 'none', border: 'none', outline: 'none',
+                      background: 'transparent', color: C.fg, fontSize: '13px',
+                      lineHeight: '1.7', fontFamily: 'inherit', minHeight: '120px',
+                      boxSizing: 'border-box', padding: '0',
+                    }}
+                  />
+
+                  {/* PPT 批注（来自画布标注，只读展示） */}
+                  {pptAnnotations.length > 0 && (
+                    <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.06em', color: C.muted }}>PPT 批注</span>
+                      {pptAnnotations.map(a => (
+                        <p key={a.id} style={{
+                          fontSize: '13px', color: C.fg, lineHeight: '1.6', margin: 0,
+                          padding: '6px 10px', borderRadius: '6px', background: C.sidebar,
+                          whiteSpace: 'pre-wrap',
+                        }}>
+                          {a.text}
+                        </p>
+                      ))}
                     </div>
-                  ) : (
-                    /* 编辑状态 */
-                    <div>
-                      <textarea
-                        autoFocus
-                        value={mnState.input}
-                        onChange={e => patchMyNoteState(currentPage, { input: e.target.value })}
-                        placeholder="写下你的理解、困惑或关键词…"
-                        rows={4}
-                        style={{
-                          width: '100%', resize: 'vertical', padding: '10px 12px',
-                          borderRadius: '8px', border: `1px solid ${C.divider}`,
-                          background: C.bg, color: C.fg, fontSize: '13px',
-                          lineHeight: '1.6', outline: 'none', fontFamily: 'inherit',
-                          boxSizing: 'border-box',
-                        }}
-                      />
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
-                        <button
-                          type="button"
-                          onClick={() => patchMyNoteState(currentPage, { status: 'idle' })}
-                          style={{
-                            padding: '6px 14px', borderRadius: '6px', border: 'none',
-                            background: C.fg, color: C.white, fontSize: '12px',
-                            fontWeight: '500', cursor: 'pointer',
-                          }}
-                        >
-                          保存
-                        </button>
+                  )}
+
+                  {/* 分隔线 + 聊天记录（有聊天才显示） */}
+                  {hasChatHistory && (
+                    <div style={{ marginTop: '16px' }}>
+                      <div style={{ height: '1px', background: C.divider, marginBottom: '16px' }} />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {pageChat.map((msg, i) => (
+                          <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                            <div style={{
+                              maxWidth: '85%', padding: '7px 11px', fontSize: '13px', lineHeight: '1.55',
+                              borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                              background: msg.role === 'user' ? C.fg : C.sidebar,
+                              color: msg.role === 'user' ? C.white : C.fg,
+                              whiteSpace: 'pre-wrap',
+                            }}>
+                              {msg.content}
+                            </div>
+                          </div>
+                        ))}
+                        {pageChatStreaming && pageChatStreamingText && (
+                          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                            <div style={{
+                              maxWidth: '85%', padding: '7px 11px', fontSize: '13px', lineHeight: '1.55',
+                              borderRadius: '12px 12px 12px 2px', background: C.sidebar, color: C.fg, whiteSpace: 'pre-wrap',
+                            }}>
+                              {pageChatStreamingText}<span style={{ opacity: 0.5 }}>▋</span>
+                            </div>
+                          </div>
+                        )}
+                        <div ref={pageChatBottomRef} />
                       </div>
                     </div>
                   )}
@@ -1455,41 +1586,21 @@ export default function NotesPage() {
             })() : noteMode === 'ai' ? (
               /* AI Notes mode */
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                {/* Provider 切换 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '10px', color: C.muted, fontWeight: '600', letterSpacing: '0.06em' }}>模型</span>
-                  {PROVIDERS.map(p => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setProvider(p)}
-                      style={{
-                        padding: '2px 8px', borderRadius: '4px', border: `1px solid ${provider === p ? C.secondary : C.divider}`,
-                        background: provider === p ? C.sidebar : 'transparent',
-                        color: provider === p ? C.fg : C.muted,
-                        fontSize: '11px', fontWeight: provider === p ? '600' : '400',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-
                 {/* My Notes 块 — AI Notes 区域顶部 */}
                 {(() => {
-                  const mnState = getMyNoteState(currentPage)
+                  const myText = getMyNoteText(currentPage)
                   const expandState = getMyNoteExpandState(currentPage)
-                  const hasMyNote = mnState.input.trim().length > 0
+                  const hasMyNote = myText.trim().length > 0
                   const isExpanding = expandState.status === 'expanding'
                   const isExpanded = expandState.status === 'expanded'
+                  const pptAnnotations = annotationsForPage(currentPage).filter(a => a.text.trim())
 
-                  if (!hasMyNote && !isExpanded) return null
+                  if (!hasMyNote && !isExpanded && pptAnnotations.length === 0) return null
 
                   return (
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', color: '#556071' }}>MY NOTES</span>
+                        <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', color: '#72726E' }}>MY NOTES</span>
                         {hasMyNote && (
                           <button
                             type="button"
@@ -1506,7 +1617,7 @@ export default function NotesPage() {
                           >
                             <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
                               <path d="M12 2L14.09 8.26L21 9.27L16 13.97L17.18 21L12 17.77L6.82 21L8 13.97L3 9.27L9.91 8.26L12 2Z"
-                                fill={isExpanding ? '#6366f1' : '#556071'} />
+                                fill={isExpanding ? '#6366f1' : '#72726E'} />
                             </svg>
                             {isExpanding ? '扩写中...' : '扩写'}
                           </button>
@@ -1514,9 +1625,27 @@ export default function NotesPage() {
                       </div>
 
                       {/* 用户笔记原文（黑色） */}
-                      <p style={{ fontSize: '13px', color: C.fg, lineHeight: '1.6', margin: 0, whiteSpace: 'pre-wrap' }}>
-                        {mnState.input}
-                      </p>
+                      {hasMyNote && (
+                        <p style={{ fontSize: '13px', color: C.fg, lineHeight: '1.6', margin: 0, whiteSpace: 'pre-wrap' }}>
+                          {myText}
+                        </p>
+                      )}
+
+                      {/* PPT 批注（只读展示） */}
+                      {pptAnnotations.length > 0 && (
+                        <div style={{ marginTop: hasMyNote ? '10px' : '0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.06em', color: C.muted }}>PPT 批注</span>
+                          {pptAnnotations.map(a => (
+                            <p key={a.id} style={{
+                              fontSize: '13px', color: C.fg, lineHeight: '1.6', margin: 0,
+                              padding: '6px 10px', borderRadius: '6px', background: C.sidebar,
+                              whiteSpace: 'pre-wrap',
+                            }}>
+                              {a.text}
+                            </p>
+                          ))}
+                        </div>
+                      )}
 
                       {/* AI 扩写流式展示（灰色） */}
                       {(isExpanding || isExpanded) && expandState.aiText && (
@@ -1527,16 +1656,14 @@ export default function NotesPage() {
                             borderLeft: '2px solid rgba(85,96,113,0.2)',
                           }}
                         >
-                          {/* shimmer 流光动画 */}
                           {isExpanding ? (
                             <div
-                              style={{ fontSize: '13px', color: '#6B6A64', lineHeight: '1.7', whiteSpace: 'pre-wrap' }}
+                              style={{ fontSize: '13px', color: '#72726E', lineHeight: '1.7', whiteSpace: 'pre-wrap' }}
                             >
                               {expandState.aiText}
                               <span style={{ opacity: 0.5 }}>▋</span>
                             </div>
                           ) : (
-                            /* expanded：带 drop-in shimmer 动画 */
                             <StreamingExpandText text={expandState.aiText} />
                           )}
                         </div>
@@ -1563,7 +1690,7 @@ export default function NotesPage() {
                       </span>
                     </div>
                     <div className="flex items-center gap-2 mb-2">
-                      <span style={{ fontSize: '11px', color: '#AFB3B0', fontWeight: '500' }}>
+                      <span style={{ fontSize: '11px', color: '#D0CFC5', fontWeight: '500' }}>
                         {formatTime(currentPageData.page_start_time)}
                       </span>
                       <div className="flex-1 h-px" style={{ background: 'rgba(175,179,176,0.3)' }} />
@@ -1577,7 +1704,7 @@ export default function NotesPage() {
                         <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                           <path
                             d="M12 2L14.09 8.26L21 9.27L16 13.97L17.18 21L12 17.77L6.82 21L8 13.97L3 9.27L9.91 8.26L12 2Z"
-                            fill="#556071"
+                            fill="#72726E"
                           />
                         </svg>
                         <span style={{ fontSize: '9px', fontWeight: '700', letterSpacing: '0.08em', color: C.secondary, textTransform: 'uppercase' }}>
@@ -1701,7 +1828,7 @@ export default function NotesPage() {
                         <button
                           onClick={() => handleTimestampClick(currentPageData.page_supplement!.timestamp_start)}
                           className="text-xs cursor-pointer transition-all duration-150 hover:opacity-70"
-                          style={{ color: '#AFB3B0', background: 'none', border: 'none', padding: 0 }}
+                          style={{ color: '#D0CFC5', background: 'none', border: 'none', padding: 0 }}
                         >
                           {formatTime(currentPageData.page_supplement.timestamp_start)} - {formatTime(currentPageData.page_supplement.timestamp_end)}
                         </button>
@@ -1717,6 +1844,44 @@ export default function NotesPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Page-level 聊天记录（AI Notes 底部，有记录才显示） */}
+                {(() => {
+                  const pageChat = getPageChat(currentPage)
+                  const hasChatHistory = pageChat.length > 0 || pageChatStreaming
+                  if (!hasChatHistory) return null
+                  return (
+                    <div style={{ marginTop: '8px' }}>
+                      <div style={{ height: '1px', background: C.divider, marginBottom: '16px' }} />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {pageChat.map((msg, i) => (
+                          <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                            <div style={{
+                              maxWidth: '85%', padding: '7px 11px', fontSize: '13px', lineHeight: '1.55',
+                              borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                              background: msg.role === 'user' ? C.fg : C.sidebar,
+                              color: msg.role === 'user' ? C.white : C.fg,
+                              whiteSpace: 'pre-wrap',
+                            }}>
+                              {msg.content}
+                            </div>
+                          </div>
+                        ))}
+                        {pageChatStreaming && pageChatStreamingText && (
+                          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                            <div style={{
+                              maxWidth: '85%', padding: '7px 11px', fontSize: '13px', lineHeight: '1.55',
+                              borderRadius: '12px 12px 12px 2px', background: C.sidebar, color: C.fg, whiteSpace: 'pre-wrap',
+                            }}>
+                              {pageChatStreamingText}<span style={{ opacity: 0.5 }}>▋</span>
+                            </div>
+                          </div>
+                        )}
+                        <div ref={pageChatBottomRef} />
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
             ) : noteMode === 'transcript' ? (
               /* Transcript mode */
@@ -1742,7 +1907,7 @@ export default function NotesPage() {
                           padding: 0,
                           cursor: 'pointer',
                           fontSize: '11px',
-                          color: '#AFB3B0',
+                          color: '#D0CFC5',
                           fontWeight: '600',
                           fontVariantNumeric: 'tabular-nums',
                           minWidth: '36px',
@@ -1766,30 +1931,55 @@ export default function NotesPage() {
             ) : null}
           </div>
 
-          {/* Bottom: copy button */}
-          <div
-            className="flex-shrink-0 p-4"
-            style={{ borderTop: '1px solid rgba(175,179,176,0.15)' }}
-          >
-            <button
-              type="button"
-              aria-label="复制当前页笔记"
-              title="复制当前页笔记到剪贴板"
-              onClick={handleCopyPage}
-              className="w-full flex items-center justify-center gap-2 text-sm cursor-pointer transition-all duration-150 py-2.5 rounded-full"
-              style={{
-                background: C.sidebar,
-                color: C.secondary,
-                border: 'none',
-              }}
+          {/* Bottom: chat input（My Notes / AI Notes 时显示，Transcript 隐藏） */}
+          {noteMode !== 'transcript' && (
+            <div
+              className="flex-shrink-0 px-4 py-3"
+              style={{ borderTop: `1px solid ${C.divider}` }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-              </svg>
-              复制当前页笔记
-            </button>
-          </div>
+              <div style={{
+                display: 'flex', alignItems: 'flex-end', gap: '8px',
+                background: C.sidebar, borderRadius: '12px', padding: '8px 12px',
+              }}>
+                <textarea
+                  rows={1}
+                  value={pageChatInput}
+                  onChange={e => setPageChatInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      handlePageChatSend()
+                    }
+                  }}
+                  placeholder="向 AI 提问… (Enter 发送)"
+                  style={{
+                    flex: 1, resize: 'none', border: 'none', outline: 'none',
+                    background: 'transparent', fontSize: '13px', lineHeight: '1.5',
+                    color: C.fg, fontFamily: 'inherit', maxHeight: '80px', overflowY: 'auto',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handlePageChatSend}
+                  disabled={pageChatStreaming || !pageChatInput.trim()}
+                  style={{
+                    flexShrink: 0, width: '28px', height: '28px',
+                    borderRadius: '50%', border: 'none',
+                    background: pageChatStreaming || !pageChatInput.trim() ? C.divider : C.fg,
+                    color: C.white,
+                    cursor: pageChatStreaming || !pageChatInput.trim() ? 'default' : 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexDirection: 'column',
+                  }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="19" x2="12" y2="5" />
+                    <polyline points="5 12 12 5 19 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
         </aside>
       </div>
 
@@ -1800,7 +1990,7 @@ export default function NotesPage() {
           height: '40px',
           background: C.bg,
           borderTop: '1px solid rgba(175,179,176,0.1)',
-          color: '#AFB3B0',
+          color: '#D0CFC5',
           fontSize: '11px',
         }}
       >

@@ -7,7 +7,6 @@ interface TextAnnotationLayerProps {
   onPlaceAnnotation: (x: number, y: number) => void
   onUpdate: (id: string, text: string, color?: string, fontSize?: number) => void
   onRemove: (id: string) => void
-  onFocusChange?: (hasFocus: boolean) => void
 }
 
 const FONT_SIZES = [10, 12, 14, 16, 18, 24, 32]
@@ -185,12 +184,10 @@ function AnnotationBox({
   annotation,
   onUpdate,
   onRemove,
-  onFocusChange,
 }: {
   annotation: TextAnnotation
   onUpdate: (id: string, text: string, color?: string, fontSize?: number) => void
   onRemove: (id: string) => void
-  onFocusChange: (focused: boolean) => void
 }) {
   const [editing, setEditing] = useState(annotation.text === '')
   const [focused, setFocused] = useState(annotation.text === '')
@@ -199,18 +196,6 @@ function AnnotationBox({
   useEffect(() => {
     if (editing && textareaRef.current) textareaRef.current.focus()
   }, [editing])
-
-  // 初始新建时通知父组件有 focus
-  useEffect(() => {
-    if (annotation.text === '') onFocusChange(true)
-    return () => onFocusChange(false)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const setFocusedState = (val: boolean) => {
-    setFocused(val)
-    onFocusChange(val)
-  }
 
   const color = annotation.color ?? '#1A1916'
   const fontSize = annotation.fontSize ?? 14
@@ -255,13 +240,13 @@ function AnnotationBox({
             ref={textareaRef}
             defaultValue={annotation.text}
             placeholder="输入文字..."
-            onFocus={() => setFocusedState(true)}
+            onFocus={() => setFocused(true)}
             onBlur={(e) => {
               const t = e.currentTarget.value.trim()
-              if (!t) { onRemove(annotation.id); return }
+              if (!t) { setFocused(false); onRemove(annotation.id); return }
               onUpdate(annotation.id, t, color, fontSize)
               setEditing(false)
-              setFocusedState(false)
+              setFocused(false)
             }}
             style={{
               width: '100%',
@@ -281,9 +266,9 @@ function AnnotationBox({
           />
         ) : (
           <span
-            onClick={() => { setEditing(true); setFocusedState(true) }}
-            onFocus={() => setFocusedState(true)}
-            onBlur={() => setFocusedState(false)}
+            onClick={() => { setEditing(true); setFocused(true) }}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             tabIndex={0}
             style={{
               cursor: 'text',
@@ -312,26 +297,25 @@ export default function TextAnnotationLayer({
   onRemove,
 }: TextAnnotationLayerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  // 追踪当前有多少个 box 处于 focused 状态（blur 前的快照）
-  const focusCountRef = useRef(0)
-  // 点击时 blur 已发生前，记录是否有 box 聚焦
-  const hadFocusOnClickRef = useRef(false)
+  // mousedown 时记录：当前是否有 textarea 正在聚焦
+  // 用 document.activeElement 直接判断，不依赖计数器或异步 cleanup
+  const wasEditingOnMouseDownRef = useRef(false)
 
-  const handleFocusChange = (focused: boolean) => {
-    focusCountRef.current = Math.max(0, focusCountRef.current + (focused ? 1 : -1))
-  }
-
-  const handleMouseDown = () => {
-    // mousedown 在 blur 之前触发，此时可以准确读到 focusCount
-    hadFocusOnClickRef.current = focusCountRef.current > 0
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    const active = document.activeElement
+    const isTextareaFocused = active instanceof HTMLTextAreaElement &&
+      containerRef.current?.contains(active)
+    // 点击的目标是否在 annotation box 之外
+    const clickedOutside = !(e.target as HTMLElement).closest('[data-annotation-box]')
+    wasEditingOnMouseDownRef.current = !!isTextareaFocused && clickedOutside
   }
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!textToolActive) return
     if ((e.target as HTMLElement).closest('[data-annotation-box]')) return
-    // 如果 mousedown 时有 box 在 focused，点击空白只是失焦，不新建
-    if (hadFocusOnClickRef.current) {
-      hadFocusOnClickRef.current = false
+    // 如果 mousedown 时有 textarea 在编辑并且点击了外部，此次点击只是失焦，不新建
+    if (wasEditingOnMouseDownRef.current) {
+      wasEditingOnMouseDownRef.current = false
       return
     }
     const rect = containerRef.current!.getBoundingClientRect()
@@ -355,7 +339,7 @@ export default function TextAnnotationLayer({
     >
       {annotations.map((ann) => (
         <div key={ann.id} data-annotation-box>
-          <AnnotationBox annotation={ann} onUpdate={onUpdate} onRemove={onRemove} onFocusChange={handleFocusChange} />
+          <AnnotationBox annotation={ann} onUpdate={onUpdate} onRemove={onRemove} />
         </div>
       ))}
     </div>
