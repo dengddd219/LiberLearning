@@ -5,7 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 import os
 
-from routers import process, sessions, diagnostics
+from routers import process, sessions, diagnostics, live
 from db import init_db
 
 load_dotenv(Path(__file__).parent / ".env")
@@ -32,6 +32,7 @@ app.mount("/runs", StaticFiles(directory="static/runs"), name="runs")
 app.include_router(process.router, prefix="/api")
 app.include_router(sessions.router, prefix="/api")
 app.include_router(diagnostics.router, prefix="/api")
+app.include_router(live.router, prefix="/api")
 
 
 @app.get("/health")
