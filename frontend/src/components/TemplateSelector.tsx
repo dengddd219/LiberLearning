@@ -1,14 +1,8 @@
 import { useState } from 'react'
+import { useTranslation } from '../context/TranslationContext'
 
 export type Template = 'outline' | 'qa' | 'cornell' | 'mindmap'
 export type Granularity = 'simple' | 'detailed'
-
-const TEMPLATES: { id: Template; label: string; desc: string }[] = [
-  { id: 'outline', label: '📋 大纲式', desc: '按要点层级整理' },
-  { id: 'qa', label: '❓ 问答式', desc: '提炼考点问答' },
-  { id: 'cornell', label: '📝 康奈尔式', desc: '要点+提示+总结' },
-  { id: 'mindmap', label: '🗺️ 思维导图', desc: '树形结构输出' },
-]
 
 interface TemplateSelectorProps {
   template: Template
@@ -23,8 +17,17 @@ export default function TemplateSelector({
   onTemplateChange,
   onGranularityChange,
 }: TemplateSelectorProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
-  const current = TEMPLATES.find((t) => t.id === template)!
+
+  const TEMPLATES: { id: Template; label: string; desc: string }[] = [
+    { id: 'outline', label: t('template_outline_label'), desc: t('template_outline_desc') },
+    { id: 'qa',      label: t('template_qa_label'),      desc: t('template_qa_desc') },
+    { id: 'cornell', label: t('template_cornell_label'), desc: t('template_cornell_desc') },
+    { id: 'mindmap', label: t('template_mindmap_label'), desc: t('template_mindmap_desc') },
+  ]
+
+  const current = TEMPLATES.find((tmpl) => tmpl.id === template)!
 
   return (
     <div className="flex items-center gap-2">
@@ -39,16 +42,16 @@ export default function TemplateSelector({
         </button>
         {open && (
           <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-lg border border-gray-100 z-20 w-48">
-            {TEMPLATES.map((t) => (
+            {TEMPLATES.map((tmpl) => (
               <button
-                key={t.id}
-                onClick={() => { onTemplateChange(t.id); setOpen(false) }}
+                key={tmpl.id}
+                onClick={() => { onTemplateChange(tmpl.id); setOpen(false) }}
                 className={`w-full flex flex-col text-left px-4 py-2.5 hover:bg-indigo-50 first:rounded-t-xl last:rounded-b-xl ${
-                  template === t.id ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700'
+                  template === tmpl.id ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700'
                 }`}
               >
-                <span className="text-sm font-medium">{t.label}</span>
-                <span className="text-xs text-gray-400">{t.desc}</span>
+                <span className="text-sm font-medium">{tmpl.label}</span>
+                <span className="text-xs text-gray-400">{tmpl.desc}</span>
               </button>
             ))}
           </div>
@@ -63,7 +66,7 @@ export default function TemplateSelector({
             granularity === 'simple' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500'
           }`}
         >
-          简洁
+          {t('template_simple')}
         </button>
         <button
           onClick={() => onGranularityChange('detailed')}
@@ -71,7 +74,7 @@ export default function TemplateSelector({
             granularity === 'detailed' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500'
           }`}
         >
-          详细
+          {t('template_detailed')}
         </button>
       </div>
     </div>

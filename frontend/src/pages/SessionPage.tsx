@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getIncompleteSession, saveSession, clearSession } from '../lib/idb'
 import { uploadFiles } from '../lib/api'
+import { useTranslation } from '../context/TranslationContext'
 
 interface Annotation {
   id: string
@@ -39,6 +40,7 @@ function formatTimestamp(seconds: number) {
 
 export default function SessionPage() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [pptFileName, setPptFileName] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [annotations, setAnnotations] = useState<Annotation[]>([])
@@ -150,7 +152,7 @@ export default function SessionPage() {
       navigate(`/processing?session_id=${result.session_id}`)
     } catch {
       setSubmitting(false)
-      setSubmitError('提交失败，请检查网络后重试')
+      setSubmitError(t('session_submit_error'))
     }
   }, [pptFile, audioChunks, annotations, navigate])
 
@@ -164,7 +166,7 @@ export default function SessionPage() {
           {/* Header */}
           <div className="self-stretch p-4 border-b border-zinc-400/10 inline-flex justify-between items-center">
             <div className="inline-flex flex-col justify-start items-start">
-              <div className="justify-center text-slate-600 text-[10px] font-bold uppercase leading-4 tracking-wide">LECTURE SLIDES</div>
+              <div className="justify-center text-slate-600 text-[10px] font-bold uppercase leading-4 tracking-wide">{t('session_lecture_slides')}</div>
             </div>
             <button className="p-1 rounded-2xl hover:bg-black/5 cursor-pointer" aria-label="收起幻灯片列表">
               <svg width="14" height="8" viewBox="0 0 14 8" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -181,7 +183,7 @@ export default function SessionPage() {
               </div>
             ) : (
               <div className="self-stretch flex flex-col justify-start items-center gap-1 px-1 py-4">
-                <div className="text-slate-400 text-xs leading-4">未上传 PPT</div>
+                <div className="text-slate-400 text-xs leading-4">{t('session_ppt_not_uploaded')}</div>
               </div>
             )}
           </div>
@@ -265,10 +267,10 @@ export default function SessionPage() {
                 {isRecording ? (
                   <>
                     <div className="w-3 h-3 rounded-full bg-red-500" style={{ animation: 'pulse 1.5s infinite' }} />
-                    <div className="text-zinc-500 text-base font-normal leading-6">录音中...</div>
+                    <div className="text-zinc-500 text-base font-normal leading-6">{t('session_recording_hint')}</div>
                   </>
                 ) : (
-                  <div className="text-zinc-400 text-base font-normal leading-6">点击开始录音</div>
+                  <div className="text-zinc-400 text-base font-normal leading-6">{t('session_start_hint')}</div>
                 )}
               </div>
             </div>
@@ -318,7 +320,7 @@ export default function SessionPage() {
                   />
                   <div className="inline-flex flex-col justify-start items-start">
                     <div className="justify-center text-zinc-800 text-sm font-bold leading-5">
-                      {isRecording ? 'LIVE RECORDING' : 'NOT RECORDING'}
+                      {isRecording ? t('session_recording') : t('session_not_recording')}
                     </div>
                   </div>
                 </div>
@@ -410,7 +412,7 @@ export default function SessionPage() {
                   <div className="self-stretch relative flex flex-col justify-start items-start">
                     <textarea
                       className="self-stretch h-24 p-4 bg-stone-100 rounded-[48px] text-zinc-800 text-sm font-normal leading-5 resize-none outline-none w-full border-none"
-                      placeholder="Type a note (Alt + N)..."
+                      placeholder={t('session_note_placeholder')}
                       style={{ color: noteInput ? '#27272A' : '#A1A1AA' }}
                       value={noteInput}
                       onChange={(e) => setNoteInput(e.target.value)}
@@ -453,7 +455,7 @@ export default function SessionPage() {
                 className="self-stretch py-3 rounded-xl text-sm font-medium cursor-pointer border-none"
                 style={{ background: '#2F3331', color: '#FFFFFF', opacity: submitting ? 0.6 : 1, width: '100%' }}
               >
-                {submitting ? '提交中…' : '生成课堂笔记 →'}
+                {submitting ? t('session_submitting') : t('session_submit_notes')}
               </button>
               {submitError && <p role="alert" style={{ color: '#E05C40', fontSize: '13px', marginTop: '8px' }}>{submitError}</p>}
             </div>
@@ -502,8 +504,8 @@ export default function SessionPage() {
           © 2024 LIBERSTUDY EDITORIAL. CRAFTED FOR CLARITY.
         </div>
         <div className="flex justify-start items-start gap-6">
-          {['SUPPORT', 'PRIVACY', 'TERMS'].map((label) => (
-            <button key={label} className="text-slate-600 text-[10px] font-normal uppercase leading-4 tracking-wide cursor-pointer border-none bg-transparent hover:text-zinc-800">
+          {([['SUPPORT', t('session_support')], ['PRIVACY', t('session_privacy')], ['TERMS', t('session_terms')]] as const).map(([key, label]) => (
+            <button key={key} className="text-slate-600 text-[10px] font-normal uppercase leading-4 tracking-wide cursor-pointer border-none bg-transparent hover:text-zinc-800">
               {label}
             </button>
           ))}
@@ -514,8 +516,8 @@ export default function SessionPage() {
       {recoveryModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.4)' }}>
           <div className="w-96 max-w-full p-8 rounded-2xl" style={{ background: '#FFFFFF', boxShadow: '0 24px 64px rgba(0,0,0,0.15)' }}>
-            <h2 className="text-lg font-bold mb-2" style={{ color: '#2F3331' }}>发现未完成的录音</h2>
-            <p className="text-sm mb-6" style={{ color: '#777C79' }}>上次录音未完成，是否要恢复？</p>
+            <h2 className="text-lg font-bold mb-2" style={{ color: '#2F3331' }}>{t('session_recovery_title')}</h2>
+            <p className="text-sm mb-6" style={{ color: '#777C79' }}>{t('session_recovery_sub')}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button
                 onClick={() => setRecoveryModal(false)}
@@ -529,7 +531,7 @@ export default function SessionPage() {
                 className="w-full py-2.5 rounded-lg text-sm cursor-pointer bg-transparent"
                 style={{ border: '1px solid rgba(175,179,176,0.3)', color: '#2F3331' }}
               >
-                用现有录音生成笔记
+                {t('session_recovery_continue')}
               </button>
               <button
                 onClick={async () => {
@@ -539,7 +541,7 @@ export default function SessionPage() {
                 className="w-full py-2.5 text-sm cursor-pointer border-none bg-transparent"
                 style={{ color: '#EF4444' }}
               >
-                放弃录音（清除数据）
+                {t('session_recovery_discard')}
               </button>
             </div>
           </div>

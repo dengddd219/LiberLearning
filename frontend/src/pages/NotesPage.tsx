@@ -376,6 +376,7 @@ function InlineQA({
   const [streaming, setStreaming] = useState(false)
   const [streamingText, setStreamingText] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
+  const { t } = useTranslation()
 
   useEffect(() => {
     loadAskHistory(sessionId, pageNum, bulletIndex).then(setMessages)
@@ -427,7 +428,7 @@ function InlineQA({
     }}>
       {/* 模型选择 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px', borderBottom: `1px solid ${C.divider}` }}>
-        <span style={{ fontSize: '9px', color: C.muted, fontWeight: '600', letterSpacing: '0.06em' }}>模型</span>
+        <span style={{ fontSize: '9px', color: C.muted, fontWeight: '600', letterSpacing: '0.06em' }}>{t('notes_model_label')}</span>
         {(['中转站', '通义千问', 'DeepSeek', '豆包'] as const).map(m => (
           <button
             key={m}
@@ -499,7 +500,7 @@ function InlineQA({
               handleSend()
             }
           }}
-          placeholder="针对此条提问… (Enter 发送)"
+          placeholder={t('notes_bullet_placeholder')}
           style={{
             flex: 1, resize: 'none', border: 'none', outline: 'none',
             background: 'transparent', fontSize: '13px', lineHeight: '1.5',
@@ -556,10 +557,11 @@ function AiBulletRow({
   pageNum: number
   bulletIndex: number
 }) {
+  const { t } = useTranslation()
   const hasComment = !!bullet.ai_comment
   const indent = bullet.level * 16
-
   const [hovered, setHovered] = useState(false)
+
   const [askOpen, setAskOpen] = useState(false)
 
   const [revealedSet, setRevealedSet] = useState<Set<number>>(new Set())
@@ -619,9 +621,20 @@ function AiBulletRow({
   // 始终渲染同一套 DOM，避免 expanded 切换时销毁/重建节点导致闪烁
   return (
     <div
-      style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: indent }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex', flexDirection: 'column', gap: '6px',
+        paddingLeft: indent,
+        paddingRight: '6px',
+        paddingTop: '4px',
+        paddingBottom: '4px',
+        borderRadius: '6px',
+        background: hovered ? 'rgba(175,179,176,0.12)' : 'transparent',
+        transition: 'background 120ms',
+        marginLeft: -6,
+        marginRight: -6,
+      }}
     >
       {/* ppt_text 行：收起时是可点击 button，展开动画期间 swipe-up 退场，退场完成后由 reveal 版本接管 */}
       <div style={{ position: 'relative' }}>
@@ -643,9 +656,9 @@ function AiBulletRow({
             {bullet.level === 0 ? '' : '•'}
           </span>
           <span style={{
-            fontSize: '14px',
+            fontSize: bullet.level === 0 ? '15px' : '14px',
             color: '#292929', lineHeight: '1.625',
-            fontWeight: '400',
+            fontWeight: bullet.level === 0 ? '600' : '400',
             opacity: !expanded
               ? (translationEnabled && !translatedPptText ? 0.4 : (hasComment ? 1 : 0.5))
               : 1,
@@ -667,7 +680,7 @@ function AiBulletRow({
             <span style={{ color: '#D0CFC5', flexShrink: 0, marginTop: '2px', fontSize: '14px' }}>
               {bullet.level === 0 ? '' : '•'}
             </span>
-            <p style={{ fontSize: '14px', lineHeight: '1.625', fontWeight: '400', margin: 0, minHeight: '1.4em' }}>
+            <p style={{ fontSize: bullet.level === 0 ? '15px' : '14px', lineHeight: '1.625', fontWeight: bullet.level === 0 ? '600' : '400', margin: 0, minHeight: '1.4em' }}>
               {animationDone
                 ? <span style={{ color: '#292929' }}>{pptText}</span>
                 : <RevealText revealed={pptRevealed} muted={false} highlight={false}>{pptText}</RevealText>
@@ -718,44 +731,41 @@ function AiBulletRow({
                   />
             }
           </div>
+
+          {/* 针对此条提问 — 在 AI 解释区内部 */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+            <button
+              type="button"
+              onClick={() => setAskOpen(v => !v)}
+              style={{
+                padding: '4px 10px', borderRadius: '6px', fontSize: '11px',
+                border: `1px solid ${askOpen ? C.secondary : C.secondary}`,
+                background: askOpen ? C.secondary : 'transparent',
+                color: askOpen ? '#fff' : C.secondary,
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '5px',
+                fontWeight: 500,
+                transition: 'all 0.15s',
+              }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+              {askOpen ? t('notes_bullet_collapse') : t('notes_bullet_ask')}
+            </button>
+          </div>
+
+          {/* InlineQA 展开区 */}
+          {askOpen && (
+            <InlineQA
+              sessionId={sessionId}
+              pageNum={pageNum}
+              bulletIndex={bulletIndex}
+              bulletText={bullet.ppt_text}
+              bulletAiComment={bullet.ai_comment ?? ''}
+            />
+          )}
         </div>
-      )}
-
-      {/* AskButton — hover 时浮现 */}
-      <div style={{
-        display: 'flex', justifyContent: 'flex-end',
-        opacity: hovered || askOpen ? 1 : 0,
-        transition: 'opacity 0.15s',
-        transform: hovered || askOpen ? 'translateY(0)' : 'translateY(2px)',
-      }}>
-        <button
-          type="button"
-          onClick={() => setAskOpen(v => !v)}
-          style={{
-            padding: '2px 8px', borderRadius: '4px', fontSize: '10px',
-            border: `1px solid ${askOpen ? C.secondary : C.divider}`,
-            background: askOpen ? C.sidebar : 'transparent',
-            color: askOpen ? C.fg : C.muted,
-            cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: '4px',
-          }}
-        >
-          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
-          {askOpen ? '收起' : '针对此条提问'}
-        </button>
-      </div>
-
-      {/* InlineQA 展开区 */}
-      {askOpen && (
-        <InlineQA
-          sessionId={sessionId}
-          pageNum={pageNum}
-          bulletIndex={bulletIndex}
-          bulletText={bullet.ppt_text}
-          bulletAiComment={bullet.ai_comment ?? ''}
-        />
       )}
     </div>
   )
@@ -769,6 +779,12 @@ export default function NotesPage() {
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [noteMode, setNoteMode] = useState<'my' | 'ai' | 'transcript'>('ai')
+  const [playingSegIdx, setPlayingSegIdx] = useState<number | null>(null)
+  const segEndRef = useRef<number | null>(null)
+  const segTimeUpdateRef = useRef<(() => void) | null>(null)
+  const [transcriptClickCount, setTranscriptClickCount] = useState<number>(() => {
+    return parseInt(localStorage.getItem('liberstudy_transcript_clicks') ?? '0', 10)
+  })
   const [copyToast, setCopyToast] = useState(false)
   const [retrying, setRetrying] = useState<number | null>(null)
   const [navVisible, setNavVisible] = useState(false)
@@ -798,7 +814,7 @@ export default function NotesPage() {
   const { addAnnotation, updateAnnotation, removeAnnotation, annotationsForPage } = useTextAnnotations(sessionId ?? '')
 
   // Translation state
-  const { enabled: translationEnabled, setEnabled: setTranslationEnabled, targetLang, setTargetLang, translate } = useTranslation()
+  const { enabled: translationEnabled, setEnabled: setTranslationEnabled, targetLang, setTargetLang, translate, t } = useTranslation()
   const [popoverOpen, setPopoverOpen] = useState(false)
   const [translatedTexts, setTranslatedTexts] = useState<Map<number, {
     bullets: string[]
@@ -1080,6 +1096,53 @@ export default function NotesPage() {
     }
   }, [])
 
+  const handleSegmentPlay = useCallback((seg: AlignedSegment, idx: number) => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    // 点击正在播放的行 → 停止
+    if (playingSegIdx === idx) {
+      audio.pause()
+      segEndRef.current = null
+      if (segTimeUpdateRef.current) {
+        audio.removeEventListener('timeupdate', segTimeUpdateRef.current)
+        segTimeUpdateRef.current = null
+      }
+      setPlayingSegIdx(null)
+      return
+    }
+
+    // 切换到新行前清除旧监听
+    if (segTimeUpdateRef.current) {
+      audio.removeEventListener('timeupdate', segTimeUpdateRef.current)
+      segTimeUpdateRef.current = null
+    }
+
+    // 记录点击次数（最多记到 3，超过后不再更新）
+    setTranscriptClickCount((prev) => {
+      const next = Math.min(prev + 1, 3)
+      localStorage.setItem('liberstudy_transcript_clicks', String(next))
+      return next
+    })
+
+    segEndRef.current = seg.end
+    setPlayingSegIdx(idx)
+    audio.currentTime = seg.start
+    audio.play()
+
+    const onTimeUpdate = () => {
+      if (segEndRef.current !== null && audio.currentTime >= segEndRef.current) {
+        audio.pause()
+        segEndRef.current = null
+        segTimeUpdateRef.current = null
+        setPlayingSegIdx(null)
+        audio.removeEventListener('timeupdate', onTimeUpdate)
+      }
+    }
+    segTimeUpdateRef.current = onTimeUpdate
+    audio.addEventListener('timeupdate', onTimeUpdate)
+  }, [playingSegIdx])
+
   const handleCopyPage = useCallback(() => {
     if (!session) return
     const page = session.pages.find((p) => p.page_num === currentPage)
@@ -1212,7 +1275,7 @@ export default function NotesPage() {
         <div className="text-center">
           <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3"
             style={{ borderColor: C.secondary, borderTopColor: 'transparent' }} />
-          <p className="text-sm" style={{ color: C.muted }}>加载笔记中…</p>
+          <p className="text-sm" style={{ color: C.muted }}>{t('notes_loading')}</p>
         </div>
       </div>
     )
@@ -1222,13 +1285,13 @@ export default function NotesPage() {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: C.bg }}>
         <div className="text-center">
-          <p className="text-sm mb-4" style={{ color: C.secondary }}>{error ?? '未知错误'}</p>
+          <p className="text-sm mb-4" style={{ color: C.secondary }}>{error ?? t('notes_unknown_error')}</p>
           <button
             onClick={() => window.location.reload()}
             className="text-sm px-4 py-2 rounded-lg cursor-pointer transition-all duration-150"
             style={{ background: C.sidebar, color: C.fg }}
           >
-            重试
+            {t('notes_retry')}
           </button>
         </div>
       </div>
@@ -1254,7 +1317,7 @@ export default function NotesPage() {
               className="flex items-center justify-between flex-shrink-0 px-4"
               style={{ height: '48px', borderBottom: '1px solid rgba(175,179,176,0.1)' }}
             >
-              <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.secondary }}>目录</span>
+              <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.secondary }}>{t('notes_toc')}</span>
               <button type="button" onClick={() => setNavVisible(false)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '2px', borderRadius: '4px' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: C.secondary }}>
                   <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -1448,7 +1511,7 @@ export default function NotesPage() {
             style={{ padding: '14px 18px 0', borderBottom: `1px solid ${C.divider}`, gap: 0 }}
           >
             {(['my', 'ai', 'transcript'] as const).map((mode) => {
-              const label = mode === 'my' ? 'My Notes' : mode === 'ai' ? 'AI Notes' : 'Transcript'
+              const label = mode === 'my' ? t('notes_my_tab') : mode === 'ai' ? t('notes_ai_tab') : t('notes_transcript_tab')
               const active = noteMode === mode
               return (
                 <button
@@ -1482,38 +1545,22 @@ export default function NotesPage() {
 
             {noteMode === 'my' ? (() => {
               const myText = getMyNoteText(currentPage)
-              const pptAnnotations = annotationsForPage(currentPage).filter(a => a.text.trim())
 
               return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                   {/* 始终可见的 textarea，像 Word 打字 */}
                   <textarea
                     value={myText}
                     onChange={e => handleMyNoteChange(currentPage, e.target.value)}
-                    placeholder="在这里记录你的理解、困惑或关键词…"
+                    placeholder={t('notes_my_placeholder')}
                     style={{
-                      width: '100%', resize: 'none', border: 'none', outline: 'none',
+                      flex: 1, width: '100%', resize: 'none', border: 'none', outline: 'none',
                       background: 'transparent', color: C.fg, fontSize: '13px',
-                      lineHeight: '1.7', fontFamily: 'inherit', minHeight: '120px',
-                      boxSizing: 'border-box', padding: '0',
+                      lineHeight: '1.7', fontFamily: 'inherit', minHeight: '200px',
+                      boxSizing: 'border-box', padding: '0', paddingTop: '12px',
                     }}
                   />
 
-                  {/* PPT 批注（来自画布标注，只读展示） */}
-                  {pptAnnotations.length > 0 && (
-                    <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.06em', color: C.muted }}>PPT 批注</span>
-                      {pptAnnotations.map(a => (
-                        <p key={a.id} style={{
-                          fontSize: '13px', color: C.fg, lineHeight: '1.6', margin: 0,
-                          padding: '6px 10px', borderRadius: '6px', background: C.sidebar,
-                          whiteSpace: 'pre-wrap',
-                        }}>
-                          {a.text}
-                        </p>
-                      ))}
-                    </div>
-                  )}
                 </div>
               )
             })() : noteMode === 'ai' ? (
@@ -1533,7 +1580,7 @@ export default function NotesPage() {
                   return (
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', color: '#72726E' }}>MY NOTES</span>
+                        <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', color: '#72726E' }}>{t('notes_my_notes_heading')}</span>
                         {hasMyNote && (
                           <button
                             type="button"
@@ -1552,7 +1599,7 @@ export default function NotesPage() {
                               <path d="M12 2L14.09 8.26L21 9.27L16 13.97L17.18 21L12 17.77L6.82 21L8 13.97L3 9.27L9.91 8.26L12 2Z"
                                 fill={isExpanding ? '#6366f1' : '#72726E'} />
                             </svg>
-                            {isExpanding ? '扩写中...' : '扩写'}
+                            {isExpanding ? t('notes_expanding') : t('notes_expand')}
                           </button>
                         )}
                       </div>
@@ -1567,7 +1614,7 @@ export default function NotesPage() {
                       {/* PPT 批注（只读展示） */}
                       {pptAnnotations.length > 0 && (
                         <div style={{ marginTop: hasMyNote ? '10px' : '0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.06em', color: C.muted }}>PPT 批注</span>
+                          <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.06em', color: C.muted }}>{t('notes_annotation_label')}</span>
                           {pptAnnotations.map(a => (
                             <p key={a.id} style={{
                               fontSize: '13px', color: C.fg, lineHeight: '1.6', margin: 0,
@@ -1741,7 +1788,7 @@ export default function NotesPage() {
                 {/* No data at all */}
                 {!currentPageData?.active_notes && !currentPageData?.passive_notes?.error && (!currentPageData?.passive_notes || currentPageData.passive_notes.bullets.length === 0) && (
                   <div className="flex items-center justify-center py-8">
-                    <p style={{ fontSize: '13px', color: C.muted }}>该页暂无 AI 笔记</p>
+                    <p style={{ fontSize: '13px', color: C.muted }}>{t('notes_no_ai_notes')}</p>
                   </div>
                 )}
 
@@ -1750,7 +1797,7 @@ export default function NotesPage() {
                   <div>
                     <div className="mb-3">
                       <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.muted }}>
-                        OFF-SLIDE CONTENT
+                        {t('notes_off_slide')}
                       </span>
                     </div>
                     <div
@@ -1782,45 +1829,61 @@ export default function NotesPage() {
             ) : noteMode === 'transcript' ? (
               /* Transcript mode */
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <div className="mb-3">
+                <div className="mb-3" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.muted }}>
                     TRANSCRIPT
                   </span>
+                  {transcriptClickCount < 2 && (
+                    <span style={{ fontSize: '10px', color: C.muted, opacity: 0.7 }}>
+                      点击句子播放，再次点击停止
+                    </span>
+                  )}
                 </div>
                 {currentPageData?.aligned_segments && currentPageData.aligned_segments.length > 0 ? (
                   currentPageData.aligned_segments.map((seg, i) => (
                     <div
                       key={i}
-                      style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '6px 0', borderBottom: '1px solid rgba(175,179,176,0.1)' }}
+                      onClick={() => handleSegmentPlay(seg, i)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '12px',
+                        padding: '10px 8px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        background: playingSegIdx === i ? 'rgba(85,107,47,0.08)' : 'transparent',
+                        transition: 'background 120ms',
+                        borderLeft: playingSegIdx === i ? '2px solid #6B7F3A' : '2px solid transparent',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (playingSegIdx !== i) (e.currentTarget as HTMLDivElement).style.background = 'rgba(175,179,176,0.12)'
+                      }}
+                      onMouseLeave={(e) => {
+                        if (playingSegIdx !== i) (e.currentTarget as HTMLDivElement).style.background = 'transparent'
+                      }}
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleTimestampClick(seg.start)}
+                      <span
                         style={{
                           flexShrink: 0,
-                          background: 'none',
-                          border: 'none',
-                          padding: 0,
-                          cursor: 'pointer',
                           fontSize: '11px',
-                          color: '#D0CFC5',
+                          color: playingSegIdx === i ? '#6B7F3A' : '#D0CFC5',
                           fontWeight: '600',
                           fontVariantNumeric: 'tabular-nums',
                           minWidth: '36px',
-                          textAlign: 'left',
                           marginTop: '2px',
+                          lineHeight: 1.6,
                         }}
                       >
                         {formatTime(seg.start)}
-                      </button>
-                      <p style={{ fontSize: '13px', color: C.fg, lineHeight: '1.6', margin: 0 }}>
+                      </span>
+                      <p style={{ fontSize: '13px', color: C.fg, lineHeight: '1.6', margin: 0, flex: 1 }}>
                         {seg.text}
                       </p>
                     </div>
                   ))
                 ) : (
                   <div className="flex items-center justify-center py-8">
-                    <p style={{ fontSize: '13px', color: C.muted }}>该页暂无转录文本</p>
+                    <p style={{ fontSize: '13px', color: C.muted }}>{t('notes_no_transcript')}</p>
                   </div>
                 )}
               </div>
@@ -2011,7 +2074,7 @@ export default function NotesPage() {
                             }
                           }
                         }}
-                        placeholder="Ask AI about this page… (Enter to send)"
+                        placeholder={t('notes_page_chat_placeholder')}
                         style={{
                           width: '100%', resize: 'none', border: 'none', outline: 'none',
                           background: 'transparent', fontSize: '13px', lineHeight: '1.5',

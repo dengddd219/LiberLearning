@@ -18,12 +18,14 @@ function FormatToolbar({
   onColorChange,
   onFontSizeChange,
   onRemove,
+  alignRight = false,
 }: {
   color: string
   fontSize: number
   onColorChange: (c: string) => void
   onFontSizeChange: (s: number) => void
   onRemove: () => void
+  alignRight?: boolean
 }) {
   const [sizeOpen, setSizeOpen] = useState(false)
   const sizeRef = useRef<HTMLDivElement>(null)
@@ -51,7 +53,7 @@ function FormatToolbar({
         boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
         position: 'absolute',
         bottom: 'calc(100% + 6px)',
-        left: 0,
+        ...(alignRight ? { right: 0, left: 'auto' } : { left: 0 }),
         whiteSpace: 'nowrap',
         zIndex: 50,
       }}
@@ -222,6 +224,7 @@ function AnnotationBox({
             textareaRef.current?.focus()
           }}
           onRemove={() => onRemove(annotation.id)}
+          alignRight={annotation.x > 55}
         />
       )}
 

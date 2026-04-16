@@ -124,6 +124,8 @@ export const i18n = {
     notes_off_slide: 'OFF-SLIDE CONTENT',
     notes_no_transcript: 'No transcript for this page',
     notes_bullet_placeholder: 'Ask about this point… (Enter to send)',
+    notes_bullet_ask: 'Ask about this',
+    notes_bullet_collapse: 'Collapse',
     notes_model_label: 'Model',
 
     // SessionPage
@@ -288,6 +290,8 @@ export const i18n = {
     notes_off_slide: 'OFF-SLIDE 内容',
     notes_no_transcript: '该页暂无转录文本',
     notes_bullet_placeholder: '针对此条提问… (Enter 发送)',
+    notes_bullet_ask: '针对此条提问',
+    notes_bullet_collapse: '收起',
     notes_model_label: '模型',
 
     // SessionPage

@@ -1,18 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-
-interface Stage {
-  id: string
-  label: string
-  description: string
-}
-
-const STAGES: Stage[] = [
-  { id: 'convert', label: '音频转换', description: '将录音转换为标准音频格式…' },
-  { id: 'ppt', label: 'PPT 解析', description: '提取每页文本与图像内容…' },
-  { id: 'asr', label: '语音转录', description: '将录音转换为带时间戳的文字稿…' },
-  { id: 'align', label: '对齐与笔记生成', description: '将转录稿与课件语义对齐，逐页生成结构化笔记…' },
-]
+import { useTranslation } from '../context/TranslationContext'
 
 const STEP_MAP: Record<string, number> = {
   uploading: 0,
@@ -30,6 +18,14 @@ export default function ProcessingPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const sessionId = searchParams.get('session_id') ?? ''
+  const { t } = useTranslation()
+
+  const STAGES = [
+    { id: 'convert', label: t('processing_stage_convert'), description: t('processing_stage_convert_desc') },
+    { id: 'ppt',     label: t('processing_stage_ppt'),     description: t('processing_stage_ppt_desc') },
+    { id: 'asr',     label: t('processing_stage_asr'),     description: t('processing_stage_asr_desc') },
+    { id: 'align',   label: t('processing_stage_align'),   description: t('processing_stage_align_desc') },
+  ]
 
   const [currentStage, setCurrentStage] = useState(0)
   const [failed, setFailed] = useState(false)
@@ -94,8 +90,8 @@ export default function ProcessingPage() {
               <line x1="15" y1="9" x2="9" y2="15" />
               <line x1="9" y1="9" x2="15" y2="15" />
             </svg>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">处理失败</h2>
-            <p className="text-sm text-gray-500 mb-6">语音转录服务暂时不可用，请稍后重试</p>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">{t('processing_failed_title')}</h2>
+            <p className="text-sm text-gray-500 mb-6">{t('processing_failed_sub')}</p>
           </div>
           <div className="flex gap-3 justify-center">
             <button
@@ -103,14 +99,14 @@ export default function ProcessingPage() {
               onClick={() => navigate('/upload')}
               className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
             >
-              重新上传
+              {t('processing_reupload')}
             </button>
             <button
               type="button"
               onClick={() => setFailed(false)}
               className="px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-hover"
             >
-              重试
+              {t('processing_retry')}
             </button>
           </div>
         </div>
@@ -121,9 +117,9 @@ export default function ProcessingPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-surface font-sans">
       <div className="bg-white rounded-2xl shadow-lg p-10 max-w-lg w-full">
-        <h1 className="text-xl font-bold text-gray-900 mb-1">正在处理课堂录音</h1>
+        <h1 className="text-xl font-bold text-gray-900 mb-1">{t('processing_title')}</h1>
         <p className="text-sm text-gray-600 mb-8">
-          {remaining > 0 ? `预计还需 ${remaining} 秒` : '仍在处理中，请稍候...'}
+          {remaining > 0 ? `${t('processing_remaining')} ${remaining} 秒` : t('processing_still')}
         </p>
 
         <div
@@ -131,7 +127,7 @@ export default function ProcessingPage() {
           aria-valuenow={progress}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label="处理总进度"
+          aria-label={t('processing_progress_label')}
           className="w-full bg-gray-100 rounded-full h-2 mb-8"
         >
           <div
@@ -147,7 +143,7 @@ export default function ProcessingPage() {
             return (
               <li
                 key={stage.id}
-                aria-label={`${stage.label}：${done ? '已完成' : active ? '进行中' : '等待中'}`}
+                aria-label={`${stage.label}：${done ? t('processing_done') : active ? t('processing_in_progress') : t('processing_waiting')}`}
                 className="flex items-start gap-4"
               >
                 <div
