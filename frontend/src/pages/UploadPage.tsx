@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { uploadFiles } from '../lib/api'
+import { useTranslation } from '../context/TranslationContext'
 
 // ─── Business logic ───────────────────────────────────────────────────────────
 
@@ -172,6 +173,7 @@ function UploadZone({ label, hint, accept, icon, file, error, onFile, onClear }:
 
 export default function UploadPage() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [pptFile, setPptFile] = useState<File | null>(null)
   const [audioFile, setAudioFile] = useState<File | null>(null)
   const [pptError, setPptError] = useState<string | null>(null)
@@ -307,6 +309,45 @@ export default function UploadPage() {
           {/* Upload areas — Figma: layout_D7G8JS (column, stretch) */}
           {!uploading ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+              {/* Live 入口卡片 */}
+              <div
+                style={{
+                  border: '1.5px solid #798C00',
+                  borderRadius: '12px',
+                  padding: '24px 32px',
+                  marginBottom: '24px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  backgroundColor: 'rgba(121,140,0,0.04)',
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '18px', color: '#2F3331', marginBottom: '4px' }}>
+                    {t('live_card_title')}
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#72726E' }}>
+                    {t('live_card_desc')}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate('/live')}
+                  style={{
+                    backgroundColor: '#798C00',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '9999px',
+                    padding: '10px 20px',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {t('live_card_cta')} →
+                </button>
+              </div>
               {/* Two side-by-side drop zones */}
               <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
                 <UploadZone
