@@ -1,7 +1,7 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTabs } from '../context/TabsContext'
-import { uploadFiles, listSessions } from '../lib/api'
+import { listSessions } from '../lib/api'
 import { useTranslation } from '../context/TranslationContext'
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -315,181 +315,7 @@ function ListTable({ sessions, onRowClick }: { sessions: CourseCard[]; onRowClic
   )
 }
 
-// ─── Modal ───────────────────────────────────────────────────────────────────
-
-const MAX_AUDIO_MB = 500
-
-function validateFile(file: File, accept: string[], maxMb?: number): string | null {
-  const ext = '.' + file.name.split('.').pop()?.toLowerCase()
-  if (!accept.includes(ext)) return `不支持的格式，请上传 ${accept.join(' / ')}`
-  if (maxMb && file.size > maxMb * 1024 * 1024) return `文件过大，最大支持 ${maxMb}MB`
-  return null
-}
-
-function IconModalClose() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function IconPPT() {
-  return (
-    <svg width="32" height="40" viewBox="0 0 32 40" fill="none">
-      <rect x="1" y="1" width="22" height="30" rx="3" stroke="#D0CFC5" strokeWidth="1.5" />
-      <path d="M7 9h12M7 14h12M7 19h8" stroke="#D0CFC5" strokeWidth="1.5" strokeLinecap="round" />
-      <rect x="14" y="22" width="17" height="17" rx="3" fill="#F2F2EC" stroke="#D0CFC5" strokeWidth="1.5" />
-      <path d="M18 30h5M18 33h3" stroke="#D0CFC5" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function IconAudioFile() {
-  return (
-    <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-      <rect x="12" y="4" width="12" height="18" rx="6" stroke="#D0CFC5" strokeWidth="1.5" />
-      <path d="M6 18c0 6.627 5.373 12 12 12s12-5.373 12-12" stroke="#D0CFC5" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M18 30v4M14 34h8" stroke="#D0CFC5" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-
-interface UploadZoneProps {
-  label: string; hint: string; accept: string; icon: React.ReactNode
-  file: File | null; error: string | null; onFile: (f: File) => void; onClear: () => void
-}
-
-function UploadZone({ label, hint, accept, icon, file, error, onFile, onClear }: UploadZoneProps) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [dragging, setDragging] = useState(false)
-  const isSuccess = !!file && !error
-
-  return (
-    <div
-      onClick={() => inputRef.current?.click()}
-      onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) onFile(f) }}
-      className="relative flex flex-col items-center justify-center cursor-pointer transition-all duration-150 flex-1"
-      style={{
-        borderRadius: '32px',
-        border: error ? '2px dashed rgba(224,92,64,0.5)' : isSuccess ? '2px dashed rgba(95,94,94,0.4)' : dragging ? '2px dashed rgba(95,94,94,0.5)' : '2px dashed rgba(175,179,176,0.2)',
-        padding: '32px',
-      }}
-    >
-      <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f) }} />
-      <div className="pb-4">{icon}</div>
-      <div className="pb-1">
-        <span className="font-bold text-sm" style={{ color: '#292929' }}>{isSuccess ? file!.name : label}</span>
-      </div>
-      <span className="font-normal text-[11px] uppercase tracking-[0.05em]" style={{ color: error ? 'rgba(224,92,64,0.8)' : '#72726E' }}>
-        {error ?? (isSuccess ? 'Click to replace' : hint)}
-      </span>
-      {isSuccess && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onClear() }}
-          className="absolute top-3 right-3 flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity"
-          style={{ width: '24px', height: '24px', borderRadius: '9999px', backgroundColor: 'rgba(175,179,176,0.15)', color: '#292929', border: 'none' }}
-        >
-          <IconModalClose />
-        </button>
-      )}
-    </div>
-  )
-}
-
 const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
-
-function NewClassModal({ onClose, onUploaded }: { onClose: () => void; onUploaded: (sessionId: string) => void }) {
-  const { t } = useTranslation()
-  const [pptFile, setPptFile] = useState<File | null>(null)
-  const [audioFile, setAudioFile] = useState<File | null>(null)
-  const [pptError, setPptError] = useState<string | null>(null)
-  const [audioError, setAudioError] = useState<string | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const [uploadError, setUploadError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape' && !uploading) onClose(); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onClose, uploading])
-
-  const handlePpt = useCallback((file: File) => { const err = validateFile(file, ['.ppt', '.pptx', '.pdf']); setPptError(err); if (!err) setPptFile(file) }, [])
-  const handleAudio = useCallback((file: File) => { const err = validateFile(file, ['.mp3', '.wav', '.m4a', '.aac'], MAX_AUDIO_MB); setAudioError(err); if (!err) setAudioFile(file) }, [])
-  const handleSubmit = useCallback(async () => {
-    if (!audioFile) return
-    setUploading(true)
-    setUploadError(null)
-    try {
-      const result = await uploadFiles(pptFile ?? undefined, audioFile)
-      // 拿到 session_id 后立即关闭 Modal，交给 LobbyPage 后台轮询
-      onUploaded(result.session_id)
-      onClose()
-    } catch {
-      setUploading(false)
-      setUploadError(t('modal_upload_error'))
-    }
-  }, [pptFile, audioFile, onUploaded, onClose])
-
-  const canSubmit = !!audioFile && !pptError && !audioError && !uploading
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="modal-title"
-      className="fixed inset-0 flex items-center justify-center z-50"
-      style={{ backgroundColor: 'rgba(47,51,49,0.2)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', padding: '24px' }}
-      onClick={onClose}
-    >
-      <div
-        className="relative w-full flex flex-col"
-        style={{ maxWidth: '768px', backgroundColor: '#FFFFFF', borderRadius: '48px', border: '1px solid rgba(175,179,176,0.1)', boxShadow: '0px 25px 50px -12px rgba(0,0,0,0.25)', fontFamily: 'Inter, system-ui, sans-serif' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex flex-col gap-12 p-12">
-          {/* Header */}
-          <div className="flex justify-between items-start">
-            <div className="flex flex-col gap-2">
-              <span className="font-bold text-base uppercase tracking-[0.2em]" style={{ color: 'rgba(95,94,94,0.6)' }}>ACTION CENTER</span>
-              <h2 id="modal-title" className="font-bold text-[36px] leading-[1.11] tracking-[-0.025em] m-0" style={{ color: '#292929' }}>{t('modal_new_class_title')}</h2>
-            </div>
-            <button type="button" onClick={onClose} aria-label="关闭对话框" className="flex items-center justify-center flex-shrink-0 cursor-pointer hover:opacity-70 transition-opacity" style={{ width: '40px', height: '40px', borderRadius: '9999px', backgroundColor: '#F2F2EC', color: '#292929', border: 'none' }}>
-              <IconModalClose aria-hidden="true" />
-            </button>
-          </div>
-
-          {/* Upload zones */}
-          <div className="flex gap-0 items-stretch">
-            <UploadZone label={t('modal_ppt_label')} hint={t('modal_ppt_hint')} accept=".ppt,.pptx,.pdf" icon={<IconPPT />} file={pptFile} error={pptError} onFile={handlePpt} onClear={() => { setPptFile(null); setPptError(null) }} />
-            <UploadZone label={t('modal_audio_label')} hint={t('modal_audio_hint')} accept=".mp3,.wav,.m4a,.aac" icon={<IconAudioFile />} file={audioFile} error={audioError} onFile={handleAudio} onClear={() => { setAudioFile(null); setAudioError(null) }} />
-          </div>
-
-          {uploadError && (
-            <div className="text-sm text-red-500 text-center -mt-6">{uploadError}</div>
-          )}
-
-          {/* CTA */}
-          <div className="flex justify-end gap-4 items-center">
-            <button onClick={onClose} className="cursor-pointer hover:opacity-70 transition-opacity font-bold text-sm uppercase tracking-[0.1em] bg-transparent border-none" style={{ color: '#72726E', padding: '13.5px 24px 14.5px' }}>
-              CANCEL
-            </button>
-            <button
-              onClick={handleSubmit} disabled={!canSubmit}
-              className="px-8 py-3 rounded-full font-bold text-base border-none transition-all"
-              style={{ backgroundColor: canSubmit ? '#798C00' : 'rgba(121,140,0,0.35)', color: '#FAF7F6', cursor: canSubmit ? 'pointer' : 'not-allowed', boxShadow: canSubmit ? '0px 4px 6px -4px rgba(0,0,0,0.1), 0px 10px 15px -3px rgba(0,0,0,0.1)' : 'none' }}
-            >
-              {uploading ? t('modal_uploading') : t('modal_submit')}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ─── Processing Toast ─────────────────────────────────────────────────────────
 
@@ -680,7 +506,6 @@ export default function LobbyPage() {
   const { t } = useTranslation()
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [activeNav, setActiveNav] = useState<'courses' | 'settings'>('courses')
-  const [showModal, setShowModal] = useState(false)
   const [sessions, setSessions] = useState<CourseCard[]>(FALLBACK_SESSIONS)
 
   // ── Background processing toast ──────────────────────────────────────────
@@ -782,8 +607,7 @@ export default function LobbyPage() {
         {/* New Recording CTA */}
         <div className="self-stretch px-2 pb-8 flex flex-col justify-start items-start">
           <button
-            onClick={() => setShowModal(true)}
-            className="self-stretch px-4 py-3 rounded-full shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)] inline-flex justify-center items-center gap-2 cursor-pointer hover:opacity-85 transition-opacity border-none"
+            onClick={() => navigate('/upload')}
             style={{ backgroundColor: '#798C00' }}
           >
             <IconMic />
@@ -901,7 +725,7 @@ export default function LobbyPage() {
                   <div className="flex flex-col items-center justify-center py-16 w-full">
                     <p className="text-sm mb-4" style={{ color: '#D0CFC5' }}>{t('lobby_empty_hint')}</p>
                     <button
-                      onClick={() => setShowModal(true)}
+                      onClick={() => navigate('/upload')}
                       className="px-4 py-2 text-white text-sm rounded-full cursor-pointer hover:opacity-85 border-none"
                       style={{ backgroundColor: '#798C00' }}
                     >
@@ -922,8 +746,6 @@ export default function LobbyPage() {
         </div>
         )}
       </div>
-
-      {showModal && <NewClassModal onClose={() => setShowModal(false)} onUploaded={(sid) => { handleUploaded(sid); setShowModal(false) }} />}
 
       {toast && (
         <ProcessingToast
