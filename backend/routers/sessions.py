@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from pathlib import Path
+import json
+from pydantic import BaseModel
 
 import settings as _settings
 
@@ -218,5 +220,110 @@ def get_slide_png(session_id: str, page_num: int):
     # Cache to disk
     slides_dir.mkdir(parents=True, exist_ok=True)
     png_path.write_bytes(png_bytes)
+
+
+class AskRequest(BaseModel):
+    question: str
+    page_num: int
+    bullet_index: int
+    bullet_text: str
+    bullet_ai_comment: str = ""
+    model: str = "中转站"
+
+
+@router.post("/sessions/{session_id}/ask")
+async def ask_bullet(session_id: str, req: AskRequest):
+    """针对单条 bullet 的流式问答。返回 text/event-stream (SSE)。"""
+    from services.note_generator import (
+        PROVIDER_ZHONGZHUAN, PROVIDER_ZHIZENGZENG,
+        PROVIDERS,
+    )
+
+    PROVIDER_QWEN = "通义千问"
+    PROVIDER_DEEPSEEK = "DeepSeek"
+    PROVIDER_DOUBAO = "豆包"
+    ALL_PROVIDERS = PROVIDERS + [PROVIDER_QWEN, PROVIDER_DEEPSEEK, PROVIDER_DOUBAO]
+
+    if req.model not in ALL_PROVIDERS:
+        raise HTTPException(status_code=400, detail=f"Unknown model: {req.model}")
+
+    # 读取 prompt 模板
+    prompt_path = Path("prompts/ai_frontpage_ask/prompt.md")
+    system_prompt = prompt_path.read_text(encoding="utf-8")
+    system_prompt = (
+        system_prompt
+        .replace("{{ppt_text}}", req.bullet_text.strip())
+        .replace("{{ai_comment}}", req.bullet_ai_comment.strip() or "（无）")
+    )
+
+    user_msg = req.question.strip()
+
+    import os
+
+    async def stream_anthropic():
+        import anthropic as _anthropic
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        base_url = os.environ.get("ANTHROPIC_BASE_URL", "").strip() or None
+        kwargs = {"base_url": base_url} if base_url else {}
+        client = _anthropic.AsyncAnthropic(api_key=api_key, **kwargs)
+        model = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
+        async with client.messages.stream(
+            model=model,
+            max_tokens=1024,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_msg}],
+        ) as stream:
+            async for text in stream.text_stream:
+                yield f"data: {json.dumps({'type': 'chunk', 'content': text})}\n\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+    async def stream_openai_compat(base_url: str, api_key: str, model: str):
+        import openai as _openai
+        client = _openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
+        stream = await client.chat.completions.create(
+            model=model,
+            max_tokens=1024,
+            stream=True,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_msg},
+            ],
+        )
+        async for chunk in stream:
+            delta = chunk.choices[0].delta.content if chunk.choices else None
+            if delta:
+                yield f"data: {json.dumps({'type': 'chunk', 'content': delta})}\n\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+    if req.model == PROVIDER_ZHONGZHUAN:
+        gen = stream_anthropic()
+    elif req.model == PROVIDER_QWEN:
+        gen = stream_openai_compat(
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+            api_key=os.environ.get("DASHSCOPE_API_KEY", ""),
+            model=os.environ.get("QWEN_MODEL", "qwen-plus"),
+        )
+    elif req.model == PROVIDER_DEEPSEEK:
+        gen = stream_openai_compat(
+            base_url="https://api.deepseek.com",
+            api_key=os.environ.get("DEEPSEEK_API_KEY", ""),
+            model=os.environ.get("DEEPSEEK_MODEL", "deepseek-chat"),
+        )
+    elif req.model == PROVIDER_DOUBAO:
+        gen = stream_openai_compat(
+            base_url="https://ark.cn-beijing.volces.com/api/v3",
+            api_key=os.environ.get("VOLC_API_KEY", ""),
+            model=os.environ.get("DOUBAO_MODEL", "doubao-pro-4k"),
+        )
+    elif req.model == PROVIDER_ZHIZENGZENG:
+        gen = stream_openai_compat(
+            base_url=os.environ.get("OPENAI_BASE_URL", "").strip() or "https://api.openai.com/v1",
+            api_key=os.environ.get("OPENAI_API_KEY", ""),
+            model=os.environ.get("ANTHROPIC_MODEL", "gpt-4o-mini"),
+        )
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown model: {req.model}")
+
+    return StreamingResponse(gen, media_type="text/event-stream")
 
     return Response(content=png_bytes, media_type="image/png")
