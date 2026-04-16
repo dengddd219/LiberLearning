@@ -188,14 +188,15 @@ with st.sidebar:
         st.caption(f"📁 {_get_run_dir()}")
 
 # ── Tab layout ────────────────────────────────────────────────────────────────
-tab_main, tab_dashboard, tab_gt, tab_batch = st.tabs([
-    "🔬 Pipeline", "📊 Dashboard", "🎯 Ground Truth", "📦 Batch"
+tab_main, tab_dashboard, tab_gt, tab_batch, tab_ai_ask = st.tabs([
+    "🔬 Pipeline", "📊 Dashboard", "🎯 Ground Truth", "📦 Batch", "💬 AI Ask"
 ])
 
-from test_ui.pipeline     import render_pipeline
-from test_ui.dashboard    import render_dashboard
-from test_ui.ground_truth import render_ground_truth
-from test_ui.batch        import render_batch
+from test_ui.pipeline        import render_pipeline
+from test_ui.dashboard       import render_dashboard
+from test_ui.ground_truth    import render_ground_truth
+from test_ui.batch           import render_batch
+from test_ui.ai_frontpage_ask import render_ai_frontpage_ask
 
 with tab_main:
     render_pipeline(language, threshold, realign_btn)
@@ -208,3 +209,6 @@ with tab_gt:
 
 with tab_batch:
     render_batch()
+
+with tab_ai_ask:
+    render_ai_frontpage_ask()
