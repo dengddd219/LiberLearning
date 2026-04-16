@@ -52,3 +52,46 @@ export async function listSessions(): Promise<
 > {
   return apiGet('/api/sessions')
 }
+
+/**
+ * 流式生成 My Notes AI 扩写。
+ * onChunk 每次收到一段文本时回调；返回完整文本。
+ */
+export async function generateMyNote(
+  sessionId: string,
+  pageNum: number,
+  userNote: string,
+  pptText: string,
+  provider: string,
+  onChunk: (chunk: string) => void,
+): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/page/${pageNum}/my-notes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_note: userNote, ppt_text: pptText, provider }),
+  })
+  if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
+
+  const reader = res.body!.getReader()
+  const decoder = new TextDecoder()
+  let full = ''
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      const data = line.slice(6)
+      if (data === '[DONE]') break
+      try {
+        const { chunk } = JSON.parse(data)
+        if (chunk) { full += chunk; onChunk(chunk) }
+      } catch { /* ignore malformed */ }
+    }
+  }
+  return full
+}

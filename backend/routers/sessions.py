@@ -1,6 +1,10 @@
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
+from pydantic import BaseModel
 from pathlib import Path
+from typing import Optional
+import json
+import asyncio
 
 import settings as _settings
 
@@ -186,6 +190,118 @@ def get_session(session_id: str):
         return session
 
     raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+
+
+MY_NOTES_SYSTEM_PROMPT = """你是一个学习助手。用户正在看一页 PPT，他写下了自己的理解或困惑。
+你的任务：根据用户的笔记和 PPT 内容，生成结构化的学习笔记。
+
+输出格式（Markdown）：
+## [简洁的标题，概括这页的核心概念]
+
+• [bullet point 1，具体解释或补充]
+• [bullet point 2]
+• [bullet point 3]
+...
+
+要求：
+- 标题一行，bullet 3-6 条
+- 重点回应用户笔记中提到的困惑或关键词
+- 结合 PPT 文本补充用户没有写到的重要内容
+- 语言简洁，适合复习时快速阅读
+- 直接输出 Markdown，不要加任何前缀或解释"""
+
+
+class MyNoteRequest(BaseModel):
+    user_note: str
+    ppt_text: str
+    provider: str = "中转站"
+
+
+@router.post("/sessions/{session_id}/page/{page_num}/my-notes")
+async def generate_my_note(session_id: str, page_num: int, req: MyNoteRequest):
+    """流式生成 My Notes AI 扩写。返回 text/event-stream，每个 SSE event 是一个文本 chunk。"""
+    from services.note_generator import _get_async_call_fn, PROVIDERS
+
+    if req.provider not in PROVIDERS:
+        raise HTTPException(status_code=400, detail=f"Unknown provider: {req.provider}")
+
+    user_msg = f"## 我的笔记\n{req.user_note.strip()}\n\n## PPT 内容\n{req.ppt_text.strip()}"
+
+    # 对 Anthropic provider 用原生 streaming；OpenAI 兼容 provider 用 openai streaming
+    async def stream_anthropic():
+        import anthropic as _anthropic
+        import os
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        base_url = os.environ.get("ANTHROPIC_BASE_URL", "").strip() or None
+        kwargs = {"base_url": base_url} if base_url else {}
+        client = _anthropic.AsyncAnthropic(api_key=api_key, **kwargs)
+        model = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
+        async with client.messages.stream(
+            model=model,
+            max_tokens=1024,
+            system=MY_NOTES_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_msg}],
+        ) as stream:
+            async for text in stream.text_stream:
+                yield f"data: {json.dumps({'chunk': text})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    async def stream_openai_compat(base_url: str, api_key: str, model: str):
+        import openai as _openai
+        client = _openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
+        stream = await client.chat.completions.create(
+            model=model,
+            max_tokens=1024,
+            stream=True,
+            messages=[
+                {"role": "system", "content": MY_NOTES_SYSTEM_PROMPT},
+                {"role": "user", "content": user_msg},
+            ],
+        )
+        async for chunk in stream:
+            delta = chunk.choices[0].delta.content if chunk.choices else None
+            if delta:
+                yield f"data: {json.dumps({'chunk': delta})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    import os
+    from services.note_generator import (
+        PROVIDER_ZHONGZHUAN, PROVIDER_ZHIZENGZENG,
+        PROVIDER_QWEN, PROVIDER_DEEPSEEK, PROVIDER_DOUBAO,
+    )
+
+    provider = req.provider
+
+    if provider == PROVIDER_ZHONGZHUAN:
+        gen = stream_anthropic()
+    elif provider == PROVIDER_QWEN:
+        gen = stream_openai_compat(
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+            api_key=os.environ.get("DASHSCOPE_API_KEY", ""),
+            model=os.environ.get("QWEN_MODEL", "qwen-plus"),
+        )
+    elif provider == PROVIDER_DEEPSEEK:
+        gen = stream_openai_compat(
+            base_url="https://api.deepseek.com",
+            api_key=os.environ.get("DEEPSEEK_API_KEY", ""),
+            model=os.environ.get("DEEPSEEK_MODEL", "deepseek-chat"),
+        )
+    elif provider == PROVIDER_DOUBAO:
+        gen = stream_openai_compat(
+            base_url="https://ark.cn-beijing.volces.com/api/v3",
+            api_key=os.environ.get("VOLC_API_KEY", ""),
+            model=os.environ.get("DOUBAO_MODEL", "doubao-pro-4k"),
+        )
+    elif provider == PROVIDER_ZHIZENGZENG:
+        gen = stream_openai_compat(
+            base_url=os.environ.get("OPENAI_BASE_URL", "").strip() or "https://api.openai.com/v1",
+            api_key=os.environ.get("OPENAI_API_KEY", ""),
+            model=os.environ.get("ANTHROPIC_MODEL", "gpt-4o-mini"),
+        )
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown provider: {provider}")
+
+    return StreamingResponse(gen, media_type="text/event-stream")
 
 
 @router.get("/sessions/{session_id}/slide/{page_num}.png")

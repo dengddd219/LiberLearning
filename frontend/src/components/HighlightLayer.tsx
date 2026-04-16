@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react'
 import { type HighlightRecord } from '../hooks/useHighlights'
-import { getXPath, resolveXPath } from '../lib/xpath'
 
 interface HighlightLayerProps {
   /** react-pdf Page 的外层容器 ref（TextLayer 在其内部） */
@@ -19,32 +18,18 @@ interface HighlightLayerProps {
   onRemove: (id: string) => void
 }
 
-/** 把 <mark> 施加到 range，返回 mark 元素 */
-function applyMarkToRange(range: Range, color: string, highlightId: string): HTMLElement | null {
-  try {
-    const mark = document.createElement('mark')
-    mark.style.backgroundColor = color
-    mark.style.color = 'inherit'
-    mark.style.borderRadius = '2px'
-    mark.dataset.highlightId = highlightId
-    range.surroundContents(mark)
-    return mark
-  } catch {
-    // surroundContents 在 range 跨越多个元素边界时会失败，忽略
-    return null
+/** 把 DOMRect 转换为相对于容器的坐标 */
+function toRelativeRect(
+  rect: DOMRect,
+  container: HTMLElement,
+): { x: number; y: number; w: number; h: number } {
+  const containerRect = container.getBoundingClientRect()
+  return {
+    x: rect.left - containerRect.left,
+    y: rect.top - containerRect.top,
+    w: rect.width,
+    h: rect.height,
   }
-}
-
-/** 从 TextLayer 容器里清除所有 <mark> */
-function clearMarks(container: HTMLElement) {
-  const marks = Array.from(container.querySelectorAll('mark[data-highlight-id]'))
-  marks.forEach((mark) => {
-    const parent = mark.parentNode
-    if (!parent) return
-    while (mark.firstChild) parent.insertBefore(mark.firstChild, mark)
-    parent.removeChild(mark)
-    parent.normalize()
-  })
 }
 
 export default function HighlightLayer({
@@ -57,67 +42,38 @@ export default function HighlightLayer({
   onAdd,
   onRemove,
 }: HighlightLayerProps) {
-  const appliedPageRef = useRef<number>(-1)
-
-  // 页面渲染后恢复高亮（等 TextLayer 出现）
-  useEffect(() => {
-    const container = pageContainerRef.current
-    if (!container) return
-
-    // TextLayer 可能是异步渲染的，poll 直到出现
-    let attempts = 0
-    const tryApply = () => {
-      const textLayer = container.querySelector('.react-pdf__Page__textContent')
-      if (!textLayer) {
-        if (attempts++ < 20) setTimeout(tryApply, 100)
-        return
-      }
-      clearMarks(textLayer as HTMLElement)
-      highlights.forEach((rec) => {
-        const startNode = resolveXPath(rec.startXPath, textLayer)
-        const endNode = resolveXPath(rec.endXPath, textLayer)
-        if (!startNode || !endNode) return
-        try {
-          const range = document.createRange()
-          range.setStart(startNode, rec.startOffset)
-          range.setEnd(endNode, rec.endOffset)
-          applyMarkToRange(range, rec.color, rec.id)
-        } catch {
-          // range 无效，跳过
-        }
-      })
-      appliedPageRef.current = pageNum
-    }
-    // 每次 pageNum 变化或 highlights 变化时重新施加
-    tryApply()
-  }, [pageNum, highlights, pageContainerRef])
+  const containerRef = useRef<HTMLDivElement | null>(null)
 
   // 荧光笔工具激活时监听 mouseup
   useEffect(() => {
     if (!highlightToolActive) return
-    const container = pageContainerRef.current
-    if (!container) return
+    const pageContainer = pageContainerRef.current
+    if (!pageContainer) return
 
-    const handleMouseUp = (e: MouseEvent) => {
+    const handleMouseUp = (_e: MouseEvent) => {
       const sel = window.getSelection()
       if (!sel || sel.isCollapsed || sel.rangeCount === 0) return
       const range = sel.getRangeAt(0)
-      const textLayer = container.querySelector('.react-pdf__Page__textContent')
+
+      // 确保选区在 TextLayer 内
+      const textLayer = pageContainer.querySelector('.react-pdf__Page__textContent')
       if (!textLayer || !textLayer.contains(range.commonAncestorContainer)) return
 
-      const startXPath = getXPath(range.startContainer, textLayer)
-      const endXPath = getXPath(range.endContainer, textLayer)
+      const clientRects = Array.from(range.getClientRects()).filter(
+        (r) => r.width > 0 && r.height > 0,
+      )
+      if (clientRects.length === 0) return
+
+      const rects = clientRects.map((r) => toRelativeRect(r, pageContainer))
 
       onAdd({
-        sessionId: '', // 由调用方填入
+        sessionId: '',
         pageNum,
         color: highlightColor,
-        startXPath,
-        startOffset: range.startOffset,
-        endXPath,
-        endOffset: range.endOffset,
+        rects,
         text: range.toString(),
       })
+
       sel.removeAllRanges()
     }
 
@@ -125,23 +81,44 @@ export default function HighlightLayer({
     return () => document.removeEventListener('mouseup', handleMouseUp)
   }, [highlightToolActive, pageNum, highlightColor, onAdd, pageContainerRef])
 
-  // 橡皮擦工具激活时，点击 <mark> 删除
-  useEffect(() => {
-    if (!eraserToolActive) return
-    const container = pageContainerRef.current
-    if (!container) return
+  // 橡皮擦工具激活时，点击高亮矩形删除
+  const handleEraserClick = (id: string) => {
+    if (eraserToolActive) onRemove(id)
+  }
 
-    const handleClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
-      const mark = target.closest('mark[data-highlight-id]') as HTMLElement | null
-      if (!mark) return
-      const id = mark.dataset.highlightId
-      if (id) onRemove(id)
-    }
-
-    container.addEventListener('click', handleClick)
-    return () => container.removeEventListener('click', handleClick)
-  }, [eraserToolActive, onRemove, pageContainerRef])
-
-  return null // 无自身渲染，纯逻辑组件
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        pointerEvents: eraserToolActive ? 'auto' : 'none',
+        zIndex: 10,
+        cursor: eraserToolActive
+          ? "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Crect x='4' y='12' width='12' height='8' rx='1' fill='%23f8f0e3' stroke='%23888' stroke-width='1.5'/%3E%3Cpath d='M4 16h12' stroke='%23888' stroke-width='1'/%3E%3Cpath d='M8 20H18a2 2 0 0 0 1.4-3.4L12 9l-8 8 1.6 1.6' fill='%23f8f0e3' stroke='%23888' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E\") 4 20, cell"
+          : 'default',
+      }}
+    >
+      {highlights.map((rec) =>
+        rec.rects.map((rect, i) => (
+          <div
+            key={`${rec.id}-${i}`}
+            onClick={() => handleEraserClick(rec.id)}
+            style={{
+              position: 'absolute',
+              left: rect.x,
+              top: rect.y,
+              width: rect.w,
+              height: rect.h,
+              backgroundColor: rec.color,
+              opacity: 0.4,
+              borderRadius: '2px',
+              cursor: 'inherit',
+              mixBlendMode: 'multiply',
+            }}
+          />
+        )),
+      )}
+    </div>
+  )
 }

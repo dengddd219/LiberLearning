@@ -36,7 +36,7 @@ export default function TranslationPopover({
       style={{
         position: 'absolute',
         top: 'calc(100% + 8px)',
-        right: 0,
+        left: 0,
         width: '280px',
         background: '#FFFFFF',
         borderRadius: '12px',

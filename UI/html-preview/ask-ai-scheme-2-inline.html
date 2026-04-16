@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>方案二：上下文内联问答</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lora:wght@400;500;600&display=swap" />
+<style>
+  :root {
+    --bg: #F0EFEA;
+    --surface: #FAFAF8;
+    --surface-hover: #E8E7E2;
+    --divider: #E4E3DE;
+    --fg: #1A1916;
+    --secondary: #6B6A64;
+    --muted: #9B9A94;
+    --dark: #3D3B35;
+    --accent: #2D6A4F;
+    --tag-bg: #E8E7E2;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    font-family: 'Inter', sans-serif;
+    color: var(--fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  .notes-panel {
+    width: 480px;
+    height: 680px;
+    background: var(--surface);
+    border-radius: 16px;
+    border: 1px solid var(--divider);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  }
+
+  .tab-bar {
+    display: flex;
+    gap: 4px;
+    padding: 12px 16px 0;
+    border-bottom: 1px solid var(--divider);
+  }
+  .tab {
+    padding: 6px 14px;
+    border-radius: 20px 20px 0 0;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    transition: all 0.15s;
+  }
+  .tab.active {
+    background: var(--dark);
+    color: #fff;
+  }
+  .tab:hover:not(.active) { color: var(--secondary); }
+
+  .notes-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .notes-content::-webkit-scrollbar { width: 4px; }
+  .notes-content::-webkit-scrollbar-thumb { background: var(--divider); border-radius: 2px; }
+
+  /* ── 方案二核心：Bullet 卡片 Hover 问答 ── */
+  .bullet-row {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border-radius: 10px;
+    border: 1px solid var(--divider);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .bullet-row:hover {
+    border-color: var(--secondary);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+
+  .bullet-main {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--fg);
+    font-family: 'Lora', serif;
+    line-height: 1.5;
+  }
+  .bullet-comment {
+    font-size: 12px;
+    color: var(--secondary);
+    line-height: 1.6;
+  }
+  .bullet-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+
+  /* Hover 浮现的提问按钮 */
+  .ask-btn {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    border: 1px solid var(--divider);
+    background: var(--surface);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(2px);
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .bullet-row:hover .ask-btn {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .ask-btn:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  /* 内联问答展开区 */
+  .inline-qa {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--divider);
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .inline-qa.open {
+    display: flex;
+  }
+
+  /* 模型切换（小尺寸） */
+  .model-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .model-label {
+    font-size: 9px;
+    color: var(--muted);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .model-chip {
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--divider);
+    background: transparent;
+    color: var(--muted);
+    transition: all 0.12s;
+  }
+  .model-chip.active {
+    background: var(--tag-bg);
+    border-color: var(--secondary);
+    color: var(--fg);
+  }
+  .model-chip:hover:not(.active) { border-color: var(--muted); color: var(--secondary); }
+
+  /* 内联对话 */
+  .inline-msgs {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 140px;
+    overflow-y: auto;
+  }
+  .inline-msgs::-webkit-scrollbar { width: 3px; }
+  .inline-msgs::-webkit-scrollbar-thumb { background: var(--divider); border-radius: 2px; }
+
+  .msg { display: flex; flex-direction: column; gap: 1px; }
+  .msg-label {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .msg.user .msg-label { color: var(--dark); }
+  .msg.ai .msg-label { color: var(--accent); }
+
+  .msg-bubble {
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    line-height: 1.5;
+  }
+  .msg.user .msg-bubble {
+    background: var(--tag-bg);
+    color: var(--fg);
+    border-radius: 6px 6px 2px 6px;
+  }
+  .msg.ai .msg-bubble {
+    background: #EBF4EF;
+    color: #1A3A2A;
+    border-radius: 6px 6px 6px 2px;
+  }
+  .typing-cursor::after {
+    content: '▌';
+    animation: blink 0.8s step-start infinite;
+    color: var(--accent);
+    font-size: 10px;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* 内联输入行 */
+  .inline-input-row {
+    display: flex;
+    gap: 6px;
+    align-items: flex-end;
+  }
+  .inline-input {
+    flex: 1;
+    padding: 6px 9px;
+    border-radius: 7px;
+    border: 1px solid var(--divider);
+    background: var(--surface);
+    font-size: 11px;
+    font-family: 'Inter', sans-serif;
+    color: var(--fg);
+    resize: none;
+    outline: none;
+    line-height: 1.4;
+    min-height: 30px;
+    max-height: 60px;
+    transition: border-color 0.15s;
+  }
+  .inline-input:focus { border-color: var(--secondary); }
+  .inline-input::placeholder { color: var(--muted); }
+
+  .inline-send {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    border: none;
+    background: var(--dark);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .inline-send:hover { background: #2A2925; }
+
+  /* 收起按钮 */
+  .collapse-btn {
+    align-self: flex-end;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: none;
+    background: var(--tag-bg);
+    font-size: 9px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .collapse-btn:hover { background: var(--divider); color: var(--secondary); }
+</style>
+</head>
+<body>
+
+<div class="notes-panel">
+
+  <div class="tab-bar">
+    <button class="tab">我的笔记</button>
+    <button class="tab active">AI 笔记</button>
+    <button class="tab">转录</button>
+  </div>
+
+  <div class="notes-content">
+
+    <!-- Bullet 卡片 1 -->
+    <div class="bullet-row" id="card1">
+      <span class="bullet-tag">Slide Bullet</span>
+      <div class="bullet-main">梯度下降的核心思想</div>
+      <div class="bullet-comment">沿损失函数负梯度方向迭代更新参数，使模型逐步逼近最优解。学习率 η 控制每步步长，过大会震荡，过小会收敛慢。</div>
+      <button class="ask-btn" onclick="toggleQA('card1')">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+        针对此条提问
+      </button>
+      <div class="inline-qa" id="qa-card1">
+        <div class="model-row">
+          <span class="model-label">模型</span>
+          <button class="model-chip active" onclick="selectModel(this, 'card1')">中转站</button>
+          <button class="model-chip" onclick="selectModel(this, 'card1')">通义千问</button>
+          <button class="model-chip" onclick="selectModel(this, 'card1')">DeepSeek</button>
+        </div>
+        <div class="inline-msgs">
+          <div class="msg user">
+            <span class="msg-label">我</span>
+            <div class="msg-bubble">学习率 η 太大为什么会震荡？</div>
+          </div>
+          <div class="msg ai">
+            <span class="msg-label">AI</span>
+            <div class="msg-bubble">想象你在下山，η 太大会让你一步跨过山谷最低点，跑到对面山坡上；下次又跨回来，如此反复形成震荡。<span class="typing-cursor"></span></div>
+          </div>
+        </div>
+        <div class="inline-input-row">
+          <textarea class="inline-input" placeholder="继续追问..." rows="1" oninput="autoResize(this)" onkeydown="handleKey(event, 'card1')"></textarea>
+          <button class="inline-send" onclick="sendInline('card1')">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
+        <button class="collapse-btn" onclick="toggleQA('card1')">收起</button>
+      </div>
+    </div>
+
+    <!-- Bullet 卡片 2 -->
+    <div class="bullet-row" id="card2">
+      <span class="bullet-tag">Slide Bullet</span>
+      <div class="bullet-main">反向传播算法（Backprop）</div>
+      <div class="bullet-comment">链式法则逐层计算梯度，从输出层往输入层传播误差信号，每层只需知道上层传来的梯度即可完成本层更新。</div>
+      <button class="ask-btn" onclick="toggleQA('card2')">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+        针对此条提问
+      </button>
+      <div class="inline-qa" id="qa-card2">
+        <div class="model-row">
+          <span class="model-label">模型</span>
+          <button class="model-chip active" onclick="selectModel(this, 'card2')">中转站</button>
+          <button class="model-chip" onclick="selectModel(this, 'card2')">通义千问</button>
+        </div>
+        <div class="inline-msgs" id="msgs-card2">
+          <div class="msg user">
+            <span class="msg-label">我</span>
+            <div class="msg-bubble">能详细解释一下链式法则吗？</div>
+          </div>
+        </div>
+        <div class="inline-input-row">
+          <textarea class="inline-input" id="input-card2" placeholder="继续追问..." rows="1" oninput="autoResize(this)" onkeydown="handleKey(event, 'card2')"></textarea>
+          <button class="inline-send" onclick="sendInline('card2')">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
+        <button class="collapse-btn" onclick="toggleQA('card2')">收起</button>
+      </div>
+    </div>
+
+    <!-- Bullet 卡片 3 -->
+    <div class="bullet-row" id="card3">
+      <span class="bullet-tag">Off-slide 补充</span>
+      <div class="bullet-main">老师补充：为什么不用二阶导（牛顿法）</div>
+      <div class="bullet-comment">计算 Hessian 矩阵在高维参数空间中代价极高，实际不可行。Adam 等自适应优化器是折中方案。</div>
+      <button class="ask-btn" onclick="toggleQA('card3')">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+        针对此条提问
+      </button>
+      <div class="inline-qa" id="qa-card3">
+        <div class="model-row">
+          <span class="model-label">模型</span>
+          <button class="model-chip active" onclick="selectModel(this, 'card3')">中转站</button>
+        </div>
+        <div class="inline-msgs"></div>
+        <div class="inline-input-row">
+          <textarea class="inline-input" id="input-card3" placeholder="对此条提问..." rows="1" oninput="autoResize(this)" onkeydown="handleKey(event, 'card3')"></textarea>
+          <button class="inline-send" onclick="sendInline('card3')">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
+        <button class="collapse-btn" onclick="toggleQA('card3')">收起</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function toggleQA(cardId) {
+    const qa = document.getElementById('qa-' + cardId);
+    qa.classList.toggle('open');
+    if (qa.classList.contains('open')) {
+      qa.querySelector('.inline-input').focus();
+    }
+  }
+
+  function selectModel(btn, cardId) {
+    const container = btn.closest('.inline-qa');
+    container.querySelectorAll('.model-chip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 60) + 'px';
+  }
+
+  function handleKey(e, cardId) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendInline(cardId);
+    }
+  }
+
+  function sendInline(cardId) {
+    const input = document.getElementById('input-' + cardId);
+    const text = input.value.trim();
+    if (!text) return;
+
+    const msgs = document.getElementById('msgs-' + cardId) || document.querySelector('#qa-' + cardId + ' .inline-msgs');
+
+    const userMsg = document.createElement('div');
+    userMsg.className = 'msg user';
+    userMsg.innerHTML = `<span class="msg-label">我</span><div class="msg-bubble">${escapeHtml(text)}</div>`;
+    msgs.appendChild(userMsg);
+
+    input.value = '';
+    input.style.height = 'auto';
+
+    const aiMsg = document.createElement('div');
+    aiMsg.className = 'msg ai';
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+    bubble.innerHTML = '<span class="typing-cursor"></span>';
+    aiMsg.appendChild(document.createElement('span')).className = 'msg-label';
+    aiMsg.querySelector('span').textContent = 'AI';
+    aiMsg.appendChild(bubble);
+    msgs.appendChild(aiMsg);
+    msgs.scrollTop = msgs.scrollHeight;
+
+    const responses = {
+      'card1': '震荡的本质是参数在最优解两侧反复跳跃，无法收敛到最低点。',
+      'card2': '链式法则简单说就是：复合函数的梯度 = 外层梯度 × 内层梯度，一层层传回去。',
+      'card3': 'Hessian 矩阵是二阶偏导组成的矩阵，维度是参数数量的平方，在深度学习中参数量巨大，计算和存储都不现实。'
+    };
+
+    const response = responses[cardId] || '根据这条笔记的内容，我来为你解答...';
+    let i = 0;
+    const cursor = bubble.querySelector('.typing-cursor');
+
+    function typeChar() {
+      if (i < response.length) {
+        cursor.insertAdjacentText('beforebegin', response[i]);
+        i++;
+        msgs.scrollTop = msgs.scrollHeight;
+        setTimeout(typeChar, 18 + Math.random() * 20);
+      } else {
+        cursor.remove();
+      }
+    }
+    setTimeout(typeChar, 400);
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+</body>
+</html>

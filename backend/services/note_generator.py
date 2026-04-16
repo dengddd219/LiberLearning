@@ -44,7 +44,10 @@ DEFAULT_MODEL = _settings.NOTE_MODEL
 # Supported provider names shown in the UI
 PROVIDER_ZHONGZHUAN = "中转站"
 PROVIDER_ZHIZENGZENG = "智增增"
-PROVIDERS = [PROVIDER_ZHONGZHUAN, PROVIDER_ZHIZENGZENG]
+PROVIDER_QWEN = "通义千问"
+PROVIDER_DEEPSEEK = "DeepSeek"
+PROVIDER_DOUBAO = "豆包"
+PROVIDERS = [PROVIDER_ZHONGZHUAN, PROVIDER_ZHIZENGZENG, PROVIDER_QWEN, PROVIDER_DEEPSEEK, PROVIDER_DOUBAO]
 
 PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 
@@ -142,45 +145,85 @@ class LLMTask(BaseModel):
 # Phase 2: Native Async Clients
 # ---------------------------------------------------------------------------
 
+def _make_openai_call_fn(client, model: str):
+    """Shared helper: build a call_fn for any OpenAI-compatible client."""
+    async def call_fn(system: str, user_msg: str):
+        resp = await client.chat.completions.create(
+            model=model,
+            max_tokens=2048,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user_msg},
+            ],
+        )
+        text = resp.choices[0].message.content or ""
+        usage = resp.usage
+        return text, usage.prompt_tokens, usage.completion_tokens
+    return call_fn
+
+
 def _get_async_call_fn(provider: str):
     """Return (async_call_fn, model, call_meta).
 
     async_call_fn(system, user_msg) -> (text, input_tokens, output_tokens)
     call_meta: dict with keys model, endpoint, provider — logged into _cost per page.
     """
-    import time as _time
+    import openai as _openai
 
     model = os.environ.get("ANTHROPIC_MODEL", "").strip() or DEFAULT_MODEL
 
-    if provider == PROVIDER_ZHIZENGZENG:
-        import openai as _openai
+    if provider == PROVIDER_QWEN:
+        api_key = os.environ.get("DASHSCOPE_API_KEY", "")
+        if not api_key:
+            raise RuntimeError("DASHSCOPE_API_KEY not set. Add it to backend/.env")
+        qwen_model = os.environ.get("QWEN_MODEL", "qwen-plus")
+        base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        client = _openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
+        return (
+            _make_openai_call_fn(client, qwen_model),
+            qwen_model,
+            {"provider": provider, "model": qwen_model, "endpoint": base_url},
+        )
+
+    elif provider == PROVIDER_DEEPSEEK:
+        api_key = os.environ.get("DEEPSEEK_API_KEY", "")
+        if not api_key:
+            raise RuntimeError("DEEPSEEK_API_KEY not set. Add it to backend/.env")
+        ds_model = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
+        base_url = "https://api.deepseek.com"
+        client = _openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
+        return (
+            _make_openai_call_fn(client, ds_model),
+            ds_model,
+            {"provider": provider, "model": ds_model, "endpoint": base_url},
+        )
+
+    elif provider == PROVIDER_DOUBAO:
+        api_key = os.environ.get("VOLC_API_KEY", "")
+        if not api_key:
+            raise RuntimeError("VOLC_API_KEY not set. Add it to backend/.env")
+        doubao_model = os.environ.get("DOUBAO_MODEL", "doubao-pro-4k")
+        base_url = "https://ark.cn-beijing.volces.com/api/v3"
+        client = _openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
+        return (
+            _make_openai_call_fn(client, doubao_model),
+            doubao_model,
+            {"provider": provider, "model": doubao_model, "endpoint": base_url},
+        )
+
+    elif provider == PROVIDER_ZHIZENGZENG:
         api_key = os.environ.get("OPENAI_API_KEY", "")
         base_url = os.environ.get("OPENAI_BASE_URL", "").strip() or None
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY not set. Add it to backend/.env")
         client = _openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
-        call_meta = {
-            "provider": provider,
-            "model": model,
-            "endpoint": base_url or "https://api.openai.com/v1",
-        }
+        return (
+            _make_openai_call_fn(client, model),
+            model,
+            {"provider": provider, "model": model, "endpoint": base_url or "https://api.openai.com/v1"},
+        )
 
-        async def call_fn(system: str, user_msg: str):
-            resp = await client.chat.completions.create(
-                model=model,
-                max_tokens=2048,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user_msg},
-                ],
-            )
-            text = resp.choices[0].message.content or ""
-            usage = resp.usage
-            return text, usage.prompt_tokens, usage.completion_tokens
-
-        return call_fn, model, call_meta
-
-    else:  # 中转站 (default)
+    else:  # 中转站 (default, Anthropic Claude)
         api_key = os.environ.get("ANTHROPIC_API_KEY", "")
         if not api_key or api_key.startswith("sk-ant-xxx"):
             raise RuntimeError(

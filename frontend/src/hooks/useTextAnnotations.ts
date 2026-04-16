@@ -7,6 +7,8 @@ export interface TextAnnotation {
   x: number   // 相对于页面容器的百分比 0-100
   y: number
   text: string
+  color: string
+  fontSize: number
 }
 
 const STORAGE_KEY = 'liberstudy:text-annotations'
@@ -25,15 +27,15 @@ export function useTextAnnotations(sessionId: string) {
 
   const addAnnotation = useCallback((pageNum: number, x: number, y: number) => {
     const id = crypto.randomUUID()
-    const record: TextAnnotation = { id, sessionId, pageNum, x, y, text: '' }
+    const record: TextAnnotation = { id, sessionId, pageNum, x, y, text: '', color: '#1A1916', fontSize: 14 }
     const next = [...load(), record]
     save(next)
     setAnnotations(next.filter((a) => a.sessionId === sessionId))
     return id
   }, [sessionId])
 
-  const updateAnnotation = useCallback((id: string, text: string) => {
-    const next = load().map((a) => a.id === id ? { ...a, text } : a)
+  const updateAnnotation = useCallback((id: string, text: string, color?: string, fontSize?: number) => {
+    const next = load().map((a) => a.id === id ? { ...a, text, ...(color !== undefined ? { color } : {}), ...(fontSize !== undefined ? { fontSize } : {}) } : a)
     save(next)
     setAnnotations(next.filter((a) => a.sessionId === sessionId))
   }, [sessionId])

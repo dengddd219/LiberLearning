@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Notes Q1 — 三种输入方案对比</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; padding: 32px 24px; }
+  h1 { font-size: 18px; color: #111; margin-bottom: 8px; }
+  .subtitle { font-size: 13px; color: #666; margin-bottom: 32px; }
+
+  .options { display: flex; gap: 24px; align-items: flex-start; }
+
+  .option-card {
+    flex: 1;
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.06);
+  }
+
+  .card-header {
+    padding: 12px 16px 10px;
+    border-bottom: 1px solid #f0f0f0;
+    background: #fafafa;
+  }
+  .card-header .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-bottom: 6px;
+  }
+  .tag-a { background: #e0f2fe; color: #0369a1; }
+  .tag-b { background: #fce7f3; color: #be185d; }
+  .tag-c { background: #dcfce7; color: #15803d; }
+
+  .card-header h2 { font-size: 14px; font-weight: 600; color: #111; margin-bottom: 2px; }
+  .card-header p  { font-size: 12px; color: #888; }
+
+  /* ---- mock notes panel ---- */
+  .notes-panel { padding: 14px 16px; }
+
+  .section-label {
+    font-size: 11px; font-weight: 600; letter-spacing: .06em;
+    color: #9ca3af; text-transform: uppercase; margin-bottom: 10px;
+  }
+
+  /* ============================
+     Option A — Big Textarea
+  ============================ */
+  .textarea-wrap { position: relative; }
+  .textarea-wrap textarea {
+    width: 100%; height: 160px;
+    border: 1.5px solid #e5e7eb; border-radius: 8px;
+    padding: 10px 12px; font-size: 13px; line-height: 1.6;
+    resize: none; outline: none; color: #374151;
+    font-family: inherit;
+    transition: border-color .15s;
+  }
+  .textarea-wrap textarea:focus { border-color: #6366f1; }
+  .textarea-hint { font-size: 11px; color: #9ca3af; margin-top: 6px; }
+
+  /* ============================
+     Option B — Enter per item
+  ============================ */
+  .note-list { display: flex; flex-direction: column; gap: 6px; }
+  .note-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 8px 10px; background: #f9fafb; border-radius: 6px;
+    border: 1px solid #e5e7eb;
+  }
+  .note-item .bullet {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #6366f1; flex-shrink: 0; margin-top: 5px;
+  }
+  .note-item span { font-size: 13px; color: #374151; line-height: 1.5; }
+  .note-input-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border: 1.5px dashed #d1d5db; border-radius: 6px;
+    background: #fff; margin-top: 2px;
+  }
+  .note-input-row input {
+    flex: 1; border: none; outline: none; font-size: 13px;
+    color: #374151; font-family: inherit; background: transparent;
+  }
+  .note-input-row input::placeholder { color: #9ca3af; }
+  .note-input-row kbd {
+    font-size: 10px; color: #9ca3af; background: #f3f4f6;
+    border: 1px solid #e5e7eb; border-radius: 4px;
+    padding: 1px 5px; font-family: monospace;
+  }
+
+  /* ============================
+     Option C — + Button
+  ============================ */
+  .note-cards { display: flex; flex-direction: column; gap: 6px; }
+  .note-card {
+    border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;
+  }
+  .note-card-body {
+    padding: 8px 12px; display: flex; justify-content: space-between; align-items: flex-start;
+  }
+  .note-card-body span { font-size: 13px; color: #374151; line-height: 1.5; flex: 1; }
+  .note-card-body .del-btn {
+    font-size: 16px; color: #d1d5db; cursor: pointer; flex-shrink: 0;
+    margin-left: 8px; line-height: 1; margin-top: 1px;
+  }
+  .note-card-body .del-btn:hover { color: #ef4444; }
+  .add-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 12px; border: 1.5px dashed #d1d5db; border-radius: 8px;
+    color: #6b7280; font-size: 13px; cursor: pointer; background: #fff;
+    transition: border-color .15s, color .15s; margin-top: 4px;
+    width: 100%;
+  }
+  .add-btn:hover { border-color: #6366f1; color: #6366f1; }
+  .add-btn .plus { font-size: 16px; font-weight: 300; line-height: 1; }
+
+  /* ---- pros/cons ---- */
+  .meta {
+    padding: 12px 16px 14px;
+    border-top: 1px solid #f0f0f0;
+    background: #fafafa;
+  }
+  .meta-row { display: flex; gap: 8px; margin-bottom: 4px; }
+  .meta-row:last-child { margin-bottom: 0; }
+  .meta-icon { font-size: 12px; flex-shrink: 0; margin-top: 1px; }
+  .meta-text { font-size: 12px; color: #4b5563; line-height: 1.5; }
+  .pro .meta-icon::before { content: '✓'; color: #16a34a; }
+  .con .meta-icon::before { content: '✗'; color: #dc2626; }
+</style>
+</head>
+<body>
+
+<h1>My Notes 输入方式 — Q1 三个方案</h1>
+<p class="subtitle">帮助你选择 My Notes 区域的输入交互方式</p>
+
+<div class="options">
+
+  <!-- ========== OPTION A ========== -->
+  <div class="option-card">
+    <div class="card-header">
+      <span class="tag tag-a">方案 A</span>
+      <h2>大文本框</h2>
+      <p>整页只有一个 textarea，自由输入</p>
+    </div>
+    <div class="notes-panel">
+      <div class="section-label">My Notes</div>
+      <div class="textarea-wrap">
+        <textarea placeholder="在这里记录你的想法、疑问、关键词…&#10;&#10;例：老师说这章必考，重点是CRC和ARQ的区别"></textarea>
+      </div>
+      <div class="textarea-hint">Ctrl+S 保存 · 自动同步到 AI Notes</div>
+    </div>
+    <div class="meta">
+      <div class="meta-row pro"><span class="meta-icon"></span><span class="meta-text">最低认知负担，想到什么写什么</span></div>
+      <div class="meta-row pro"><span class="meta-icon"></span><span class="meta-text">实现最简单</span></div>
+      <div class="meta-row con"><span class="meta-icon"></span><span class="meta-text">AI Notes 里无法按条目触发扩写，只能整体扩写</span></div>
+      <div class="meta-row con"><span class="meta-icon"></span><span class="meta-text">内容结构全靠用户自己维护</span></div>
+    </div>
+  </div>
+
+  <!-- ========== OPTION B ========== -->
+  <div class="option-card">
+    <div class="card-header">
+      <span class="tag tag-b">方案 B</span>
+      <h2>回车生成条目</h2>
+      <p>每按回车，新增一条笔记 item</p>
+    </div>
+    <div class="notes-panel">
+      <div class="section-label">My Notes</div>
+      <div class="note-list">
+        <div class="note-item">
+          <div class="bullet"></div>
+          <span>老师说这章必考</span>
+        </div>
+        <div class="note-item">
+          <div class="bullet"></div>
+          <span>CRC 只检错，ARQ 才负责重传</span>
+        </div>
+        <div class="note-input-row">
+          <input type="text" placeholder="继续写下一条…" />
+          <kbd>↵ Enter</kbd>
+        </div>
+      </div>
+    </div>
+    <div class="meta">
+      <div class="meta-row pro"><span class="meta-icon"></span><span class="meta-text">天然生成条目列表，AI Notes 可以按条触发扩写</span></div>
+      <div class="meta-row pro"><span class="meta-icon"></span><span class="meta-text">符合课堂快速记录习惯（一句话一条）</span></div>
+      <div class="meta-row con"><span class="meta-icon"></span><span class="meta-text">换行 = 新条目，多行句子不方便</span></div>
+      <div class="meta-row con"><span class="meta-icon"></span><span class="meta-text">需要处理删除/编辑已有条目的交互</span></div>
+    </div>
+  </div>
+
+  <!-- ========== OPTION C ========== -->
+  <div class="option-card">
+    <div class="card-header">
+      <span class="tag tag-c">方案 C</span>
+      <h2>+ 按钮添加</h2>
+      <p>点击 + 弹出输入框，确认后添加卡片</p>
+    </div>
+    <div class="notes-panel">
+      <div class="section-label">My Notes</div>
+      <div class="note-cards">
+        <div class="note-card">
+          <div class="note-card-body">
+            <span>老师说这章必考</span>
+            <span class="del-btn">×</span>
+          </div>
+        </div>
+        <div class="note-card">
+          <div class="note-card-body">
+            <span>CRC 只检错，ARQ 才负责重传</span>
+            <span class="del-btn">×</span>
+          </div>
+        </div>
+        <button class="add-btn"><span class="plus">+</span> 添加一条笔记</button>
+      </div>
+    </div>
+    <div class="meta">
+      <div class="meta-row pro"><span class="meta-icon"></span><span class="meta-text">最清晰的条目结构，删除/编辑体验好</span></div>
+      <div class="meta-row pro"><span class="meta-icon"></span><span class="meta-text">每条笔记可以是多行文本</span></div>
+      <div class="meta-row con"><span class="meta-icon"></span><span class="meta-text">课堂场景中操作步骤多，打断思路</span></div>
+      <div class="meta-row con"><span class="meta-icon"></span><span class="meta-text">实现最复杂（弹窗/modal 或 inline expand）</span></div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

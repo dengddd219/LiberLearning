@@ -1,9 +1,9 @@
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { useTabs } from '../context/TabsContext'
 import { useTranslation } from '../context/TranslationContext'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import CanvasToolbar from '../components/CanvasToolbar'
-import { getSession, retryPage } from '../lib/api'
+import { getSession, retryPage, generateMyNote } from '../lib/api'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
@@ -221,6 +221,34 @@ function LineRevealSpan({ text, revealed }: { text: string; revealed: boolean })
   )
 }
 
+// ─── StreamingExpandText：AI 扩写完成后全文 drop-in shimmer ───
+function StreamingExpandText({ text }: { text: string }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const settledRef = useRef(false)
+
+  useEffect(() => {
+    if (settledRef.current || !text) return
+    const el = ref.current
+    if (!el) return
+    settledRef.current = true
+    el.classList.add('drop-in', 'shimmer-text')
+    const t = setTimeout(() => {
+      el.classList.remove('shimmer-text')
+      el.classList.add('color-settle')
+    }, 600)
+    return () => clearTimeout(t)
+  }, [text]) // 依赖 text 变化：每次新内容触发新动画
+
+  return (
+    <span
+      ref={ref}
+      style={{ fontSize: '13px', color: 'transparent', lineHeight: '1.7', whiteSpace: 'pre-wrap', display: 'block' }}
+    >
+      {text}
+    </span>
+  )
+}
+
 // ─── AiBulletRow：点击展开时 ppt_text 向上抹去，然后 ppt_text + AI 解释全部逐项彩虹揭开 ───
 function AiBulletRow({
   bullet,
@@ -406,7 +434,6 @@ function AiBulletRow({
 
 export default function NotesPage() {
   const { sessionId } = useParams<{ sessionId: string }>()
-  const navigate = useNavigate()
   const { openTab } = useTabs()
   const [session, setSession] = useState<SessionData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -432,6 +459,9 @@ export default function NotesPage() {
   const prevPageRef = useRef<number>(1)
   const audioRef = useRef<HTMLAudioElement>(null)
   const wheelTimeoutRef = useRef<number | null>(null)
+  const wheelAccumRef = useRef(0)
+  const currentPageRef = useRef(currentPage)
+  const totalPagesRef = useRef(session?.pages.length ?? 1)
 
   // Highlight tool state
   const pageContainerRef = useRef<HTMLDivElement | null>(null)
@@ -448,16 +478,51 @@ export default function NotesPage() {
     aiExpansion: string | null
   }>>(new Map())
 
+  // Provider 切换（AI Notes 顶部）
+  const PROVIDERS = ['中转站', '通义千问', 'DeepSeek', '豆包'] as const
+  type Provider = typeof PROVIDERS[number]
+  const [provider, setProvider] = useState<Provider>('中转站')
+
+  // My Notes 状态：idle 编辑空闲 | editing 正在编辑
+  // AI 扩写状态通过 myNoteExpandStates 独立管理
+  type MyNoteState = { input: string; status: 'idle' | 'editing' }
+  const [myNoteStates, setMyNoteStates] = useState<Map<number, MyNoteState>>(new Map())
+
+  // AI 扩写状态：idle | expanding（扩写中）| expanded（扩写完成）
+  type MyNoteExpandState = { userNote: string; aiText: string; status: 'idle' | 'expanding' | 'expanded' }
+  const [myNoteExpandStates, setMyNoteExpandStates] = useState<Map<number, MyNoteExpandState>>(new Map())
+
+  const getMyNoteState = (page: number): MyNoteState =>
+    myNoteStates.get(page) ?? { input: '', status: 'idle' }
+
+  const patchMyNoteState = useCallback((page: number, patch: Partial<MyNoteState>) =>
+    setMyNoteStates(prev => {
+      const current = prev.get(page) ?? { input: '', status: 'idle' as const }
+      const next = new Map(prev)
+      next.set(page, { ...current, ...patch })
+      return next
+    }), [])
+
+  const getMyNoteExpandState = (page: number): MyNoteExpandState =>
+    myNoteExpandStates.get(page) ?? { userNote: '', aiText: '', status: 'idle' }
+
+  const patchMyNoteExpandState = useCallback((page: number, patch: Partial<MyNoteExpandState>) =>
+    setMyNoteExpandStates(prev => {
+      const current = prev.get(page) ?? { userNote: '', aiText: '', status: 'idle' as const }
+      const next = new Map(prev)
+      next.set(page, { ...current, ...patch })
+      return next
+    }), [])
+
   // Resizable panel state
   const [notesPanelWidth, setNotesPanelWidth] = useState(500)
   const isResizingRef = useRef(false)
   const resizeStartXRef = useRef(0)
   const resizeStartWidthRef = useRef(320)
 
-  // Canvas width for react-pdf
+    // Canvas width for react-pdf
   const canvasAreaRef = useRef<HTMLDivElement>(null)
   const [canvasWidth, setCanvasWidth] = useState(800)
-  const [zoomLevel, setZoomLevel] = useState(100)
 
   useEffect(() => {
     if (!canvasAreaRef.current) return
@@ -495,6 +560,13 @@ export default function NotesPage() {
     document.addEventListener('mouseup', onMouseUp)
   }, [notesPanelWidth])
 
+  // NotesPage 挂载时锁定 body 滚动，防止触摸板带动整页上下滚
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [])
+
   useEffect(() => {
     if (!sessionId) return
     getSession(sessionId)
@@ -506,20 +578,58 @@ export default function NotesPage() {
       .catch(() => { setError('无法加载笔记数据'); setLoading(false) })
   }, [sessionId])
 
-  // Wheel翻页 handler
-  const handleWheel = useCallback((e: WheelEvent) => {
+  // Wheel翻页 handler（用 passive:false 原生监听才能 preventDefault）
+  const handleWheelRef = useRef<(e: WheelEvent) => void>((e) => {
+    // 横向滑动为主时不翻页
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
     e.preventDefault()
+    e.stopPropagation()
+
+    // 累积 deltaY，超过阈值才翻页（兼容触摸板小增量和鼠标大增量）
+    // deltaMode=1 是行模式（鼠标），乘以 40 转换为像素
+    const delta = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY
+    wheelAccumRef.current += delta
+
+    const THRESHOLD = 50
+    if (Math.abs(wheelAccumRef.current) < THRESHOLD) return
+
+    const direction = wheelAccumRef.current > 0 ? 1 : -1
+    wheelAccumRef.current = 0
+
     if (wheelTimeoutRef.current) return
-    const direction = e.deltaY > 0 ? 1 : -1
-    if (direction === 1 && currentPage < (session?.pages.length ?? 1)) {
+    if (direction === 1 && currentPageRef.current < totalPagesRef.current) {
       setCurrentPage(p => p + 1)
-    } else if (direction === -1 && currentPage > 1) {
+    } else if (direction === -1 && currentPageRef.current > 1) {
       setCurrentPage(p => p - 1)
     }
     wheelTimeoutRef.current = window.setTimeout(() => {
       wheelTimeoutRef.current = null
-    }, 300)
-  }, [currentPage, session?.pages.length])
+      wheelAccumRef.current = 0
+    }, 400)
+  })
+
+  // 在 window 捕获阶段监听 wheel，检查事件是否发生在 canvas 区域内
+  // 原因：useEffect([]) 运行时 loading 尚未结束，canvasAreaRef.current 为 null，
+  // 导致事件永远无法注册。改用 window 级监听 + 区域检测规避此问题。
+  useEffect(() => {
+    const handler = (e: WheelEvent) => {
+      const el = canvasAreaRef.current
+      if (!el) return
+      if (!el.contains(e.target as Node)) return
+      handleWheelRef.current(e)
+    }
+    window.addEventListener('wheel', handler, { passive: false, capture: true })
+    return () => window.removeEventListener('wheel', handler, { capture: true })
+  }, [])
+
+  // Keep wheel ref pages in sync
+  useEffect(() => {
+    currentPageRef.current = currentPage
+  }, [currentPage])
+
+  useEffect(() => {
+    totalPagesRef.current = session?.pages.length ?? 1
+  }, [session?.pages.length])
 
   // 键盘翻页
   useEffect(() => {
@@ -552,7 +662,7 @@ export default function NotesPage() {
     if (!session) return
     const page = session.pages.find((p) => p.page_num === currentPage)
     if (!page) return
-    const bullets = page.passive_notes?.bullets.map((b) => `• ${b.text}`).join('\n') ?? ''
+    const bullets = page.passive_notes?.bullets.map((b) => `• ${b.ppt_text}`).join('\n') ?? ''
     const text = `## 第 ${page.page_num} 页\n\n${bullets}`
     navigator.clipboard.writeText(text)
     setCopyToast(true)
@@ -569,7 +679,7 @@ export default function NotesPage() {
         lines.push(`\n${page.active_notes.ai_expansion}`)
       }
       if (page.passive_notes) {
-        page.passive_notes.bullets.forEach((b) => lines.push(`- ${b.text}`))
+        page.passive_notes.bullets.forEach((b) => lines.push(`- ${b.ppt_text}`))
       }
       if (page.page_supplement) {
         lines.push(`\n**脱离课件内容：**\n${page.page_supplement.content}`)
@@ -584,6 +694,28 @@ export default function NotesPage() {
     a.click()
     URL.revokeObjectURL(url)
   }, [session])
+
+  const handleExpandMyNote = useCallback(async (pageNum: number) => {
+    if (!sessionId) return
+    const userNote = myNoteStates.get(pageNum)?.input ?? ''
+    if (!userNote.trim()) return
+    const pptText = session?.pages.find(p => p.page_num === pageNum)?.ppt_text ?? ''
+    patchMyNoteExpandState(pageNum, { userNote, aiText: '', status: 'expanding' })
+    try {
+      await generateMyNote(sessionId, pageNum, userNote, pptText, provider, (chunk) => {
+        setMyNoteExpandStates(prev => {
+          const current = prev.get(pageNum)
+          if (!current) return prev
+          const next = new Map(prev)
+          next.set(pageNum, { ...current, aiText: current.aiText + chunk })
+          return next
+        })
+      })
+      patchMyNoteExpandState(pageNum, { status: 'expanded' })
+    } catch {
+      patchMyNoteExpandState(pageNum, { status: 'idle' })
+    }
+  }, [sessionId, session, provider, myNoteStates, patchMyNoteExpandState])
 
   const handleRetryPage = useCallback(async (pageNum: number) => {
     if (!sessionId || retrying !== null) return
@@ -707,7 +839,7 @@ export default function NotesPage() {
                 </svg>
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-3" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div className="flex-1 overflow-y-auto p-3" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }} onWheel={(e) => e.stopPropagation()}>
               {session.pages.map((page) => {
                 const isActive = page.page_num === currentPage
                 return (
@@ -777,13 +909,13 @@ export default function NotesPage() {
           {/* Canvas area — single page with wheel navigation */}
           <div
             ref={canvasAreaRef}
-            className="flex-1 flex items-start justify-center"
+            className="flex-1 flex items-center justify-center"
             style={{
               background: 'rgba(232,231,226,0.6)',
               overflowX: zoomLevel > 100 ? 'auto' : 'hidden',
               overflowY: 'hidden',
+              touchAction: 'none',
             }}
-            onWheel={handleWheel}
           >
             {currentPageData && (() => {
               const pdfUrl = currentPageData.pdf_url ? `${API_BASE}${currentPageData.pdf_url}` : null
@@ -888,21 +1020,6 @@ export default function NotesPage() {
           className="flex-shrink-0 flex flex-col overflow-hidden"
           style={{ width: `${notesPanelWidth}px`, background: C.white }}
         >
-          {/* Detailed Note 入口 */}
-          <div className="px-4 pt-3 pb-1 flex justify-end">
-            <button
-              onClick={() => navigate(`/notes/detail/${sessionId}`)}
-              className="text-xs px-3 py-1 rounded-full cursor-pointer transition-all duration-150"
-              style={{
-                background: 'rgba(175,179,176,0.15)',
-                color: '#556071',
-                border: '1px solid rgba(175,179,176,0.2)',
-              }}
-            >
-              Detailed Note →
-            </button>
-          </div>
-
           {/* Pill toggle */}
           <div className="flex-shrink-0 px-6 pt-4 pb-4">
             <div
@@ -988,39 +1105,185 @@ export default function NotesPage() {
           </div>
 
           {/* Notes content area */}
-          <div className="flex-1 overflow-y-auto px-6 pb-4">
+          <div className="flex-1 overflow-y-auto px-6 pb-4" onWheel={(e) => e.stopPropagation()}>
 
-            {noteMode === 'my' ? (
-              /* My Notes mode */
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                {currentPageData?.active_notes ? (
-                  <div>
-                    <div className="mb-3">
-                      <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.muted }}>
-                        ACTIVE ANNOTATION
-                      </span>
+            {noteMode === 'my' ? (() => {
+              const mnState = getMyNoteState(currentPage)
+              const isEditing = mnState.status === 'editing'
+              const isIdle = mnState.status === 'idle'
+              const hasContent = mnState.input.trim().length > 0
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {isIdle && !hasContent ? (
+                    /* 空状态 */
+                    <button
+                      type="button"
+                      onClick={() => patchMyNoteState(currentPage, { status: 'editing' })}
+                      style={{
+                        width: '100%', textAlign: 'left', padding: '12px 14px',
+                        borderRadius: '8px', border: `1.5px dashed ${C.divider}`,
+                        background: 'transparent', cursor: 'text', color: C.muted,
+                        fontSize: '13px', lineHeight: '1.6', fontFamily: 'inherit',
+                      }}
+                    >
+                      + 点击记录这一页的理解或困惑...
+                    </button>
+                  ) : isIdle && hasContent ? (
+                    /* 只读展示 */
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+                      <p style={{ fontSize: '13px', color: C.fg, lineHeight: '1.6', margin: 0, flex: 1 }}>
+                        {mnState.input}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => patchMyNoteState(currentPage, { status: 'editing' })}
+                        style={{
+                          flexShrink: 0, padding: '2px 8px', borderRadius: '4px',
+                          border: `1px solid ${C.divider}`, background: 'transparent',
+                          color: C.muted, fontSize: '11px', cursor: 'pointer',
+                        }}
+                      >
+                        编辑
+                      </button>
                     </div>
-                    {/* Timestamp row */}
-                    <div className="flex items-center gap-2 mb-2">
-                      <span style={{ fontSize: '11px', color: '#AFB3B0', fontWeight: '500' }}>
-                        {formatTime(currentPageData.page_start_time)}
-                      </span>
-                      <div className="flex-1 h-px" style={{ background: 'rgba(175,179,176,0.3)' }} />
+                  ) : (
+                    /* 编辑状态 */
+                    <div>
+                      <textarea
+                        autoFocus
+                        value={mnState.input}
+                        onChange={e => patchMyNoteState(currentPage, { input: e.target.value })}
+                        placeholder="写下你的理解、困惑或关键词…"
+                        rows={4}
+                        style={{
+                          width: '100%', resize: 'vertical', padding: '10px 12px',
+                          borderRadius: '8px', border: `1px solid ${C.divider}`,
+                          background: C.bg, color: C.fg, fontSize: '13px',
+                          lineHeight: '1.6', outline: 'none', fontFamily: 'inherit',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={() => patchMyNoteState(currentPage, { status: 'idle' })}
+                          style={{
+                            padding: '6px 14px', borderRadius: '6px', border: 'none',
+                            background: C.fg, color: C.white, fontSize: '12px',
+                            fontWeight: '500', cursor: 'pointer',
+                          }}
+                        >
+                          保存
+                        </button>
+                      </div>
                     </div>
-                    <p style={{ fontSize: '14px', color: C.fg, fontWeight: '500', lineHeight: '1.6' }}>
-                      {currentPageData.active_notes.user_note}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center py-8">
-                    <p style={{ fontSize: '13px', color: C.muted }}>该页暂无用户笔记</p>
-                  </div>
-                )}
-              </div>
-            ) : noteMode === 'ai' ? (
+                  )}
+                </div>
+              )
+            })() : noteMode === 'ai' ? (
               /* AI Notes mode */
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                {/* Active notes (user note + AI expansion) */}
+                {/* Provider 切换 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '10px', color: C.muted, fontWeight: '600', letterSpacing: '0.06em' }}>模型</span>
+                  {PROVIDERS.map(p => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setProvider(p)}
+                      style={{
+                        padding: '2px 8px', borderRadius: '4px', border: `1px solid ${provider === p ? C.secondary : C.divider}`,
+                        background: provider === p ? C.sidebar : 'transparent',
+                        color: provider === p ? C.fg : C.muted,
+                        fontSize: '11px', fontWeight: provider === p ? '600' : '400',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+
+                {/* My Notes 块 — AI Notes 区域顶部 */}
+                {(() => {
+                  const mnState = getMyNoteState(currentPage)
+                  const expandState = getMyNoteExpandState(currentPage)
+                  const hasMyNote = mnState.input.trim().length > 0
+                  const isExpanding = expandState.status === 'expanding'
+                  const isExpanded = expandState.status === 'expanded'
+
+                  if (!hasMyNote && !isExpanded) return null
+
+                  return (
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', color: '#556071' }}>MY NOTES</span>
+                        {hasMyNote && (
+                          <button
+                            type="button"
+                            onClick={() => handleExpandMyNote(currentPage)}
+                            disabled={isExpanding}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '4px',
+                              padding: '2px 8px', borderRadius: '4px',
+                              border: `1px solid ${isExpanding ? '#6366f1' : C.divider}`,
+                              background: isExpanding ? 'rgba(99,102,241,0.08)' : 'transparent',
+                              color: isExpanding ? '#6366f1' : C.muted,
+                              fontSize: '11px', fontWeight: '500', cursor: isExpanding ? 'not-allowed' : 'pointer',
+                            }}
+                          >
+                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
+                              <path d="M12 2L14.09 8.26L21 9.27L16 13.97L17.18 21L12 17.77L6.82 21L8 13.97L3 9.27L9.91 8.26L12 2Z"
+                                fill={isExpanding ? '#6366f1' : '#556071'} />
+                            </svg>
+                            {isExpanding ? '扩写中...' : '扩写'}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* 用户笔记原文（黑色） */}
+                      <p style={{ fontSize: '13px', color: C.fg, lineHeight: '1.6', margin: 0, whiteSpace: 'pre-wrap' }}>
+                        {mnState.input}
+                      </p>
+
+                      {/* AI 扩写流式展示（灰色） */}
+                      {(isExpanding || isExpanded) && expandState.aiText && (
+                        <div
+                          style={{
+                            marginTop: '10px',
+                            paddingLeft: '14px',
+                            borderLeft: '2px solid rgba(85,96,113,0.2)',
+                          }}
+                        >
+                          {/* shimmer 流光动画 */}
+                          {isExpanding ? (
+                            <div
+                              style={{ fontSize: '13px', color: '#6B6A64', lineHeight: '1.7', whiteSpace: 'pre-wrap' }}
+                            >
+                              {expandState.aiText}
+                              <span style={{ opacity: 0.5 }}>▋</span>
+                            </div>
+                          ) : (
+                            /* expanded：带 drop-in shimmer 动画 */
+                            <StreamingExpandText text={expandState.aiText} />
+                          )}
+                        </div>
+                      )}
+
+                      {/* 分隔线 — My Notes 与 AI Notes 分开 */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '20px', marginBottom: '4px' }}>
+                        <div style={{ flex: 1, height: '1px', background: C.divider }} />
+                        <span style={{ fontSize: '9px', fontWeight: '700', letterSpacing: '0.1em', color: C.muted, whiteSpace: 'nowrap' }}>
+                          AI NOTES
+                        </span>
+                        <div style={{ flex: 1, height: '1px', background: C.divider }} />
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Active notes (user note + AI expansion) — 原始 session 数据 */}
                 {currentPageData?.active_notes ? (
                   <div>
                     <div className="mb-3">

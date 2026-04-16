@@ -66,8 +66,8 @@ body {
 }
 
 .color-settle {
+  color: #6B6A64 !important;
   transition: color 0.4s ease-out;
-  -webkit-text-fill-color: unset;
 }
 
 @keyframes drop-in {
@@ -77,4 +77,22 @@ body {
 
 .drop-in {
   animation: drop-in 0.25s ease-out forwards;
+}
+
+/* react-pdf TextLayer: enable text selection for highlight tool */
+.react-pdf__Page__textContent {
+  user-select: text !important;
+  cursor: text !important;
+}
+
+.react-pdf__Page__textContent > span {
+  user-select: text !important;
+  cursor: text !important;
+  -webkit-user-select: text !important;
+}
+
+.react-pdf__Page__textContent * {
+  user-select: text !important;
+  cursor: text !important;
+  -webkit-user-select: text !important;
 }

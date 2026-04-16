@@ -1,18 +1,22 @@
 import { useState, useCallback } from 'react'
 
+export interface HighlightRect {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
 export interface HighlightRecord {
   id: string
   sessionId: string
   pageNum: number
   color: string
-  startXPath: string
-  startOffset: number
-  endXPath: string
-  endOffset: number
+  rects: HighlightRect[]
   text: string
 }
 
-const STORAGE_KEY = 'liberstudy:highlights'
+const STORAGE_KEY = 'liberstudy:highlights:v2'
 
 function load(): HighlightRecord[] {
   try {

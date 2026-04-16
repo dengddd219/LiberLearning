@@ -23,3 +23,20 @@
 **启发**：当测试平台 UI 超过 300 行时就要拆包。拆法：每个 tab/功能块对应一个 `test_ui/xxx.py` 模块，主入口只做 sidebar + tab 路由（目标 &lt; 80 行）。新功能先建模块，不往主文件追加。
 
 ---
+
+## 2026-04-16 | React wheel 事件在 loading 后 DOM 延迟挂载导致监听失效
+
+**问题**：NotesPage 的 PPT 画布区域无法通过滚轮 / 触摸板翻页，但又不能引发整页滚动。多次修复均无效。
+
+**尝试过的无效修复**：
+1. 给 `canvasAreaRef` 容器加 `overflowY: 'hidden'` + `touchAction: 'none'`
+2. 在 `canvasAreaRef` 上用 `{ passive: false }` 注册原生 wheel 监听
+3. 将监听改为捕获阶段 `{ passive: false, capture: true }`
+
+**根因**：`useEffect(() => { el.addEventListener... }, [])` 的空依赖让它只在组件挂载后运行一次。但组件挂载时处于 `loading` 状态，直接 `return` 了 loading UI，canvas 区域的 DOM **根本不存在**，`canvasAreaRef.current === null`，`if (!el) return` 直接退出，事件**永远没注册上**。之后 loading 完成、canvas 出现，effect 不再重跑。
+
+**正确修复**：改为在 `window` 上注册捕获阶段监听（`window.addEventListener('wheel', handler, { passive: false, capture: true })`），在 handler 内部动态读取 `canvasAreaRef.current` 并用 `el.contains(e.target)` 判断事件是否发生在画布区域内，不在则跳过。
+
+**启发**：`useEffect(fn, [])` 注册 DOM 事件时，若目标 DOM 在 loading/条件渲染中延迟出现，ref 在 effect 运行时为 `null`，监听永远不生效。遇到"事件监听不工作"时，**首先检查 effect 运行时目标 DOM 是否已存在**，而不是反复调整 `passive` / `capture` 参数。
+
+---
