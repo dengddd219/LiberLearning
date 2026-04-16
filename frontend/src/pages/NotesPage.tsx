@@ -453,6 +453,9 @@ function AiBulletRow({
   translationEnabled,
   translatedPptText,
   translatedAiComment,
+  sessionId,
+  pageNum,
+  bulletIndex,
 }: {
   bullet: Bullet
   expanded: boolean
@@ -463,9 +466,15 @@ function AiBulletRow({
   translationEnabled?: boolean
   translatedPptText?: string
   translatedAiComment?: string | null
+  sessionId: string
+  pageNum: number
+  bulletIndex: number
 }) {
   const hasComment = !!bullet.ai_comment
   const indent = bullet.level * 16
+
+  const [hovered, setHovered] = useState(false)
+  const [askOpen, setAskOpen] = useState(false)
 
   const [revealedSet, setRevealedSet] = useState<Set<number>>(new Set())
   // ppt_text 是否正在向上退场
@@ -523,7 +532,11 @@ function AiBulletRow({
 
   // 始终渲染同一套 DOM，避免 expanded 切换时销毁/重建节点导致闪烁
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: indent }}>
+    <div
+      style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: indent }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       {/* ppt_text 行：收起时是可点击 button，展开动画期间 swipe-up 退场，退场完成后由 reveal 版本接管 */}
       <div style={{ position: 'relative' }}>
         {/* 退场层：始终存在，expanded+pptExiting 时播 swipe-up，pptSwipedAway 后隐藏 */}
@@ -620,6 +633,43 @@ function AiBulletRow({
             }
           </div>
         </div>
+      )}
+
+      {/* AskButton — hover 时浮现 */}
+      <div style={{
+        display: 'flex', justifyContent: 'flex-end',
+        opacity: hovered || askOpen ? 1 : 0,
+        transition: 'opacity 0.15s',
+        transform: hovered || askOpen ? 'translateY(0)' : 'translateY(2px)',
+      }}>
+        <button
+          type="button"
+          onClick={() => setAskOpen(v => !v)}
+          style={{
+            padding: '2px 8px', borderRadius: '4px', fontSize: '10px',
+            border: `1px solid ${askOpen ? C.secondary : C.divider}`,
+            background: askOpen ? C.sidebar : 'transparent',
+            color: askOpen ? C.fg : C.muted,
+            cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: '4px',
+          }}
+        >
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          {askOpen ? '收起' : '针对此条提问'}
+        </button>
+      </div>
+
+      {/* InlineQA 展开区 */}
+      {askOpen && (
+        <InlineQA
+          sessionId={sessionId}
+          pageNum={pageNum}
+          bulletIndex={bulletIndex}
+          bulletText={bullet.ppt_text}
+          bulletAiComment={bullet.ai_comment ?? ''}
+        />
       )}
     </div>
   )
@@ -1356,6 +1406,9 @@ export default function NotesPage() {
                           translationEnabled={translationEnabled}
                           translatedPptText={translatedTexts.get(currentPage)?.bullets[i]}
                           translatedAiComment={translatedTexts.get(currentPage)?.aiComments[i]}
+                          sessionId={sessionId ?? ''}
+                          pageNum={currentPage}
+                          bulletIndex={i}
                         />
                       ))}
                     </div>
