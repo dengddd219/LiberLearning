@@ -4,7 +4,7 @@ import { TabsProvider } from './context/TabsContext'
 import { TranslationProvider } from './context/TranslationContext'
 import TopBar from './components/TopBar'
 import LobbyPage from './pages/LobbyPage'
-import SessionPage from './pages/SessionPage'
+import LivePage from './pages/LivePage'
 import UploadPage from './pages/UploadPage'
 import ProcessingPage from './pages/ProcessingPage'
 import NotesPage from './pages/NotesPage'
@@ -18,8 +18,7 @@ function App() {
         <TopBar />
         <Routes>
           <Route path="/"                        element={<LobbyPage />} />
-          <Route path="/session"                 element={<SessionPage />} />
-          <Route path="/session/live"            element={<Navigate to="/session" replace />} />
+          <Route path="/live" element={<LivePage />} />
           <Route path="/upload"                  element={<UploadPage />} />
           <Route path="/processing"              element={<ProcessingPage />} />
           <Route path="/notes/:sessionId"        element={<NotesPage />} />
