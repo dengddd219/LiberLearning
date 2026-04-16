@@ -180,6 +180,7 @@ export default function UploadPage() {
   const [audioError, setAudioError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [selectedMode, setSelectedMode] = useState<'live' | 'upload' | null>('live')
 
   const handlePpt = useCallback((file: File) => {
     const err = validateFile(file, ['.ppt', '.pptx', '.pdf'])
@@ -306,20 +307,22 @@ export default function UploadPage() {
             </button>
           </div>
 
-          {/* Upload areas — Figma: layout_D7G8JS (column, stretch) */}
+          {/* Upload areas */}
           {!uploading ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-              {/* Live 入口卡片 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* ── Live Class 卡片 ── */}
               <div
+                onClick={() => setSelectedMode('live')}
                 style={{
-                  border: '1.5px solid #798C00',
-                  borderRadius: '12px',
+                  border: selectedMode === 'live' ? '1.5px solid #798C00' : '1.5px solid rgba(175,179,176,0.45)',
+                  borderRadius: '16px',
                   padding: '24px 32px',
-                  marginBottom: '24px',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  backgroundColor: 'rgba(121,140,0,0.04)',
+                  backgroundColor: selectedMode === 'live' ? 'rgba(121,140,0,0.04)' : 'rgba(175,179,176,0.06)',
+                  cursor: 'pointer',
+                  transition: 'border-color 0.25s ease, background-color 0.25s ease',
                 }}
               >
                 <div>
@@ -332,9 +335,9 @@ export default function UploadPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => navigate('/live')}
+                  onClick={(e) => { e.stopPropagation(); navigate('/live') }}
                   style={{
-                    backgroundColor: '#798C00',
+                    backgroundColor: selectedMode === 'live' ? '#798C00' : '#AFB3B0',
                     color: '#fff',
                     border: 'none',
                     borderRadius: '9999px',
@@ -343,33 +346,85 @@ export default function UploadPage() {
                     fontSize: '13px',
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
+                    transition: 'background-color 0.25s ease',
                   }}
                 >
                   {t('live_card_cta')} →
                 </button>
               </div>
-              {/* Two side-by-side drop zones */}
-              <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
-                <UploadZone
-                  label="PPT/PDF Materials"
-                  hint="Drag or click to upload"
-                  accept=".ppt,.pptx,.pdf"
-                  icon={<IconPPT />}
-                  file={pptFile}
-                  error={pptError}
-                  onFile={handlePpt}
-                  onClear={() => { setPptFile(null); setPptError(null) }}
-                />
-                <UploadZone
-                  label="Audio Recording"
-                  hint="Upload MP3, WAV or AAC"
-                  accept=".mp3,.wav,.m4a,.aac"
-                  icon={<IconAudio />}
-                  file={audioFile}
-                  error={audioError}
-                  onFile={handleAudio}
-                  onClear={() => { setAudioFile(null); setAudioError(null) }}
-                />
+
+              {/* ── Upload Recording 卡片 ── */}
+              <div
+                onClick={() => setSelectedMode('upload')}
+                style={{
+                  border: selectedMode === 'upload' ? '1.5px solid #798C00' : '1.5px solid rgba(175,179,176,0.45)',
+                  borderRadius: '16px',
+                  padding: '24px 32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '24px',
+                  backgroundColor: selectedMode === 'upload' ? 'rgba(121,140,0,0.04)' : 'rgba(175,179,176,0.06)',
+                  cursor: 'pointer',
+                  transition: 'border-color 0.25s ease, background-color 0.25s ease',
+                }}
+              >
+                {/* 左侧：标题 + 两个上传框 */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '18px', color: '#2F3331', marginBottom: '4px' }}>
+                      Upload Recording
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#72726E' }}>
+                      Post-class upload · PPT/PDF + audio file
+                    </div>
+                  </div>
+                  {/* 两个上传小框，横排 */}
+                  <div style={{ display: 'flex', gap: '12px' }} onClick={(e) => e.stopPropagation()}>
+                    <UploadZone
+                      label="PPT/PDF Materials"
+                      hint="Drag or click to upload"
+                      accept=".ppt,.pptx,.pdf"
+                      icon={<IconPPT />}
+                      file={pptFile}
+                      error={pptError}
+                      onFile={(f) => { setSelectedMode('upload'); handlePpt(f) }}
+                      onClear={() => { setPptFile(null); setPptError(null) }}
+                    />
+                    <UploadZone
+                      label="Audio Recording"
+                      hint="Upload MP3, WAV or AAC"
+                      accept=".mp3,.wav,.m4a,.aac"
+                      icon={<IconAudio />}
+                      file={audioFile}
+                      error={audioError}
+                      onFile={(f) => { setSelectedMode('upload'); handleAudio(f) }}
+                      onClear={() => { setAudioFile(null); setAudioError(null) }}
+                    />
+                  </div>
+                </div>
+
+                {/* 右侧：Start Review 按钮，与 Start Live Class 对齐 */}
+                <div style={{ flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); handleSubmit() }}
+                    disabled={!canSubmit}
+                    style={{
+                      backgroundColor: canSubmit ? '#798C00' : '#AFB3B0',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '9999px',
+                      padding: '10px 20px',
+                      fontWeight: 600,
+                      fontSize: '13px',
+                      cursor: canSubmit ? 'pointer' : 'not-allowed',
+                      whiteSpace: 'nowrap',
+                      transition: 'background-color 0.25s ease',
+                    }}
+                  >
+                    Start Review →
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
@@ -397,57 +452,12 @@ export default function UploadPage() {
             </div>
           )}
 
-          {/* CTA row — Figma: layout_G94R1R (row, justify flex-end, gap 16px) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
-            {uploadError && (
-              <p role="alert" style={{ color: 'var(--color-error)', fontSize: '14px', margin: 0 }}>
-                {uploadError}
-              </p>
-            )}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '16px', alignItems: 'center' }}>
-            {/* Cancel button */}
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="cursor-pointer hover:opacity-70 transition-opacity"
-              style={{
-                padding: '13.5px 24px 14.5px',
-                fontWeight: 700,
-                fontSize: '14px',
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: '#556071',
-                background: 'none',
-                border: 'none',
-              }}
-            >
-              CANCEL
-            </button>
-
-            {/* Save / Submit button — Figma: layout_VBL07D, fill_6PCZJK, borderRadius 9999px */}
-            <button
-              onClick={handleSubmit}
-              disabled={!canSubmit}
-              className="relative cursor-pointer transition-all duration-150"
-              style={{
-                padding: '12px 32px',
-                borderRadius: '9999px',
-                backgroundColor: canSubmit ? '#5F5E5E' : 'rgba(95,94,94,0.35)',
-                color: '#FAF7F6',
-                fontWeight: 700,
-                fontSize: '16px',
-                lineHeight: '1.5',
-                border: 'none',
-                cursor: canSubmit ? 'pointer' : 'not-allowed',
-                boxShadow: canSubmit
-                  ? '0px 4px 6px -4px rgba(0,0,0,0.1), 0px 10px 15px -3px rgba(0,0,0,0.1)'
-                  : 'none',
-              }}
-            >
-              {uploading ? 'Processing…' : 'Save Workspace'}
-            </button>
-            </div>
-          </div>
+          {/* 上传错误提示 */}
+          {uploadError && (
+            <p role="alert" style={{ color: 'var(--color-error)', fontSize: '14px', margin: 0, textAlign: 'right' }}>
+              {uploadError}
+            </p>
+          )}
         </div>
       </div>
     </div>

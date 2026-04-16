@@ -162,6 +162,35 @@ MOCK_SESSION = {
 }
 
 
+class RenameRequest(BaseModel):
+    ppt_filename: str
+
+
+@router.patch("/sessions/{session_id}")
+def rename_session(session_id: str, req: RenameRequest):
+    import db as _db
+    session = _db.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    _db.update_session(session_id, {"ppt_filename": req.ppt_filename.strip()})
+    return {"ok": True}
+
+
+@router.delete("/sessions/{session_id}")
+def delete_session(session_id: str):
+    import db as _db
+    from sqlmodel import Session as DbSession
+    session = _db.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    with DbSession(_db.engine) as s:
+        row = s.get(_db.SessionRow, session_id)
+        if row:
+            s.delete(row)
+            s.commit()
+    return {"ok": True}
+
+
 @router.get("/sessions/health")
 def sessions_health():
     return {"status": "ok", "router": "sessions"}

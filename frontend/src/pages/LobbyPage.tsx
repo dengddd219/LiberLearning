@@ -1,7 +1,7 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTabs } from '../context/TabsContext'
-import { listSessions } from '../lib/api'
+import { listSessions, renameSession, deleteSession } from '../lib/api'
 import { useTranslation } from '../context/TranslationContext'
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -92,7 +92,109 @@ function IconBell() {
 }
 
 
-// ─── Data ────────────────────────────────────────────────────────────────────
+// ─── Card Context Menu ────────────────────────────────────────────────────────
+
+interface CardMenuProps {
+  onRename: () => void
+  onDelete: () => void
+  onShare: () => void
+}
+
+function CardMenu({ onRename, onDelete, onShare }: CardMenuProps) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [open])
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
+      <button
+        type="button"
+        aria-label="更多操作"
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: '28px',
+          height: '28px',
+          borderRadius: '9999px',
+          border: 'none',
+          backgroundColor: open ? 'rgba(41,41,41,0.08)' : 'transparent',
+          color: '#72726E',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'background-color 0.15s',
+        }}
+        onMouseEnter={e => { if (!open) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'rgba(41,41,41,0.06)' }}
+        onMouseLeave={e => { if (!open) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent' }}
+      >
+        <svg width="14" height="4" viewBox="0 0 14 4" fill="none">
+          <circle cx="2" cy="2" r="1.5" fill="currentColor" />
+          <circle cx="7" cy="2" r="1.5" fill="currentColor" />
+          <circle cx="12" cy="2" r="1.5" fill="currentColor" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '32px',
+            right: '0',
+            backgroundColor: '#FFFFFF',
+            borderRadius: '12px',
+            boxShadow: '0px 4px 16px -2px rgba(47,51,49,0.14), 0px 0px 0px 1px rgba(175,179,176,0.12)',
+            padding: '4px',
+            zIndex: 50,
+            minWidth: '120px',
+            fontFamily: 'Inter, system-ui, sans-serif',
+          }}
+        >
+          {([
+            { label: 'Rename', action: onRename, color: '#292929' },
+            { label: 'Delete', action: onDelete, color: '#D94F3D' },
+            { label: 'Share', action: onShare, color: '#72726E' },
+          ] as const).map(({ label, action, color }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => { setOpen(false); action() }}
+              style={{
+                display: 'block',
+                width: '100%',
+                padding: '7px 12px',
+                textAlign: 'left',
+                background: 'none',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: 500,
+                color,
+                cursor: 'pointer',
+                transition: 'background-color 0.12s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(47,51,49,0.05)')}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+
 
 interface CourseCard {
   id: string
@@ -162,7 +264,13 @@ function ProcessingCard() {
 
 const API_BASE_FOR_THUMB = import.meta.env.VITE_API_BASE_URL || ''
 
-function DoneCard({ card, onClick }: { card: CourseCard; onClick: () => void }) {
+function DoneCard({ card, onClick, onRename, onDelete, onShare }: {
+  card: CourseCard
+  onClick: () => void
+  onRename: () => void
+  onDelete: () => void
+  onShare: () => void
+}) {
   const { t } = useTranslation()
   const [thumbLoaded, setThumbLoaded] = useState(false)
   const [thumbError, setThumbError] = useState(false)
@@ -177,8 +285,12 @@ function DoneCard({ card, onClick }: { card: CourseCard; onClick: () => void }) 
       style={{ width: '224px', height: '288px' }}
     >
       <div className="w-56 h-72 left-0 top-0 absolute bg-white/0 rounded-[32px] shadow-[0px_40px_40px_-15px_rgba(47,51,49,0.04)]" />
+      {/* ... menu */}
+      <div style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 10 }}>
+        <CardMenu onRename={onRename} onDelete={onDelete} onShare={onShare} />
+      </div>
       {/* Thumbnail */}
-      <div className="w-44 left-[25px] top-[25px] absolute rounded-md inline-flex flex-col justify-center items-start overflow-hidden" style={{ backgroundColor: '#F2F2EC' }}>
+      <div className="w-44 left-[25px] top-[44px] absolute rounded-md inline-flex flex-col justify-center items-start overflow-hidden" style={{ backgroundColor: '#F2F2EC' }}>
         <div className="self-stretch h-24 relative overflow-hidden" style={{ backgroundColor: card.thumbColor, opacity: thumbLoaded ? 1 : 0.85 }}>
           {!thumbError && (
             <img
@@ -197,7 +309,7 @@ function DoneCard({ card, onClick }: { card: CourseCard; onClick: () => void }) 
         </div>
       </div>
       {/* Info */}
-      <div className="w-44 left-[25px] top-[136.65px] absolute inline-flex flex-col justify-start items-start gap-1">
+      <div className="w-44 left-[25px] top-[148px] absolute inline-flex flex-col justify-start items-start gap-1">
         <div className="self-stretch pb-[0.69px] flex flex-col justify-start items-start">
           <div className="self-stretch text-base font-bold font-['Inter'] leading-6 truncate" style={{ color: '#292929' }}>{card.course}</div>
         </div>
@@ -206,7 +318,7 @@ function DoneCard({ card, onClick }: { card: CourseCard; onClick: () => void }) 
         </div>
       </div>
       {/* Footer */}
-      <div className="w-44 pt-4 left-[25px] top-[239.14px] absolute inline-flex justify-between items-center" style={{ borderTop: '1px solid #E3E3DA' }}>
+      <div className="w-44 pt-4 left-[25px] top-[244px] absolute inline-flex justify-between items-center" style={{ borderTop: '1px solid #E3E3DA' }}>
         <div className="flex justify-start items-center gap-1">
           <div className="w-3.5 h-3.5 relative" style={{ color: '#72726E' }}><IconNotes /></div>
           <div className="text-xs font-normal font-['Inter'] leading-4" style={{ color: '#72726E' }}>{card.notes} {t('card_notes_suffix')}</div>
@@ -225,7 +337,14 @@ const FOLDER_BADGE: Record<string, { bg: string; text: string }> = {
   neutral: { bg: '#E3E3DA', text: '#72726E' },
 }
 
-function ListRow({ card, onClick, isLast }: { card: CourseCard; onClick: () => void; isLast: boolean }) {
+function ListRow({ card, onClick, isLast, onRename, onDelete, onShare }: {
+  card: CourseCard
+  onClick: () => void
+  isLast: boolean
+  onRename: () => void
+  onDelete: () => void
+  onShare: () => void
+}) {
   const { t } = useTranslation()
   const badge = FOLDER_BADGE[card.folderColor]
   const [thumbLoaded, setThumbLoaded] = useState(false)
@@ -233,67 +352,82 @@ function ListRow({ card, onClick, isLast }: { card: CourseCard; onClick: () => v
   const thumbSrc = `${API_BASE_FOR_THUMB}/api/sessions/${card.id}/slide/1.png`
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={`打开课程：${card.course}`}
-      className={`w-full text-left flex items-center cursor-pointer hover:bg-[#F2F2EC]/60 transition-colors${isLast ? '' : ' border-b'}`}
+    <div
+      className={`w-full flex items-center${isLast ? '' : ' border-b'}`}
       style={isLast ? {} : { borderColor: '#E3E3DA' }}
     >
-      {/* Thumbnail */}
-      <div className="w-40 px-6 py-7 flex-shrink-0">
-        <div className="w-16 h-10 rounded-2xl outline outline-1 outline-offset-[-1px] overflow-hidden relative" style={{ backgroundColor: card.thumbColor, opacity: 0.8, outlineColor: '#E3E3DA' }}>
-          {!thumbError && (
-            <img
-              src={thumbSrc}
-              alt=""
-              aria-hidden="true"
-              onLoad={() => setThumbLoaded(true)}
-              onError={() => setThumbError(true)}
-              className="absolute inset-0 w-full h-full object-cover"
-              style={{ opacity: thumbLoaded ? 1 : 0, transition: 'opacity 0.2s' }}
-            />
-          )}
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={`打开课程：${card.course}`}
+        className="flex-1 min-w-0 text-left flex items-center cursor-pointer hover:bg-[#F2F2EC]/60 transition-colors"
+      >
+        {/* Thumbnail */}
+        <div className="w-40 px-6 py-7 flex-shrink-0">
+          <div className="w-16 h-10 rounded-2xl outline outline-1 outline-offset-[-1px] overflow-hidden relative" style={{ backgroundColor: card.thumbColor, opacity: 0.8, outlineColor: '#E3E3DA' }}>
+            {!thumbError && (
+              <img
+                src={thumbSrc}
+                alt=""
+                aria-hidden="true"
+                onLoad={() => setThumbLoaded(true)}
+                onError={() => setThumbError(true)}
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ opacity: thumbLoaded ? 1 : 0, transition: 'opacity 0.2s' }}
+              />
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Course name & subtitle */}
-      <div className="w-56 pl-6 flex-shrink-0 flex flex-col gap-0.5">
-        <div className="text-sm font-semibold font-['Inter'] leading-5" style={{ color: '#292929' }}>{card.course}</div>
-        <div className="text-xs font-normal font-['Inter'] leading-4" style={{ color: '#72726E' }}>{card.lecture}</div>
-      </div>
-
-      {/* Folder badge */}
-      <div className="w-48 pl-12 pr-6 py-9 flex-shrink-0">
-        <div
-          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full"
-          style={{ backgroundColor: badge.bg }}
-        >
-          <div className="w-2.5 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: badge.text }} />
-          <span className="text-[10px] font-medium font-['Inter']" style={{ color: badge.text }}>{card.folder}</span>
+        {/* Course name & subtitle */}
+        <div className="w-56 pl-6 flex-shrink-0 flex flex-col gap-0.5">
+          <div className="text-sm font-semibold font-['Inter'] leading-5" style={{ color: '#292929' }}>{card.course}</div>
+          <div className="text-xs font-normal font-['Inter'] leading-4" style={{ color: '#72726E' }}>{card.lecture}</div>
         </div>
-      </div>
 
-      {/* Date */}
-      <div className="w-28 px-6 py-7 flex-shrink-0 text-sm font-normal font-['Inter'] leading-5" style={{ color: '#72726E' }}>
-        {card.date}
-      </div>
+        {/* Folder badge */}
+        <div className="w-48 pl-12 pr-6 py-9 flex-shrink-0">
+          <div
+            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full"
+            style={{ backgroundColor: badge.bg }}
+          >
+            <div className="w-2.5 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: badge.text }} />
+            <span className="text-[10px] font-medium font-['Inter']" style={{ color: badge.text }}>{card.folder}</span>
+          </div>
+        </div>
 
-      {/* Duration */}
-      <div className="w-28 px-6 py-7 flex-shrink-0 text-sm font-normal font-['Inter'] leading-5" style={{ color: '#72726E' }}>
-        {card.duration}
-      </div>
+        {/* Date */}
+        <div className="w-28 px-6 py-7 flex-shrink-0 text-sm font-normal font-['Inter'] leading-5" style={{ color: '#72726E' }}>
+          {card.date}
+        </div>
 
-      {/* Notes */}
-      <div className="w-32 pl-6 flex-shrink-0 flex items-center gap-2 text-sm font-medium font-['Inter'] leading-5" style={{ color: '#292929' }}>
-        <IconNotes />
-        {card.notes} {t('card_notes_suffix')}
+        {/* Duration */}
+        <div className="w-28 px-6 py-7 flex-shrink-0 text-sm font-normal font-['Inter'] leading-5" style={{ color: '#72726E' }}>
+          {card.duration}
+        </div>
+
+        {/* Notes */}
+        <div className="w-32 pl-6 flex-shrink-0 flex items-center gap-2 text-sm font-medium font-['Inter'] leading-5" style={{ color: '#292929' }}>
+          <IconNotes />
+          {card.notes} {t('card_notes_suffix')}
+        </div>
+      </button>
+
+      {/* ... menu */}
+      <div className="px-4 flex-shrink-0">
+        <CardMenu onRename={onRename} onDelete={onDelete} onShare={onShare} />
       </div>
-    </button>
+    </div>
   )
 }
 
-function ListTable({ sessions, onRowClick }: { sessions: CourseCard[]; onRowClick: (id: string) => void }) {
+function ListTable({ sessions, onRowClick, onRename, onDelete, onShare }: {
+  sessions: CourseCard[]
+  onRowClick: (id: string) => void
+  onRename: (id: string) => void
+  onDelete: (id: string) => void
+  onShare: (id: string) => void
+}) {
   const { t } = useTranslation()
   const done = sessions.filter(s => s.status === 'done')
   return (
@@ -309,7 +443,15 @@ function ListTable({ sessions, onRowClick }: { sessions: CourseCard[]; onRowClic
       </div>
       {/* Rows */}
       {done.map((card, i) => (
-        <ListRow key={card.id} card={card} onClick={() => onRowClick(card.id)} isLast={i === done.length - 1} />
+        <ListRow
+          key={card.id}
+          card={card}
+          onClick={() => onRowClick(card.id)}
+          isLast={i === done.length - 1}
+          onRename={() => onRename(card.id)}
+          onDelete={() => onDelete(card.id)}
+          onShare={() => onShare(card.id)}
+        />
       ))}
     </div>
   )
@@ -508,6 +650,26 @@ export default function LobbyPage() {
   const [activeNav, setActiveNav] = useState<'courses' | 'settings'>('courses')
   const [sessions, setSessions] = useState<CourseCard[]>(FALLBACK_SESSIONS)
 
+  const handleRename = useCallback((id: string) => {
+    const card = sessions.find(s => s.id === id)
+    const newName = window.prompt('重命名', card?.course ?? '')
+    if (!newName || newName.trim() === '' || newName === card?.course) return
+    renameSession(id, newName.trim())
+      .then(() => setSessions(prev => prev.map(s => s.id === id ? { ...s, course: newName.trim() } : s)))
+      .catch(() => alert('重命名失败，请重试'))
+  }, [sessions])
+
+  const handleDelete = useCallback((id: string) => {
+    if (!window.confirm('确认删除这条记录？')) return
+    deleteSession(id)
+      .then(() => setSessions(prev => prev.filter(s => s.id !== id)))
+      .catch(() => alert('删除失败，请重试'))
+  }, [])
+
+  const handleShare = useCallback((_id: string) => {
+    alert('分享功能即将上线')
+  }, [])
+
   // ── Background processing toast ──────────────────────────────────────────
   const [toast, setToast] = useState<ToastState | null>(null)
 
@@ -608,6 +770,7 @@ export default function LobbyPage() {
         <div className="self-stretch px-2 pb-8 flex flex-col justify-start items-start">
           <button
             onClick={() => navigate('/upload')}
+            className="self-stretch px-4 py-3 rounded-2xl inline-flex justify-start items-center gap-2 border-none cursor-pointer hover:opacity-90 transition-opacity"
             style={{ backgroundColor: '#798C00' }}
           >
             <IconMic />
@@ -671,7 +834,7 @@ export default function LobbyPage() {
       <div className="flex-1 min-w-0 min-h-screen flex flex-col justify-start items-start" style={{ backgroundColor: '#F7F7F2' }}>
 
         {/* Header */}
-        <div className="self-stretch px-12 py-6 backdrop-blur-md inline-flex justify-between items-center sticky top-16 z-10" style={{ backgroundColor: 'rgba(247,247,242,0.85)' }}>
+        <div className="self-stretch px-12 py-6 backdrop-blur-md inline-flex justify-between items-center sticky top-10 z-10" style={{ backgroundColor: 'rgba(247,247,242,0.65)' }}>
           <div className="inline-flex flex-col justify-start items-start gap-0.5">
             <div className="self-stretch flex flex-col justify-start items-start">
               <div className="text-2xl font-black font-['Inter'] leading-8" style={{ color: '#292929' }}>{t('lobby_title')}</div>
@@ -719,7 +882,11 @@ export default function LobbyPage() {
                     : <DoneCard key={s.id} card={s} onClick={() => {
                         openTab({ sessionId: s.id, label: s.course })
                         navigate(`/notes/${s.id}`)
-                      }} />
+                      }}
+                      onRename={() => handleRename(s.id)}
+                      onDelete={() => handleDelete(s.id)}
+                      onShare={() => handleShare(s.id)}
+                      />
                 )}
                 {sessions.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-16 w-full">
@@ -740,7 +907,11 @@ export default function LobbyPage() {
               const card = sessions.find((s) => s.id === id)
               openTab({ sessionId: id, label: card?.course ?? id })
               navigate(`/notes/${id}`)
-            }} />
+            }}
+            onRename={handleRename}
+            onDelete={handleDelete}
+            onShare={handleShare}
+            />
           )}
 
         </div>

@@ -271,16 +271,16 @@ def _get_default_prompt() -> str:
 
 以下是你要回答的课件原文：
 
-"""
+'''
 {{ppt_text}}
-"""
+'''
 
 {% if ai_comment %}
 ---
 补充注释（老师/AI 已添加）：
-"""
+'''
 {{ai_comment}}
-"""
+'''
 {% endif %}
 
 ---

@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 export interface CourseTab {
   sessionId: string
   label: string          // 显示在 tab 上的名字，如 "7028" 或课程名
+  path?: string          // 点击 tab 时跳转的路径，默认 /notes/:sessionId
 }
 
 interface TabsState {
@@ -13,6 +14,7 @@ interface TabsState {
   openTab: (tab: CourseTab) => void
   closeTab: (sessionId: string) => void
   activateTab: (sessionId: string) => void
+  updateTabLabel: (sessionId: string, label: string) => void
 }
 
 const TabsContext = createContext<TabsState | null>(null)
@@ -30,23 +32,19 @@ export function TabsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const closeTab = useCallback((sessionId: string) => {
-    setTabs((prev) => {
-      const next = prev.filter((t) => t.sessionId !== sessionId)
-      setActiveTabId((currentActive) => {
-        if (currentActive !== sessionId) return currentActive
-        const idx = prev.findIndex((t) => t.sessionId === sessionId)
-        return next[Math.max(0, idx - 1)]?.sessionId ?? null
-      })
-      return next
-    })
+    setTabs((prev) => prev.filter((t) => t.sessionId !== sessionId))
   }, [])
 
   const activateTab = useCallback((sessionId: string) => {
     setActiveTabId(sessionId)
   }, [])
 
+  const updateTabLabel = useCallback((sessionId: string, label: string) => {
+    setTabs((prev) => prev.map((t) => t.sessionId === sessionId ? { ...t, label } : t))
+  }, [])
+
   return (
-    <TabsContext.Provider value={{ tabs, activeTabId, openTab, closeTab, activateTab }}>
+    <TabsContext.Provider value={{ tabs, activeTabId, openTab, closeTab, activateTab, updateTabLabel }}>
       {children}
     </TabsContext.Provider>
   )

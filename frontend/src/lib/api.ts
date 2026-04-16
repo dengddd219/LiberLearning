@@ -41,6 +41,20 @@ export async function retryPage(sessionId: string, pageNum: number) {
   return apiPost(`/api/sessions/${sessionId}/page/${pageNum}/retry`)
 }
 
+export async function renameSession(sessionId: string, newName: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ppt_filename: newName }),
+  })
+  if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
+}
+
+export async function deleteSession(sessionId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
+}
+
 export async function listSessions(): Promise<
   {
     session_id: string

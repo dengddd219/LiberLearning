@@ -461,5 +461,15 @@
     "granularity": "simple",
     "prompt_version": "(production)",
     "n_pages": 8
+  },
+  {
+    "ts": "2026-04-16T20:13:07",
+    "step": "active_learn_canvas",
+    "elapsed_s": 18.98,
+    "tokens": 2426,
+    "cost_usd": 0.016062,
+    "template": "active_expand",
+    "page_num": 5,
+    "n_annotations": 1
   }
 ]

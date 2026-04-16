@@ -887,6 +887,7 @@ export default function NotesPage() {
   const [drawerHeightPx, setDrawerHeightPx] = useState<number | null>(null) // null = use default %
   const [drawerModel, setDrawerModel] = useState('Auto')
   const [drawerModelDDOpen, setDrawerModelDDOpen] = useState(false)
+  const drawerModelBtnRef = useRef<HTMLButtonElement>(null)
 
   // 切换页面时收回抽屉
   const drawerPrevPageRef = useRef(currentPage)
@@ -1985,10 +1986,13 @@ export default function NotesPage() {
                 {drawerPhase !== 'closed' && (
                   <div
                     style={{
-                      position: 'absolute', inset: 0, zIndex: 25,
+                      position: 'absolute',
+                      top: 0, left: 0, right: 0,
+                      bottom: drawerHeight,
+                      zIndex: 25,
                       cursor: 'default',
                     }}
-                    onClick={() => setDrawerPhase('closed')}
+                    onClick={() => { setDrawerModelDDOpen(false); setDrawerPhase('closed') }}
                   />
                 )}
 
@@ -2166,6 +2170,7 @@ export default function NotesPage() {
                         {/* Left: model picker */}
                         <div style={{ position: 'relative' }}>
                           <button
+                            ref={drawerModelBtnRef}
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setDrawerModelDDOpen(v => !v) }}
                             style={{
@@ -2180,17 +2185,21 @@ export default function NotesPage() {
                               <polyline points="6 9 12 15 18 9"/>
                             </svg>
                           </button>
-                          {drawerModelDDOpen && (
-                            <div
-                              onClick={e => e.stopPropagation()}
-                              style={{
-                                position: 'absolute', bottom: 'calc(100% + 6px)', left: 0,
-                                width: '220px', background: C.white,
-                                borderRadius: '10px',
-                                boxShadow: '0 4px 20px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.06)',
-                                padding: '5px 0', zIndex: 300,
-                              }}
-                            >
+                          {drawerModelDDOpen && (() => {
+                            const rect = drawerModelBtnRef.current?.getBoundingClientRect()
+                            return (
+                              <div
+                                onClick={e => e.stopPropagation()}
+                                style={{
+                                  position: 'fixed',
+                                  bottom: rect ? window.innerHeight - rect.top + 6 : 'auto',
+                                  left: rect ? rect.left : 0,
+                                  width: '220px', background: C.white,
+                                  borderRadius: '10px',
+                                  boxShadow: '0 4px 20px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.06)',
+                                  padding: '5px 0', zIndex: 9999,
+                                }}
+                              >
                               {models.map((m, idx) => (
                                 <div key={m.id}>
                                   {idx === 1 && <div style={{ height: '1px', background: C.divider, margin: '3px 0' }} />}
@@ -2238,7 +2247,8 @@ export default function NotesPage() {
                                 </div>
                               ))}
                             </div>
-                          )}
+                            )
+                          })()}
                         </div>
 
                         {/* Right: mic + send */}

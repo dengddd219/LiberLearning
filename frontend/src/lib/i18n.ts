@@ -10,7 +10,7 @@ export const i18n = {
     // LobbyPage – sidebar
     lobby_brand: 'Student\nWorkspace',
     lobby_academic_year: 'ACADEMIC YEAR 2026',
-    lobby_new_record: 'Upload the\nrecord',
+    lobby_new_record: 'New Class',
     lobby_search: 'Search',
     lobby_nav_courses: 'MY COURSES',
     lobby_nav_settings: 'SETTINGS',

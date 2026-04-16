@@ -773,11 +773,35 @@ function AiBulletRow({
 
 export default function LivePage() {
   const navigate = useNavigate()
-  const sessionIdRef = useRef(`live-${Date.now()}`)
+  const sessionIdRef = useRef('live')
   const sessionId = sessionIdRef.current
   const { openTab } = useTabs()
-  const [session, setSession] = useState<SessionData | null>(null)
-  const [loading, setLoading] = useState(true)
+
+  // 进入 LivePage 时注册 Tab
+  useEffect(() => {
+    openTab({ sessionId, label: 'New Living', path: '/live' })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const [session, setSession] = useState<SessionData>({
+    session_id: sessionId,
+    status: 'live',
+    ppt_filename: 'Live Class',
+    audio_url: '',
+    total_duration: 0,
+    pages: [],
+  })
+  // 本地 PPT/PDF 文件（Live 模式直接在浏览器渲染，无需上传）
+  const [localPdfUrl, setLocalPdfUrl] = useState<string | null>(null)
+  const [localPdfPageCount, setLocalPdfPageCount] = useState(0)
+  const localPdfInputRef = useRef<HTMLInputElement>(null)
+
+  function handleLocalPdfSelect(file: File) {
+    if (localPdfUrl) URL.revokeObjectURL(localPdfUrl)
+    const url = URL.createObjectURL(file)
+    setLocalPdfUrl(url)
+    setCurrentPage(1)
+  }
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [noteMode, setNoteMode] = useState<'my' | 'ai' | 'transcript'>('ai')
@@ -1413,7 +1437,7 @@ export default function LivePage() {
     )
   }
 
-  if (error || !session) {
+  if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: C.bg }}>
         <div className="text-center">
@@ -1431,7 +1455,7 @@ export default function LivePage() {
   }
 
   const currentPageData = session.pages.find((p) => p.page_num === currentPage)
-  const totalPages = session.pages.length
+  const totalPages = localPdfUrl ? (localPdfPageCount || 1) : session.pages.length
 
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ background: C.bg, fontFamily: FONT_SERIF }}>
@@ -1568,7 +1592,60 @@ export default function LivePage() {
               touchAction: 'none',
             }}
           >
-            {currentPageData && (() => {
+            {/* 本地 PDF 渲染（Live 模式直接加载本地文件） */}
+            {localPdfUrl ? (
+              <div className="relative" style={{ maxWidth: '100%', maxHeight: '100%' }}>
+                <div
+                  ref={pageContainerRef}
+                  className="relative rounded-lg overflow-hidden"
+                  style={{ background: C.white, boxShadow: '0 4px 24px rgba(0,0,0,0.10)' }}
+                >
+                  <Document
+                    file={localPdfUrl}
+                    onLoadSuccess={({ numPages }) => setLocalPdfPageCount(numPages)}
+                    loading={
+                      <div style={{ height: '500px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin"
+                          style={{ borderColor: C.secondary, borderTopColor: 'transparent' }} />
+                      </div>
+                    }
+                  >
+                    <Page
+                      pageNumber={currentPage}
+                      width={Math.round(canvasWidth * zoomLevel / 100)}
+                      renderTextLayer={true}
+                      renderAnnotationLayer={false}
+                    />
+                  </Document>
+                  {/* Highlight layer */}
+                  <HighlightLayer
+                    pageContainerRef={pageContainerRef}
+                    pageNum={currentPage}
+                    highlights={highlightsForPage(currentPage)}
+                    highlightToolActive={activeTool === 'highlight'}
+                    eraserToolActive={activeTool === 'eraser'}
+                    highlightColor={highlightColor}
+                    onAdd={(rec) => addHighlight({ ...rec, sessionId: sessionId ?? '' })}
+                    onRemove={removeHighlight}
+                  />
+                  {/* Text annotation layer */}
+                  <TextAnnotationLayer
+                    annotations={annotationsForPage(currentPage)}
+                    textToolActive={activeTool === 'text'}
+                    onPlaceAnnotation={(x, y) => addAnnotation(currentPage, x, y)}
+                    onUpdate={updateAnnotation}
+                    onRemove={removeAnnotation}
+                  />
+                  {/* Slide label */}
+                  <div
+                    className="absolute bottom-3 right-3 text-xs px-2 py-0.5 rounded"
+                    style={{ background: 'rgba(47,51,49,0.5)', color: C.white, letterSpacing: '0.05em' }}
+                  >
+                    SLIDE {String(currentPage).padStart(2, '0')} / {String(localPdfPageCount || 1).padStart(2, '0')}
+                  </div>
+                </div>
+              </div>
+            ) : currentPageData ? (() => {
               const pdfUrl = currentPageData.pdf_url ? `${API_BASE}${currentPageData.pdf_url}` : null
               return (
                 <div
@@ -1645,7 +1722,73 @@ export default function LivePage() {
                   </div>
                 </div>
               )
-            })()}
+            })() : (
+              /* 无 PPT：居中显示上传入口 */
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '16px',
+                  padding: '48px',
+                  textAlign: 'center',
+                }}
+              >
+                {/* 上传图标 */}
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                  <rect x="4" y="4" width="28" height="36" rx="4" stroke="#AFB3B0" strokeWidth="2" />
+                  <path d="M10 14h16M10 20h16M10 26h10" stroke="#AFB3B0" strokeWidth="2" strokeLinecap="round" />
+                  <circle cx="36" cy="36" r="10" fill="#F3F4F1" stroke="#AFB3B0" strokeWidth="1.5" />
+                  <path d="M36 31v10M31 36h10" stroke="#AFB3B0" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+                <div>
+                  <div style={{ fontSize: '16px', fontWeight: '600', color: '#2F3331', marginBottom: '6px' }}>
+                    Upload Course Materials
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#72726E', marginBottom: '20px' }}>
+                    Add a PDF or PPT to follow along while recording
+                  </div>
+                  <input
+                    ref={localPdfInputRef}
+                    type="file"
+                    accept=".pdf,.ppt,.pptx"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0]
+                      if (f) {
+                        if (f.name.toLowerCase().endsWith('.pdf')) {
+                          handleLocalPdfSelect(f)
+                        } else {
+                          alert('Live 模式暂仅支持 PDF，请先将 PPT 另存为 PDF。')
+                        }
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => localPdfInputRef.current?.click()}
+                    style={{
+                      backgroundColor: '#798C00',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '9999px',
+                      padding: '10px 24px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Choose File
+                  </button>
+                </div>
+                <div
+                  style={{ fontSize: '11px', color: '#B0AFA7', letterSpacing: '0.05em', textTransform: 'uppercase' }}
+                >
+                  PDF · PPT → PDF
+                </div>
+              </div>
+            )}
           </div>
         </main>
 
@@ -1700,41 +1843,102 @@ export default function LivePage() {
           className="flex-shrink-0 flex flex-col overflow-hidden"
           style={{ width: `${notesPanelWidth}px`, background: C.white, position: 'relative' }}
         >
-          {/* LivePage 右侧：AI 解释区 */}
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '16px', gap: '12px' }}>
-            <div style={{ fontWeight: 700, fontSize: '13px', letterSpacing: '0.1em', color: '#72726E', textTransform: 'uppercase' }}>
-              AI EXPLAIN
-            </div>
+          {/* Tab bar — My Notes / AI Notes / Transcript */}
+          <div
+            className="flex-shrink-0 flex items-end"
+            style={{ padding: '14px 18px 0', borderBottom: '1px solid rgba(175,179,176,0.15)', gap: 0 }}
+          >
+            {(['my', 'ai', 'transcript'] as const).map((mode) => {
+              const label = mode === 'my' ? t('notes_my_tab') : mode === 'ai' ? t('notes_ai_tab') : t('notes_transcript_tab')
+              const active = noteMode === mode
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setNoteMode(mode)}
+                  style={{
+                    padding: '6px 16px 10px',
+                    fontSize: '13px',
+                    fontWeight: active ? '700' : '500',
+                    color: active ? '#2F3331' : '#556071',
+                    background: 'none',
+                    border: 'none',
+                    borderBottom: `2px solid ${active ? '#798C00' : 'transparent'}`,
+                    marginBottom: '-1px',
+                    cursor: 'pointer',
+                    transition: 'color 0.15s',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', fontSize: '14px', lineHeight: '1.7', color: '#2F3331' }}>
-              {explaining ? (
-                <span style={{ whiteSpace: 'pre-wrap' }}>{currentExplanation}<span style={{ opacity: 0.5 }}>▋</span></span>
-              ) : explanationsByPage[currentPage] ? (
-                <span style={{ whiteSpace: 'pre-wrap' }}>{explanationsByPage[currentPage]}</span>
-              ) : (
-                <span style={{ color: '#B0AFA7' }}>{t('live_explain_empty')}</span>
-              )}
-            </div>
+          {/* Notes content */}
+          <div className="flex-1 overflow-y-auto px-6 pb-4" onWheel={(e) => e.stopPropagation()}>
 
-            <button
-              type="button"
-              disabled={wsStatus === 'idle' || wsStatus === 'connecting' || explaining}
-              onClick={handleExplainPage}
-              title={wsStatus === 'idle' ? t('live_recording_required') : undefined}
-              style={{
-                backgroundColor: wsStatus === 'idle' || explaining ? '#D0CFC5' : '#798C00',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '9999px',
-                padding: '10px 0',
-                fontWeight: 600,
-                fontSize: '13px',
-                cursor: wsStatus === 'idle' || explaining ? 'not-allowed' : 'pointer',
-                width: '100%',
-              }}
-            >
-              {explaining ? '…' : explanationsByPage[currentPage] ? t('live_explain_refresh') : t('live_explain_btn')}
-            </button>
+            {noteMode === 'my' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <textarea
+                  value={getMyNoteText(currentPage)}
+                  onChange={e => handleMyNoteChange(currentPage, e.target.value)}
+                  placeholder={t('notes_my_placeholder')}
+                  style={{
+                    flex: 1, width: '100%', resize: 'none', border: 'none', outline: 'none',
+                    background: 'transparent', color: '#2F3331', fontSize: '13px',
+                    lineHeight: '1.7', fontFamily: 'inherit', minHeight: '200px',
+                    boxSizing: 'border-box', padding: '0', paddingTop: '12px',
+                  }}
+                />
+              </div>
+            ) : noteMode === 'ai' ? (
+              /* AI Explain */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '16px' }}>
+                <div style={{ flex: 1, fontSize: '14px', lineHeight: '1.7', color: '#2F3331' }}>
+                  {explaining ? (
+                    <span style={{ whiteSpace: 'pre-wrap' }}>{currentExplanation}<span style={{ opacity: 0.5 }}>▋</span></span>
+                  ) : explanationsByPage[currentPage] ? (
+                    <span style={{ whiteSpace: 'pre-wrap' }}>{explanationsByPage[currentPage]}</span>
+                  ) : (
+                    <span style={{ color: '#B0AFA7' }}>{t('live_explain_empty')}</span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  disabled={wsStatus === 'idle' || wsStatus === 'connecting' || explaining}
+                  onClick={handleExplainPage}
+                  title={wsStatus === 'idle' ? t('live_recording_required') : undefined}
+                  style={{
+                    backgroundColor: wsStatus === 'idle' || explaining ? '#D0CFC5' : '#798C00',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '9999px',
+                    padding: '10px 0',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: wsStatus === 'idle' || explaining ? 'not-allowed' : 'pointer',
+                    width: '100%',
+                  }}
+                >
+                  {explaining ? '…' : explanationsByPage[currentPage] ? t('live_explain_refresh') : t('live_explain_btn')}
+                </button>
+              </div>
+            ) : (
+              /* Transcript */
+              <div style={{ paddingTop: '12px', fontSize: '13px', lineHeight: '1.7', color: '#2F3331' }}>
+                {(transcriptByPage[currentPage] ?? []).length === 0 ? (
+                  <span style={{ color: '#B0AFA7' }}>{t('live_subtitle_placeholder')}</span>
+                ) : (
+                  (transcriptByPage[currentPage] ?? []).map((line, i) => (
+                    <p key={i} style={{ margin: '4px 0' }}>{line}</p>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </aside>
       </div>
