@@ -137,6 +137,20 @@ export const i18n = {
     session_submit_notes: 'Generate lecture notes →',
     session_submitting: 'Submitting…',
     session_submit_error: 'Submission failed, please check your network and retry',
+
+    // LivePage
+    live_card_title: 'Live Class',
+    live_card_desc: 'Real-time recording · Live transcript · In-class AI explanation',
+    live_card_cta: 'Start Live Class',
+    live_subtitle_placeholder: 'Subtitles will appear here once recording starts',
+    live_explain_empty: 'Recording in progress. Click below for AI explanation',
+    live_explain_btn: 'Explain This Page',
+    live_explain_refresh: 'Re-explain',
+    live_recording_required: 'Please start recording first',
+    live_recording_label: 'LIVE RECORDING',
+    live_stopped_label: 'STOPPED',
+    live_idle_label: 'NOT STARTED',
+
     session_recovery_title: 'Unfinished recording found',
     session_recovery_sub: 'Your last recording was interrupted. Would you like to resume?',
     session_recovery_continue: 'Generate notes with existing recording',
@@ -303,6 +317,20 @@ export const i18n = {
     session_submit_notes: '生成课堂笔记 →',
     session_submitting: '提交中…',
     session_submit_error: '提交失败，请检查网络后重试',
+
+    // LivePage
+    live_card_title: '直播课堂',
+    live_card_desc: '实时录音 · 实时字幕 · 课中 AI 解释',
+    live_card_cta: '进入直播课堂',
+    live_subtitle_placeholder: '开始录音后，字幕将在这里实时显示',
+    live_explain_empty: '录音中，点击下方按钮获取 AI 解释',
+    live_explain_btn: '解释这页',
+    live_explain_refresh: '重新解释',
+    live_recording_required: '请先开始录音',
+    live_recording_label: '录音中',
+    live_stopped_label: '已停止',
+    live_idle_label: '未开始',
+
     session_recovery_title: '发现未完成的录音',
     session_recovery_sub: '上次录音未完成，是否要恢复？',
     session_recovery_continue: '用现有录音生成笔记',
