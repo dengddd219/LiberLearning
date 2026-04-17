@@ -769,7 +769,7 @@ export default function LobbyPage() {
         {/* New Recording CTA */}
         <div className="self-stretch px-2 pb-8 flex flex-col justify-start items-start">
           <button
-            onClick={() => navigate('/upload')}
+            onClick={() => navigate('/notes/new')}
             className="self-stretch px-4 py-3 rounded-2xl inline-flex justify-start items-center gap-2 border-none cursor-pointer hover:opacity-90 transition-opacity"
             style={{ backgroundColor: '#798C00' }}
           >
@@ -892,7 +892,7 @@ export default function LobbyPage() {
                   <div className="flex flex-col items-center justify-center py-16 w-full">
                     <p className="text-sm mb-4" style={{ color: '#D0CFC5' }}>{t('lobby_empty_hint')}</p>
                     <button
-                      onClick={() => navigate('/upload')}
+                      onClick={() => navigate('/notes/new')}
                       className="px-4 py-2 text-white text-sm rounded-full cursor-pointer hover:opacity-85 border-none"
                       style={{ backgroundColor: '#798C00' }}
                     >
