@@ -243,6 +243,77 @@ NotesPage 内部用 `useParams` 获取 `sessionId`。当 `sessionId` 为 `undefi
 
 注意：需要让 `/notes/new` 路由在 `/notes/:sessionId` 之前匹配。React Router v6 会自动处理这个优先级（静态路径优先于动态参数）。
 
+### 3.8 渐进式点亮微交互 (AI Sweep Animation)
+
+**目标**：当 `page_ready` 事件触发，单页 AI 笔记数据就绪时，用一道柔和的光晕扫过灰色的占位文本，平滑过渡为最终的深色笔记内容。
+
+设计理念：平台整体偏向纸质化、极简主义的阅读体验，光晕不应是赛博朋克风的刺眼霓虹色，而是一种**柔和、温暖的光泽**——像阅读灯的光束轻轻扫过纸面，将灰色的草稿"点亮"为最终的清晰墨迹。
+
+#### 1. CSS 动效定义
+
+利用 `background-clip: text` 和动态改变 `background-position` 实现光晕扫过文字本身的效果：
+
+```css
+@keyframes ai-shimmer-sweep {
+  0% { background-position: 200% 50%; }
+  100% { background-position: -100% 50%; }
+}
+
+.ai-bullet-reveal {
+  color: transparent;
+  background: linear-gradient(
+    110deg,
+    #333333 40%,
+    #ffffff 50%,
+    #333333 60%
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: ai-shimmer-sweep 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.ai-bullet-placeholder {
+  color: #999999;
+  transition: opacity 0.3s ease;
+}
+```
+
+#### 2. React 渲染逻辑适配
+
+根据该页 `passive_notes` 是否存在，动态挂载 CSS 类。不改变现有组件结构，只在条件渲染时增加状态判断：
+
+```tsx
+const isProcessing = pagePhase === 'processing';
+const hasAiNotes = !!currentPageData.passive_notes;
+
+// 还在处理中，且当前页没有 AI 笔记 → 灰色占位
+if (isProcessing && !hasAiNotes && currentPageData.ppt_text) {
+  return (
+    <div className="ai-bullet-placeholder">
+      {currentPageData.ppt_text.split('\n').filter(Boolean).map((line, i) => (
+        <div key={`draft-${i}`}>• {line}</div>
+      ))}
+    </div>
+  );
+}
+
+// AI 笔记已生成 → 挂载 .ai-bullet-reveal 触发一次光晕动画
+if (hasAiNotes) {
+  return (
+    <div className="ai-bullet-reveal">
+      {/* 复用现有 AiBulletRow 组件 */}
+    </div>
+  );
+}
+```
+
+#### 3. 体验细节
+
+- **贝塞尔曲线**：`cubic-bezier(0.4, 0, 0.2, 1)`（Material Design 标准减速曲线），光晕扫入较快、扫出微微减速，显得从容优雅。
+- **不打扰已读内容**：按页触发的单次动画（`forwards`），用户回看已生成的笔记不会看到重复闪烁，保持阅读环境纯净。
+- **与现有 opacity 过渡共存**：光晕扫过动画替代了简单的 `opacity 0.5→1` 过渡，作为 `processing` 阶段的增强效果。`ready` 阶段（从 Lobby 打开已完成 session）不触发此动画。
+
 ---
 
 ## 4. 后端设计
