@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useTabs } from '../context/TabsContext'
 import { useTranslation } from '../context/TranslationContext'
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -11,11 +11,39 @@ import { useHighlights } from '../hooks/useHighlights'
 import HighlightLayer from '../components/HighlightLayer'
 import { useTextAnnotations } from '../hooks/useTextAnnotations'
 import TextAnnotationLayer from '../components/TextAnnotationLayer'
+import NotesBgShell from '../components/bg/NotesBgShell'
+import UploadModal from '../components/UploadModal'
+import { useSessionEvents, SSEEvent } from '../hooks/useSessionEvents'
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
   import.meta.url,
 ).toString()
+
+const SWEEP_STYLE_ID = 'ai-sweep-animation'
+if (typeof document !== 'undefined' && !document.getElementById(SWEEP_STYLE_ID)) {
+  const style = document.createElement('style')
+  style.id = SWEEP_STYLE_ID
+  style.textContent = `
+    @keyframes ai-shimmer-sweep {
+      0% { background-position: 200% 50%; }
+      100% { background-position: -100% 50%; }
+    }
+    .ai-bullet-reveal {
+      color: transparent;
+      background: linear-gradient(110deg, #333333 40%, #ffffff 50%, #333333 60%);
+      background-size: 250% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      animation: ai-shimmer-sweep 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    .ai-bullet-placeholder {
+      color: #999999;
+      transition: opacity 0.3s ease;
+    }
+  `
+  document.head.appendChild(style)
+}
 
 // ─── IndexedDB：持久化（ask_history / my_notes / page_chat） ───
 const DB_NAME = 'liberstudy_ask'
@@ -779,7 +807,60 @@ export default function NotesPage() {
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [noteMode, setNoteMode] = useState<'my' | 'ai' | 'transcript'>('ai')
-  const [playingSegIdx, setPlayingSegIdx] = useState<number | null>(null)
+
+  type PagePhase = 'upload' | 'processing' | 'ready'
+  const [pagePhase, setPagePhase] = useState<PagePhase>(sessionId ? 'ready' : 'upload')
+  const [processingSessionId, setProcessingSessionId] = useState<string | undefined>(sessionId)
+  const navigate = useNavigate()
+
+  const [transcriptJustDone, setTranscriptJustDone] = useState(false)
+  const [aiNotesJustDone, setAiNotesJustDone] = useState(false)
+  const [revealedPages, setRevealedPages] = useState<Set<number>>(new Set())
+
+  const handleSSEEvent = useCallback(async (event: SSEEvent) => {
+    const sid = processingSessionId
+    if (!sid) return
+
+    if (event.event === 'error') {
+      setError(typeof event.message === 'string' ? event.message : '处理失败')
+      setPagePhase('ready')
+      return
+    }
+
+    try {
+      const data = await getSession(sid)
+      setSession(data as SessionData)
+      if (loading) setLoading(false)
+    } catch { /* ignore fetch errors */ }
+
+    if (event.event === 'ppt_parsed') {
+      setLoading(false)
+    }
+
+    if (event.event === 'asr_done') {
+      setTranscriptJustDone(true)
+      setTimeout(() => setTranscriptJustDone(false), 1500)
+    }
+
+    if (event.event === 'page_ready' && typeof event.page_num === 'number') {
+      setRevealedPages(prev => new Set(prev).add(event.page_num as number))
+    }
+
+    if (event.event === 'all_done') {
+      setPagePhase('ready')
+      setAiNotesJustDone(true)
+      setTimeout(() => setAiNotesJustDone(false), 1500)
+    }
+  }, [processingSessionId, loading])
+
+  useSessionEvents(processingSessionId, pagePhase === 'processing', handleSSEEvent)
+
+  const handleUploadSuccess = useCallback((newSessionId: string) => {
+    setProcessingSessionId(newSessionId)
+    setPagePhase('processing')
+    setLoading(true)
+    window.history.replaceState(null, '', `/notes/${newSessionId}`)
+  }, [])
   const [playProgress, setPlayProgress] = useState(0) // 0–1，当前播放段进度
   const segStartRef = useRef<number | null>(null)
   const segEndRef = useRef<number | null>(null)
@@ -1015,6 +1096,10 @@ export default function NotesPage() {
         setSession(data as SessionData)
         openTab({ sessionId: sessionId!, label: (data as SessionData).ppt_filename ?? sessionId! })
         setLoading(false)
+        if ((data as SessionData).status === 'processing') {
+          setPagePhase('processing')
+          setProcessingSessionId(sessionId)
+        }
       })
       .catch(() => { setError('无法加载笔记数据'); setLoading(false) })
   }, [sessionId])
@@ -1284,6 +1369,20 @@ export default function NotesPage() {
     prevPageRef.current = currentPage
   }, [currentPage])
 
+  if (pagePhase === 'upload') {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 50 }}>
+        <div className="absolute inset-0" style={{ pointerEvents: 'none' }}>
+          <NotesBgShell />
+        </div>
+        <div className="absolute inset-0" style={{ backgroundColor: 'rgba(20, 24, 22, 0.6)', pointerEvents: 'none' }} />
+        <div style={{ position: 'relative', zIndex: 2 }}>
+          <UploadModal onSuccess={handleUploadSuccess} onClose={() => navigate('/')} />
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: C.bg }}>
@@ -1550,6 +1649,18 @@ export default function NotesPage() {
                   }}
                 >
                   {label}
+                  {mode === 'transcript' && pagePhase === 'processing' && !session?.pages?.some(p => (p.aligned_segments?.length ?? 0) > 0) && (
+                    <span className="inline-block ml-1 w-2.5 h-2.5 border border-transparent rounded-full animate-spin" style={{ borderWidth: '1.5px', borderColor: '#D0CFC5', borderTopColor: '#EC4899', verticalAlign: 'middle' }} />
+                  )}
+                  {mode === 'transcript' && transcriptJustDone && (
+                    <span style={{ color: '#10B981', fontSize: '10px', marginLeft: '4px', verticalAlign: 'middle' }}>✓</span>
+                  )}
+                  {mode === 'ai' && pagePhase === 'processing' && session?.pages?.some(p => !p.passive_notes?.bullets?.length) && (
+                    <span className="inline-block ml-1 w-2.5 h-2.5 border border-transparent rounded-full animate-spin" style={{ borderWidth: '1.5px', borderColor: '#D0CFC5', borderTopColor: '#8B5CF6', verticalAlign: 'middle' }} />
+                  )}
+                  {mode === 'ai' && aiNotesJustDone && (
+                    <span style={{ color: '#10B981', fontSize: '10px', marginLeft: '4px', verticalAlign: 'middle' }}>✓</span>
+                  )}
                 </button>
               )
             })}
@@ -1761,7 +1872,10 @@ export default function NotesPage() {
                         AI Notes
                       </span>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <div
+                      className={revealedPages.has(currentPage) ? 'ai-bullet-reveal' : ''}
+                      style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}
+                    >
                       {currentPageData.passive_notes.bullets.map((bullet, i) => (
                         <AiBulletRow
                           key={`${currentPage}-${i}`}
@@ -1800,8 +1914,23 @@ export default function NotesPage() {
                   </div>
                 )}
 
+                {/* Processing placeholder: show ppt_text as grey text */}
+                {pagePhase === 'processing' && !currentPageData?.passive_notes && currentPageData?.ppt_text && (
+                  <div className="ai-bullet-placeholder" style={{ padding: '8px 0' }}>
+                    {currentPageData.ppt_text.split('\n').filter(Boolean).map((line, i) => (
+                      <div key={`draft-${i}`} style={{ fontSize: '13px', lineHeight: '1.8', color: C.muted }}>
+                        • {line}
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '12px' }}>
+                      <span className="inline-block w-3 h-3 border-2 border-transparent rounded-full animate-spin" style={{ borderColor: '#D0CFC5', borderTopColor: '#8B5CF6' }} />
+                      <span style={{ fontSize: '11px', color: C.muted }}>AI 正在生成笔记...</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* No data at all */}
-                {!currentPageData?.active_notes && !currentPageData?.passive_notes?.error && (!currentPageData?.passive_notes || currentPageData.passive_notes.bullets.length === 0) && (
+                {!currentPageData?.active_notes && !currentPageData?.passive_notes?.error && (!currentPageData?.passive_notes || currentPageData.passive_notes.bullets.length === 0) && !(pagePhase === 'processing' && currentPageData?.ppt_text) && (
                   <div className="flex items-center justify-center py-8">
                     <p style={{ fontSize: '13px', color: C.muted }}>{t('notes_no_ai_notes')}</p>
                   </div>
@@ -2124,67 +2253,65 @@ export default function NotesPage() {
                     }}
                     onClick={e => e.stopPropagation()}
                   >
-                    {/* Pill input box */}
+                    {/* Context tag */}
                     <div style={{
-                      background: '#fff',
-                      borderRadius: '28px',
-                      boxShadow: '0 2px 12px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.05)',
-                      padding: '10px 12px 10px 10px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '6px',
+                      display: 'inline-flex', alignItems: 'center', gap: '4px',
+                      background: C.sidebar, border: `1px solid ${C.divider}`,
+                      borderRadius: '5px', padding: '2px 7px', fontSize: '11px', color: C.secondary,
+                      marginBottom: '7px',
                     }}>
-                      {/* Textarea row */}
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', paddingLeft: '4px' }}>
-                        <textarea
-                          rows={1}
-                          value={pageChatInput}
-                          onChange={e => setPageChatInput(e.target.value)}
-                          onFocus={() => { if (drawerPhase === 'input') setDrawerPhase('input') }}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault()
-                              if (pageChatInput.trim()) {
-                                handlePageChatSend()
-                                setDrawerPhase('full')
-                              }
-                            }
-                          }}
-                          placeholder={t('notes_page_chat_placeholder')}
-                          style={{
-                            flex: 1, resize: 'none', border: 'none', outline: 'none',
-                            background: 'transparent', fontSize: '13.5px', lineHeight: '1.55',
-                            color: C.fg, fontFamily: 'inherit', maxHeight: '100px', overflowY: 'auto',
-                            caretColor: '#798C00', display: 'block', minHeight: '22px',
-                            paddingTop: '2px',
-                          }}
-                        />
-                      </div>
+                      📄 Page {currentPage}
+                    </div>
 
-                      {/* Bottom toolbar row */}
+                    {/* Input box */}
+                    <div style={{
+                      border: `1.5px solid ${C.divider}`,
+                      borderRadius: '10px',
+                      padding: '8px 11px 6px',
+                    }}>
+                      <textarea
+                        rows={1}
+                        value={pageChatInput}
+                        onChange={e => setPageChatInput(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault()
+                            if (pageChatInput.trim()) {
+                              handlePageChatSend()
+                              setDrawerPhase('full')
+                            }
+                          }
+                        }}
+                        placeholder={t('notes_page_chat_placeholder')}
+                        style={{
+                          width: '100%', resize: 'none', border: 'none', outline: 'none',
+                          background: 'transparent', fontSize: '13px', lineHeight: '1.5',
+                          color: C.fg, fontFamily: 'inherit', maxHeight: '80px', overflowY: 'auto',
+                          caretColor: '#798C00', display: 'block', minHeight: '34px',
+                        }}
+                      />
+
+                      {/* Toolbar */}
                       <div style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        paddingLeft: '2px',
+                        paddingTop: '6px', borderTop: `1px solid ${C.divider}`, marginTop: '4px',
                       }}>
-                        {/* Left: + button → model picker */}
+                        {/* Left: model picker */}
                         <div style={{ position: 'relative' }}>
                           <button
                             ref={drawerModelBtnRef}
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setDrawerModelDDOpen(v => !v) }}
-                            title={drawerModel}
                             style={{
-                              width: '28px', height: '28px', borderRadius: '50%',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              border: `1.5px solid ${C.divider}`,
-                              background: C.sidebar,
+                              display: 'flex', alignItems: 'center', gap: '4px',
+                              padding: '3px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: '500',
+                              color: C.secondary, background: C.sidebar, border: `1px solid ${C.divider}`,
                               cursor: 'pointer',
-                              color: C.secondary,
-                              flexShrink: 0,
                             }}
                           >
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                            {drawerModel}
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                              <polyline points="6 9 12 15 18 9"/>
                             </svg>
                           </button>
                           {drawerModelDDOpen && (() => {
@@ -2194,12 +2321,12 @@ export default function NotesPage() {
                                 onClick={e => e.stopPropagation()}
                                 style={{
                                   position: 'fixed',
-                                  bottom: rect ? window.innerHeight - rect.top + 8 : 'auto',
+                                  bottom: rect ? window.innerHeight - rect.top + 6 : 'auto',
                                   left: rect ? rect.left : 0,
                                   width: '220px', background: C.white,
-                                  borderRadius: '12px',
-                                  boxShadow: '0 4px 24px rgba(0,0,0,0.13), 0 0 0 1px rgba(0,0,0,0.06)',
-                                  padding: '6px 0', zIndex: 9999,
+                                  borderRadius: '10px',
+                                  boxShadow: '0 4px 20px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.06)',
+                                  padding: '5px 0', zIndex: 9999,
                                 }}
                               >
                               {models.map((m, idx) => (
@@ -2253,30 +2380,43 @@ export default function NotesPage() {
                           })()}
                         </div>
 
-                        {/* Right: send */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (pageChatInput.trim()) {
-                              handlePageChatSend()
-                              setDrawerPhase('full')
-                            }
-                          }}
-                          disabled={pageChatStreaming || !pageChatInput.trim()}
-                          style={{
-                            width: '30px', height: '30px', borderRadius: '50%', border: 'none',
-                            background: pageChatStreaming || !pageChatInput.trim() ? '#D0CFC5' : '#798C00',
-                            color: '#fff',
-                            cursor: pageChatStreaming || !pageChatInput.trim() ? 'default' : 'pointer',
+                        {/* Right: mic + send */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <button type="button" style={{
+                            width: '26px', height: '26px', borderRadius: '5px',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            flexShrink: 0,
-                            transition: 'background 0.15s',
-                          }}
-                        >
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
-                          </svg>
-                        </button>
+                            border: 'none', background: 'transparent', cursor: 'pointer', color: C.muted,
+                          }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                              <rect x="9" y="2" width="6" height="11" rx="3"/>
+                              <path d="M5 10a7 7 0 0 0 14 0"/>
+                              <line x1="12" y1="19" x2="12" y2="22"/>
+                              <line x1="9" y1="22" x2="15" y2="22"/>
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (pageChatInput.trim()) {
+                                handlePageChatSend()
+                                setDrawerPhase('full')
+                              }
+                            }}
+                            disabled={pageChatStreaming || !pageChatInput.trim()}
+                            style={{
+                              width: '26px', height: '26px', borderRadius: '50%', border: 'none',
+                              background: pageChatStreaming || !pageChatInput.trim() ? C.muted : '#798C00',
+                              color: C.white,
+                              cursor: pageChatStreaming || !pageChatInput.trim() ? 'default' : 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              transition: 'background 0.15s',
+                            }}
+                          >
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2286,6 +2426,7 @@ export default function NotesPage() {
                 <div
                   style={{
                     flexShrink: 0,
+                    borderTop: `1px solid ${C.divider}`,
                     padding: '10px 14px 16px',
                     opacity: drawerPhase === 'closed' ? 1 : 0,
                     pointerEvents: drawerPhase === 'closed' ? 'auto' : 'none',
@@ -2295,27 +2436,16 @@ export default function NotesPage() {
                   <div
                     onClick={() => setDrawerPhase('input')}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: '10px',
-                      background: '#fff',
-                      borderRadius: '999px',
-                      boxShadow: '0 2px 12px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.05)',
-                      padding: '9px 16px 9px 10px',
-                      cursor: 'text',
+                      display: 'flex', alignItems: 'center', gap: '9px',
+                      background: C.sidebar, border: `1px solid ${C.divider}`,
+                      borderRadius: '14px', padding: '9px 14px', cursor: 'text',
                     }}
                   >
-                    {/* + icon */}
                     <div style={{
-                      width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
-                      border: `1.5px solid ${C.divider}`,
-                      background: C.sidebar,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: C.secondary,
-                    }}>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                      </svg>
-                    </div>
-                    <span style={{ fontSize: '13.5px', color: C.muted, flex: 1 }}>{t('notes_page_chat_placeholder')}</span>
+                      width: '17px', height: '17px', borderRadius: '50%', flexShrink: 0,
+                      background: 'conic-gradient(from 0deg, #798C00, #b5c833, #798C00)',
+                    }} />
+                    <span style={{ fontSize: '13px', color: C.muted }}>Ask AI about this page…</span>
                   </div>
                 </div>
               </>
