@@ -21,6 +21,7 @@ function App() {
           <Route path="/live" element={<LivePage />} />
           <Route path="/upload"                  element={<UploadPage />} />
           <Route path="/processing"              element={<ProcessingPage />} />
+          <Route path="/notes/new"              element={<NotesPage />} />
           <Route path="/notes/:sessionId"        element={<NotesPage />} />
           <Route path="/notes/detail/:sessionId" element={<DetailedNotePage />} />
           <Route path="/diagnostics"             element={<DiagnosticsPage />} />

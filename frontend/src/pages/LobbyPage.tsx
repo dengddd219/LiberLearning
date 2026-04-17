@@ -1307,7 +1307,7 @@ export default function LobbyPage() {
     <div className="w-full flex font-['Inter'] overflow-hidden" style={{ backgroundColor: '#F7F7F2', height: 'calc(100vh - 40px)', marginTop: '40px' }}>
 
       {/* ── Sidebar ── */}
-      <aside aria-label="侧边导航" className="w-52 flex-shrink-0 flex flex-col overflow-y-auto" style={{ backgroundColor: '#F2F2EC', height: '100%' }}>
+      <aside aria-label="侧边导航" className="w-52 flex-shrink-0 flex flex-col overflow-y-auto scroll-ghost" style={{ backgroundColor: '#F2F2EC', height: '100%' }}>
         {/* Brand */}
         <div className="px-7 pt-10 pb-10 flex flex-col justify-start items-start flex-shrink-0">
           <div className="text-lg font-bold font-['Inter'] leading-7" style={{ color: '#292929' }}>
@@ -1321,7 +1321,7 @@ export default function LobbyPage() {
         {/* New Recording CTA */}
         <div className="px-3 pb-8 flex-shrink-0">
           <button
-            onClick={() => navigate('/upload')}
+            onClick={() => navigate('/notes/new')}
             className="w-full px-4 py-3 rounded-2xl inline-flex justify-start items-center gap-2 border-none cursor-pointer hover:opacity-90 transition-opacity"
             style={{ backgroundColor: '#798C00' }}
           >

@@ -7,6 +7,7 @@ import json
 import asyncio
 
 import settings as _settings
+from services.events import wait_for_event
 
 router = APIRouter(tags=["sessions"])
 
@@ -331,6 +332,21 @@ async def generate_my_note(session_id: str, page_num: int, req: MyNoteRequest):
         raise HTTPException(status_code=400, detail=f"Unknown provider: {provider}")
 
     return StreamingResponse(gen, media_type="text/event-stream")
+
+
+@router.get("/sessions/{session_id}/events")
+async def session_events(session_id: str):
+    """SSE endpoint: pushes processing progress events for a session."""
+    async def event_stream():
+        while True:
+            event = await wait_for_event(session_id, timeout=300)
+            if event is None:
+                break
+            yield f"data: {json.dumps(event)}\n\n"
+            if event.get("event") == "all_done" or event.get("event") == "error":
+                break
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @router.get("/sessions/{session_id}/slide/{page_num}.png")

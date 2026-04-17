@@ -137,6 +137,23 @@ def update_session(session_id: str, updates: dict) -> None:
         s.commit()
 
 
+def replace_page(session_id: str, updated_page: dict) -> None:
+    """Replace a single page in session.pages by page_num (read-modify-write)."""
+    with Session(engine) as s:
+        row = s.get(SessionRow, session_id)
+        if row is None:
+            return
+        pages = json.loads(row.pages_json)
+        page_num = updated_page["page_num"]
+        for i, p in enumerate(pages):
+            if p["page_num"] == page_num:
+                pages[i] = updated_page
+                break
+        row.pages_json = json.dumps(pages)
+        s.add(row)
+        s.commit()
+
+
 # ── Rate limit ─────────────────────────────────────────────────────────────────
 
 def check_and_record_rate_limit(
