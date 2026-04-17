@@ -23,6 +23,7 @@ from services.audio import convert_to_wav, get_audio_duration
 from services.ppt_parser import parse_ppt
 from services.asr import transcribe
 from services.note_generator import generate_notes_for_all_pages, PROVIDER_ZHONGZHUAN
+from services.events import publish_event
 
 router = APIRouter(tags=["process"])
 
@@ -147,6 +148,29 @@ async def process_real(
     return {"session_id": session_id}
 
 
+
+def _build_initial_pages(ppt_pages: list[dict]) -> list[dict]:
+    """Construct initial page data after PPT parsing — no notes, no alignment."""
+    return [
+        {
+            "page_num": p["page_num"],
+            "status": "processing",
+            "pdf_url": p.get("pdf_url"),
+            "pdf_page_num": p.get("pdf_page_num", p["page_num"]),
+            "thumbnail_url": p.get("thumbnail_url"),
+            "ppt_text": p.get("ppt_text", ""),
+            "page_start_time": 0,
+            "page_end_time": 0,
+            "alignment_confidence": 0,
+            "active_notes": None,
+            "passive_notes": None,
+            "page_supplement": None,
+            "aligned_segments": [],
+        }
+        for p in ppt_pages
+    ]
+
+
 async def _run_pipeline(
     session_id: str,
     session_dir: str,
@@ -155,8 +179,9 @@ async def _run_pipeline(
     language: str,
     user_anchors: list[dict],
 ):
-    """Background task: full processing pipeline with progress updates."""
-    # ── Run data 初始化 ────────────────────────────────────────────────────
+    """Background task: full processing pipeline with progress updates and SSE events."""
+    import asyncio
+
     runs_dir = Path("static") / "runs" / session_id
     runs_dir.mkdir(parents=True, exist_ok=True)
     run_data_path = runs_dir / "run_data.json"
@@ -182,112 +207,103 @@ async def _run_pipeline(
     try:
         session_path = Path(session_dir)
 
-        # Step 1: 音频转 WAV
-        t1_start = _time.time()
-        db.update_session(session_id, {"progress": {"step": "converting", "percent": 15}})
-        wav_path = str(session_path / "audio.wav")
-        convert_to_wav(audio_raw_path, wav_path)
+        # ── Parallel: PPT parse + Audio convert ──────────────────────────────
 
-        duration = get_audio_duration(wav_path)
-        if duration > MAX_AUDIO_SECONDS:
-            db.update_session(session_id, {
-                "status": "error",
-                "error": f"Audio exceeds 120-minute limit ({duration/60:.1f} min)",
-                "progress": None,
-            })
-            run_data["steps"]["step1_audio"] = {"status": "error", "error": "duration_exceeded", "duration_seconds": duration}
-            run_data["finished_at"] = _time.strftime("%Y-%m-%d %H:%M:%S")
-            run_data["overall_status"] = "error"
+        async def _task_audio():
+            t_start = _time.time()
+            db.update_session(session_id, {"progress": {"step": "converting", "percent": 15}})
+            wav_path = str(session_path / "audio.wav")
+            convert_to_wav(audio_raw_path, wav_path)
+            duration = get_audio_duration(wav_path)
+            if duration > MAX_AUDIO_SECONDS:
+                raise ValueError(f"Audio exceeds 120-minute limit ({duration/60:.1f} min)")
+            db.update_session(session_id, {"total_duration": int(duration)})
+            audio_static_dir = Path("static") / "audio" / session_id
+            audio_static_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(wav_path, str(audio_static_dir / "audio.wav"))
+            t_end = _time.time()
+            run_data["steps"]["step1_audio"] = {
+                "status": "ok", "wav_path": wav_path,
+                "duration_seconds": duration, "elapsed_s": round(t_end - t_start, 2),
+            }
             _save_run_data()
-            return
+            return wav_path, duration
 
-        db.update_session(session_id, {"total_duration": int(duration)})
+        async def _task_ppt():
+            t_start = _time.time()
+            db.update_session(session_id, {"progress": {"step": "parsing_ppt", "percent": 30}})
+            slides_dir = str(Path("static") / "slides" / session_id)
+            ppt_pages: list[dict] = []
+            if ppt_path:
+                ppt_pages = parse_ppt(ppt_path, slides_dir, pdf_name=f"slides_{session_id}.pdf")
+                for page in ppt_pages:
+                    if page.get("pdf_url"):
+                        pdf_name_only = page["pdf_url"].split("/")[-1]
+                        page["pdf_url"] = f"/slides/{session_id}/{pdf_name_only}"
+                    if page.get("thumbnail_url"):
+                        png_name = page["thumbnail_url"].split("/")[-1]
+                        page["thumbnail_url"] = f"/slides/{session_id}/{png_name}"
+            t_end = _time.time()
+            run_data["steps"]["step2_ppt"] = {
+                "status": "ok", "ppt_path": str(ppt_path) if ppt_path else None,
+                "num_pages": len(ppt_pages),
+                "pages_summary": [
+                    {"page_num": p.get("page_num"), "ppt_text_len": len(p.get("ppt_text", ""))}
+                    for p in ppt_pages
+                ],
+                "elapsed_s": round(t_end - t_start, 2),
+            }
+            _save_run_data()
+            return ppt_pages
 
-        # Copy WAV to static/audio/{session_id}/ for frontend playback
-        audio_static_dir = Path("static") / "audio" / session_id
-        audio_static_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(wav_path, str(audio_static_dir / "audio.wav"))
+        # Run both in parallel
+        results = await asyncio.gather(
+            _task_ppt(),
+            _task_audio(),
+            return_exceptions=True,
+        )
 
-        t1_end = _time.time()
-        run_data["steps"]["step1_audio"] = {
-            "status": "ok",
-            "wav_path": wav_path,
-            "duration_seconds": duration,
-            "elapsed_s": round(t1_end - t1_start, 2),
-        }
-        _save_run_data()
+        # Check for exceptions
+        for r in results:
+            if isinstance(r, Exception):
+                raise r
 
-        # Step 2: PPT 解析
-        t2_start = _time.time()
-        db.update_session(session_id, {"progress": {"step": "parsing_ppt", "percent": 30}})
-        slides_dir = str(Path("static") / "slides" / session_id)
-        ppt_pages: list[dict] = []
-        if ppt_path:
-            ppt_pages = parse_ppt(ppt_path, slides_dir, pdf_name=f"slides_{session_id}.pdf")
-            # Fix pdf_url and thumbnail_url: parse_ppt returns paths without session_id subdir
-            # but files are in static/slides/{session_id}/, so prepend session_id
-            for page in ppt_pages:
-                if page.get("pdf_url"):
-                    pdf_name_only = page["pdf_url"].split("/")[-1]
-                    page["pdf_url"] = f"/slides/{session_id}/{pdf_name_only}"
-                if page.get("thumbnail_url"):
-                    png_name = page["thumbnail_url"].split("/")[-1]
-                    page["thumbnail_url"] = f"/slides/{session_id}/{png_name}"
+        ppt_pages, (wav_path, duration) = results[0], results[1]
 
-        t2_end = _time.time()
-        run_data["steps"]["step2_ppt"] = {
-            "status": "ok",
-            "ppt_path": str(ppt_path) if ppt_path else None,
-            "num_pages": len(ppt_pages),
-            "pages_summary": [
-                {"page_num": p.get("page_num"), "ppt_text_len": len(p.get("ppt_text", ""))}
-                for p in ppt_pages
-            ],
-            "elapsed_s": round(t2_end - t2_start, 2),
-        }
-        _save_run_data()
+        # Write initial pages to DB and notify frontend
+        if ppt_pages:
+            initial_pages = _build_initial_pages(ppt_pages)
+            db.update_session(session_id, {"pages": initial_pages})
+        publish_event(session_id, "ppt_parsed", {"num_pages": len(ppt_pages)})
 
-        # Step 3: ASR 转录
+        # ── Serial: ASR → Alignment ──────────────────────────────────────────
+
         t3_start = _time.time()
         db.update_session(session_id, {"progress": {"step": "transcribing", "percent": 55}})
         segments, raw_segments = transcribe(wav_path, language=language)
         t3_end = _time.time()
-
         run_data["steps"]["step3_asr"] = {
-            "status": "ok",
-            "engine": _settings.ASR_ENGINE,
-            "language": language,
-            "num_sentences": len(segments),
-            "num_raw_segments": len(raw_segments),
-            "sentences": segments,
-            "raw_segments": raw_segments,
+            "status": "ok", "engine": _settings.ASR_ENGINE, "language": language,
+            "num_sentences": len(segments), "num_raw_segments": len(raw_segments),
+            "sentences": segments, "raw_segments": raw_segments,
             "elapsed_s": round(t3_end - t3_start, 2),
         }
         _save_run_data()
 
-        # Step 4: 语义对齐（版本由 settings.ALIGNMENT_VERSION 控制）
         t4_start = _time.time()
         db.update_session(session_id, {"progress": {"step": "aligning", "percent": 70}})
         if ppt_pages:
             align_module = _settings.get_alignment_module()
             aligned_pages = align_module.build_page_timeline(
-                ppt_pages=ppt_pages,
-                segments=segments,
-                user_anchors=user_anchors,
-                total_audio_duration=duration,
+                ppt_pages=ppt_pages, segments=segments,
+                user_anchors=user_anchors, total_audio_duration=duration,
             )
         else:
             aligned_pages = [{
-                "page_num": 1,
-                "ppt_text": "",
-                "pdf_url": None,
-                "pdf_page_num": 1,
-                "page_start_time": 0,
-                "page_end_time": int(duration),
-                "alignment_confidence": 1.0,
-                "aligned_segments": segments,
-                "page_supplement": None,
-                "active_notes": None,
+                "page_num": 1, "ppt_text": "", "pdf_url": None, "pdf_page_num": 1,
+                "page_start_time": 0, "page_end_time": int(duration),
+                "alignment_confidence": 1.0, "aligned_segments": segments,
+                "page_supplement": None, "active_notes": None,
             }]
         t4_end = _time.time()
 
@@ -297,8 +313,7 @@ async def _run_pipeline(
             return obj
 
         run_data["steps"]["step4_alignment"] = {
-            "status": "ok",
-            "version": _settings.ALIGNMENT_VERSION,
+            "status": "ok", "version": _settings.ALIGNMENT_VERSION,
             "num_pages": len(aligned_pages),
             "pages_summary": [
                 {
@@ -312,26 +327,39 @@ async def _run_pipeline(
         }
         _save_run_data()
 
-        # Step 5: LLM 笔记生成（模板和 provider 由 settings 控制）
+        # Update pages with alignment data (transcript) + audio_url
+        aligned_page_dicts = [_serialize(p) for p in aligned_pages]
+        db.update_session(session_id, {
+            "pages": aligned_page_dicts,
+            "audio_url": f"/audio/{session_id}/audio.wav",
+        })
+        publish_event(session_id, "asr_done", {"num_segments": len(segments)})
+
+        # ── Per-page note generation ─────────────────────────────────────────
+
         t5_start = _time.time()
         db.update_session(session_id, {"progress": {"step": "generating", "percent": 85}})
-        generated_pages = await generate_notes_for_all_pages(
-            aligned_pages,
-            provider=_settings.NOTE_PROVIDER,
-        )
-        t5_end = _time.time()
 
+        generated_pages = []
+        for page_dict in aligned_page_dicts:
+            page_results = await generate_notes_for_all_pages(
+                [page_dict], provider=_settings.NOTE_PROVIDER,
+            )
+            noted_page = page_results[0]
+            generated_pages.append(noted_page)
+            db.replace_page(session_id, noted_page)
+            publish_event(session_id, "page_ready", {"page_num": noted_page["page_num"]})
+
+        t5_end = _time.time()
         run_data["steps"]["step5_notes"] = {
-            "status": "ok",
-            "provider": _settings.NOTE_PROVIDER,
+            "status": "ok", "provider": _settings.NOTE_PROVIDER,
             "model": _settings.NOTE_MODEL,
             "template": _settings.NOTE_PASSIVE_TEMPLATE,
             "granularity": _settings.NOTE_GRANULARITY,
             "num_pages": len(generated_pages),
             "pages_summary": [
                 {
-                    "page_num": p.get("page_num"),
-                    "status": p.get("status"),
+                    "page_num": p.get("page_num"), "status": p.get("status"),
                     "num_bullets": len(p.get("passive_notes", {}).get("bullets", [])) if p.get("passive_notes") else 0,
                     "cost": p.get("_cost"),
                 }
@@ -347,10 +375,10 @@ async def _run_pipeline(
 
         db.update_session(session_id, {
             "status": overall_status,
-            "audio_url": f"/audio/{session_id}/audio.wav",
-            "pages": generated_pages,
             "progress": None,
         })
+
+        publish_event(session_id, "all_done", {"status": overall_status})
 
         run_data["finished_at"] = _time.strftime("%Y-%m-%d %H:%M:%S")
         run_data["overall_status"] = overall_status
@@ -358,10 +386,9 @@ async def _run_pipeline(
 
     except Exception as exc:
         db.update_session(session_id, {
-            "status": "error",
-            "error": str(exc),
-            "progress": None,
+            "status": "error", "error": str(exc), "progress": None,
         })
+        publish_event(session_id, "error", {"message": str(exc)})
         run_data["finished_at"] = _time.strftime("%Y-%m-%d %H:%M:%S")
         run_data["overall_status"] = "error"
         run_data["error"] = str(exc)
