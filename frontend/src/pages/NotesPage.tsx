@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useTabs } from '../context/TabsContext'
 import { useTranslation } from '../context/TranslationContext'
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -11,11 +11,39 @@ import { useHighlights } from '../hooks/useHighlights'
 import HighlightLayer from '../components/HighlightLayer'
 import { useTextAnnotations } from '../hooks/useTextAnnotations'
 import TextAnnotationLayer from '../components/TextAnnotationLayer'
+import NotesBgShell from '../components/bg/NotesBgShell'
+import UploadModal from '../components/UploadModal'
+import { useSessionEvents, SSEEvent } from '../hooks/useSessionEvents'
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
   import.meta.url,
 ).toString()
+
+const SWEEP_STYLE_ID = 'ai-sweep-animation'
+if (typeof document !== 'undefined' && !document.getElementById(SWEEP_STYLE_ID)) {
+  const style = document.createElement('style')
+  style.id = SWEEP_STYLE_ID
+  style.textContent = `
+    @keyframes ai-shimmer-sweep {
+      0% { background-position: 200% 50%; }
+      100% { background-position: -100% 50%; }
+    }
+    .ai-bullet-reveal {
+      color: transparent;
+      background: linear-gradient(110deg, #333333 40%, #ffffff 50%, #333333 60%);
+      background-size: 250% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      animation: ai-shimmer-sweep 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    .ai-bullet-placeholder {
+      color: #999999;
+      transition: opacity 0.3s ease;
+    }
+  `
+  document.head.appendChild(style)
+}
 
 // ─── IndexedDB：持久化（ask_history / my_notes / page_chat） ───
 const DB_NAME = 'liberstudy_ask'
@@ -779,7 +807,60 @@ export default function NotesPage() {
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [noteMode, setNoteMode] = useState<'my' | 'ai' | 'transcript'>('ai')
-  const [playingSegIdx, setPlayingSegIdx] = useState<number | null>(null)
+
+  type PagePhase = 'upload' | 'processing' | 'ready'
+  const [pagePhase, setPagePhase] = useState<PagePhase>(sessionId ? 'ready' : 'upload')
+  const [processingSessionId, setProcessingSessionId] = useState<string | undefined>(sessionId)
+  const navigate = useNavigate()
+
+  const [transcriptJustDone, setTranscriptJustDone] = useState(false)
+  const [aiNotesJustDone, setAiNotesJustDone] = useState(false)
+  const [revealedPages, setRevealedPages] = useState<Set<number>>(new Set())
+
+  const handleSSEEvent = useCallback(async (event: SSEEvent) => {
+    const sid = processingSessionId
+    if (!sid) return
+
+    if (event.event === 'error') {
+      setError(typeof event.message === 'string' ? event.message : '处理失败')
+      setPagePhase('ready')
+      return
+    }
+
+    try {
+      const data = await getSession(sid)
+      setSession(data as SessionData)
+      if (loading) setLoading(false)
+    } catch { /* ignore fetch errors */ }
+
+    if (event.event === 'ppt_parsed') {
+      setLoading(false)
+    }
+
+    if (event.event === 'asr_done') {
+      setTranscriptJustDone(true)
+      setTimeout(() => setTranscriptJustDone(false), 1500)
+    }
+
+    if (event.event === 'page_ready' && typeof event.page_num === 'number') {
+      setRevealedPages(prev => new Set(prev).add(event.page_num as number))
+    }
+
+    if (event.event === 'all_done') {
+      setPagePhase('ready')
+      setAiNotesJustDone(true)
+      setTimeout(() => setAiNotesJustDone(false), 1500)
+    }
+  }, [processingSessionId, loading])
+
+  useSessionEvents(processingSessionId, pagePhase === 'processing', handleSSEEvent)
+
+  const handleUploadSuccess = useCallback((newSessionId: string) => {
+    setProcessingSessionId(newSessionId)
+    setPagePhase('processing')
+    setLoading(true)
+    window.history.replaceState(null, '', `/notes/${newSessionId}`)
+  }, [])
   const [playProgress, setPlayProgress] = useState(0) // 0–1，当前播放段进度
   const segStartRef = useRef<number | null>(null)
   const segEndRef = useRef<number | null>(null)
@@ -1015,6 +1096,10 @@ export default function NotesPage() {
         setSession(data as SessionData)
         openTab({ sessionId: sessionId!, label: (data as SessionData).ppt_filename ?? sessionId! })
         setLoading(false)
+        if ((data as SessionData).status === 'processing') {
+          setPagePhase('processing')
+          setProcessingSessionId(sessionId)
+        }
       })
       .catch(() => { setError('无法加载笔记数据'); setLoading(false) })
   }, [sessionId])
@@ -1284,6 +1369,20 @@ export default function NotesPage() {
     prevPageRef.current = currentPage
   }, [currentPage])
 
+  if (pagePhase === 'upload') {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 50 }}>
+        <div className="absolute inset-0" style={{ pointerEvents: 'none' }}>
+          <NotesBgShell />
+        </div>
+        <div className="absolute inset-0" style={{ backgroundColor: 'rgba(20, 24, 22, 0.6)', pointerEvents: 'none' }} />
+        <div style={{ position: 'relative', zIndex: 2 }}>
+          <UploadModal onSuccess={handleUploadSuccess} onClose={() => navigate('/')} />
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: C.bg }}>
@@ -1550,6 +1649,18 @@ export default function NotesPage() {
                   }}
                 >
                   {label}
+                  {mode === 'transcript' && pagePhase === 'processing' && !session?.pages?.some(p => (p.aligned_segments?.length ?? 0) > 0) && (
+                    <span className="inline-block ml-1 w-2.5 h-2.5 border border-transparent rounded-full animate-spin" style={{ borderWidth: '1.5px', borderColor: '#D0CFC5', borderTopColor: '#EC4899', verticalAlign: 'middle' }} />
+                  )}
+                  {mode === 'transcript' && transcriptJustDone && (
+                    <span style={{ color: '#10B981', fontSize: '10px', marginLeft: '4px', verticalAlign: 'middle' }}>✓</span>
+                  )}
+                  {mode === 'ai' && pagePhase === 'processing' && session?.pages?.some(p => !p.passive_notes?.bullets?.length) && (
+                    <span className="inline-block ml-1 w-2.5 h-2.5 border border-transparent rounded-full animate-spin" style={{ borderWidth: '1.5px', borderColor: '#D0CFC5', borderTopColor: '#8B5CF6', verticalAlign: 'middle' }} />
+                  )}
+                  {mode === 'ai' && aiNotesJustDone && (
+                    <span style={{ color: '#10B981', fontSize: '10px', marginLeft: '4px', verticalAlign: 'middle' }}>✓</span>
+                  )}
                 </button>
               )
             })}
@@ -1761,7 +1872,10 @@ export default function NotesPage() {
                         AI Notes
                       </span>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <div
+                      className={revealedPages.has(currentPage) ? 'ai-bullet-reveal' : ''}
+                      style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}
+                    >
                       {currentPageData.passive_notes.bullets.map((bullet, i) => (
                         <AiBulletRow
                           key={`${currentPage}-${i}`}
@@ -1800,8 +1914,23 @@ export default function NotesPage() {
                   </div>
                 )}
 
+                {/* Processing placeholder: show ppt_text as grey text */}
+                {pagePhase === 'processing' && !currentPageData?.passive_notes && currentPageData?.ppt_text && (
+                  <div className="ai-bullet-placeholder" style={{ padding: '8px 0' }}>
+                    {currentPageData.ppt_text.split('\n').filter(Boolean).map((line, i) => (
+                      <div key={`draft-${i}`} style={{ fontSize: '13px', lineHeight: '1.8', color: C.muted }}>
+                        • {line}
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '12px' }}>
+                      <span className="inline-block w-3 h-3 border-2 border-transparent rounded-full animate-spin" style={{ borderColor: '#D0CFC5', borderTopColor: '#8B5CF6' }} />
+                      <span style={{ fontSize: '11px', color: C.muted }}>AI 正在生成笔记...</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* No data at all */}
-                {!currentPageData?.active_notes && !currentPageData?.passive_notes?.error && (!currentPageData?.passive_notes || currentPageData.passive_notes.bullets.length === 0) && (
+                {!currentPageData?.active_notes && !currentPageData?.passive_notes?.error && (!currentPageData?.passive_notes || currentPageData.passive_notes.bullets.length === 0) && !(pagePhase === 'processing' && currentPageData?.ppt_text) && (
                   <div className="flex items-center justify-center py-8">
                     <p style={{ fontSize: '13px', color: C.muted }}>{t('notes_no_ai_notes')}</p>
                   </div>
