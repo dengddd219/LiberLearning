@@ -2124,65 +2124,67 @@ export default function NotesPage() {
                     }}
                     onClick={e => e.stopPropagation()}
                   >
-                    {/* Context tag */}
+                    {/* Pill input box */}
                     <div style={{
-                      display: 'inline-flex', alignItems: 'center', gap: '4px',
-                      background: C.sidebar, border: `1px solid ${C.divider}`,
-                      borderRadius: '5px', padding: '2px 7px', fontSize: '11px', color: C.secondary,
-                      marginBottom: '7px',
+                      background: '#fff',
+                      borderRadius: '28px',
+                      boxShadow: '0 2px 12px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.05)',
+                      padding: '10px 12px 10px 10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
                     }}>
-                      📄 Page {currentPage}
-                    </div>
-
-                    {/* Input box */}
-                    <div style={{
-                      border: `1.5px solid ${C.divider}`,
-                      borderRadius: '10px',
-                      padding: '8px 11px 6px',
-                    }}>
-                      <textarea
-                        rows={1}
-                        value={pageChatInput}
-                        onChange={e => setPageChatInput(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault()
-                            if (pageChatInput.trim()) {
-                              handlePageChatSend()
-                              setDrawerPhase('full')
+                      {/* Textarea row */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', paddingLeft: '4px' }}>
+                        <textarea
+                          rows={1}
+                          value={pageChatInput}
+                          onChange={e => setPageChatInput(e.target.value)}
+                          onFocus={() => { if (drawerPhase === 'input') setDrawerPhase('input') }}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault()
+                              if (pageChatInput.trim()) {
+                                handlePageChatSend()
+                                setDrawerPhase('full')
+                              }
                             }
-                          }
-                        }}
-                        placeholder={t('notes_page_chat_placeholder')}
-                        style={{
-                          width: '100%', resize: 'none', border: 'none', outline: 'none',
-                          background: 'transparent', fontSize: '13px', lineHeight: '1.5',
-                          color: C.fg, fontFamily: 'inherit', maxHeight: '80px', overflowY: 'auto',
-                          caretColor: '#798C00', display: 'block', minHeight: '34px',
-                        }}
-                      />
+                          }}
+                          placeholder={t('notes_page_chat_placeholder')}
+                          style={{
+                            flex: 1, resize: 'none', border: 'none', outline: 'none',
+                            background: 'transparent', fontSize: '13.5px', lineHeight: '1.55',
+                            color: C.fg, fontFamily: 'inherit', maxHeight: '100px', overflowY: 'auto',
+                            caretColor: '#798C00', display: 'block', minHeight: '22px',
+                            paddingTop: '2px',
+                          }}
+                        />
+                      </div>
 
-                      {/* Toolbar */}
+                      {/* Bottom toolbar row */}
                       <div style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        paddingTop: '6px', borderTop: `1px solid ${C.divider}`, marginTop: '4px',
+                        paddingLeft: '2px',
                       }}>
-                        {/* Left: model picker */}
+                        {/* Left: + button → model picker */}
                         <div style={{ position: 'relative' }}>
                           <button
                             ref={drawerModelBtnRef}
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setDrawerModelDDOpen(v => !v) }}
+                            title={drawerModel}
                             style={{
-                              display: 'flex', alignItems: 'center', gap: '4px',
-                              padding: '3px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: '500',
-                              color: C.secondary, background: C.sidebar, border: `1px solid ${C.divider}`,
+                              width: '28px', height: '28px', borderRadius: '50%',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              border: `1.5px solid ${C.divider}`,
+                              background: C.sidebar,
                               cursor: 'pointer',
+                              color: C.secondary,
+                              flexShrink: 0,
                             }}
                           >
-                            {drawerModel}
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                              <polyline points="6 9 12 15 18 9"/>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                             </svg>
                           </button>
                           {drawerModelDDOpen && (() => {
@@ -2192,12 +2194,12 @@ export default function NotesPage() {
                                 onClick={e => e.stopPropagation()}
                                 style={{
                                   position: 'fixed',
-                                  bottom: rect ? window.innerHeight - rect.top + 6 : 'auto',
+                                  bottom: rect ? window.innerHeight - rect.top + 8 : 'auto',
                                   left: rect ? rect.left : 0,
                                   width: '220px', background: C.white,
-                                  borderRadius: '10px',
-                                  boxShadow: '0 4px 20px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.06)',
-                                  padding: '5px 0', zIndex: 9999,
+                                  borderRadius: '12px',
+                                  boxShadow: '0 4px 24px rgba(0,0,0,0.13), 0 0 0 1px rgba(0,0,0,0.06)',
+                                  padding: '6px 0', zIndex: 9999,
                                 }}
                               >
                               {models.map((m, idx) => (
@@ -2251,43 +2253,30 @@ export default function NotesPage() {
                           })()}
                         </div>
 
-                        {/* Right: mic + send */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <button type="button" style={{
-                            width: '26px', height: '26px', borderRadius: '5px',
+                        {/* Right: send */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (pageChatInput.trim()) {
+                              handlePageChatSend()
+                              setDrawerPhase('full')
+                            }
+                          }}
+                          disabled={pageChatStreaming || !pageChatInput.trim()}
+                          style={{
+                            width: '30px', height: '30px', borderRadius: '50%', border: 'none',
+                            background: pageChatStreaming || !pageChatInput.trim() ? '#D0CFC5' : '#798C00',
+                            color: '#fff',
+                            cursor: pageChatStreaming || !pageChatInput.trim() ? 'default' : 'pointer',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            border: 'none', background: 'transparent', cursor: 'pointer', color: C.muted,
-                          }}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                              <rect x="9" y="2" width="6" height="11" rx="3"/>
-                              <path d="M5 10a7 7 0 0 0 14 0"/>
-                              <line x1="12" y1="19" x2="12" y2="22"/>
-                              <line x1="9" y1="22" x2="15" y2="22"/>
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (pageChatInput.trim()) {
-                                handlePageChatSend()
-                                setDrawerPhase('full')
-                              }
-                            }}
-                            disabled={pageChatStreaming || !pageChatInput.trim()}
-                            style={{
-                              width: '26px', height: '26px', borderRadius: '50%', border: 'none',
-                              background: pageChatStreaming || !pageChatInput.trim() ? C.muted : '#798C00',
-                              color: C.white,
-                              cursor: pageChatStreaming || !pageChatInput.trim() ? 'default' : 'pointer',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              transition: 'background 0.15s',
-                            }}
-                          >
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
-                            </svg>
-                          </button>
-                        </div>
+                            flexShrink: 0,
+                            transition: 'background 0.15s',
+                          }}
+                        >
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+                          </svg>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -2297,7 +2286,6 @@ export default function NotesPage() {
                 <div
                   style={{
                     flexShrink: 0,
-                    borderTop: `1px solid ${C.divider}`,
                     padding: '10px 14px 16px',
                     opacity: drawerPhase === 'closed' ? 1 : 0,
                     pointerEvents: drawerPhase === 'closed' ? 'auto' : 'none',
@@ -2307,16 +2295,27 @@ export default function NotesPage() {
                   <div
                     onClick={() => setDrawerPhase('input')}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: '9px',
-                      background: C.sidebar, border: `1px solid ${C.divider}`,
-                      borderRadius: '14px', padding: '9px 14px', cursor: 'text',
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      background: '#fff',
+                      borderRadius: '999px',
+                      boxShadow: '0 2px 12px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.05)',
+                      padding: '9px 16px 9px 10px',
+                      cursor: 'text',
                     }}
                   >
+                    {/* + icon */}
                     <div style={{
-                      width: '17px', height: '17px', borderRadius: '50%', flexShrink: 0,
-                      background: 'conic-gradient(from 0deg, #798C00, #b5c833, #798C00)',
-                    }} />
-                    <span style={{ fontSize: '13px', color: C.muted }}>Ask AI about this page…</span>
+                      width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
+                      border: `1.5px solid ${C.divider}`,
+                      background: C.sidebar,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: C.secondary,
+                    }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                      </svg>
+                    </div>
+                    <span style={{ fontSize: '13.5px', color: C.muted, flex: 1 }}>{t('notes_page_chat_placeholder')}</span>
                   </div>
                 </div>
               </>

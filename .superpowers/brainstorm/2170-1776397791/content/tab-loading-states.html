@@ -1,0 +1,145 @@
+<h2>标签页加载状态指示</h2>
+<p class="subtitle">不需要切换标签也能感知各模块的加载状态</p>
+
+<div style="display:flex;flex-direction:column;gap:28px;margin-top:20px;">
+
+  <!-- 状态 A: 全部加载中 -->
+  <div style="border:1px solid #333;border-radius:10px;padding:20px;background:#1a1a1a;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+      <span style="background:#F59E0B;color:#000;font-weight:700;padding:2px 10px;border-radius:12px;font-size:13px;">状态 A</span>
+      <span style="color:#fff;font-weight:600;">PPT 刚解析完，ASR 和 AI 笔记都在跑</span>
+    </div>
+    <!-- 标签栏模拟 -->
+    <div style="background:#111;border-radius:8px;padding:16px 20px;">
+      <div style="display:flex;gap:6px;align-items:center;">
+        <!-- AI Notes: 选中态 + loading -->
+        <div style="display:flex;align-items:center;gap:5px;padding:6px 14px;background:#2a2a2a;border-radius:20px;border:1px solid #444;">
+          <span style="font-size:13px;color:#e0e0e0;font-weight:500;">AI Notes</span>
+          <div style="width:10px;height:10px;border:1.5px solid #555;border-top-color:#8B5CF6;border-radius:50%;animation:spin 1s linear infinite;flex-shrink:0;"></div>
+        </div>
+        <!-- Transcript: 未选中 + loading -->
+        <div style="display:flex;align-items:center;gap:5px;padding:6px 14px;background:transparent;border-radius:20px;">
+          <span style="font-size:13px;color:#888;">Transcript</span>
+          <div style="width:10px;height:10px;border:1.5px solid #555;border-top-color:#EC4899;border-radius:50%;animation:spin 1s linear infinite;flex-shrink:0;"></div>
+        </div>
+        <!-- My Notes: 无 loading（不依赖后端） -->
+        <div style="display:flex;align-items:center;gap:5px;padding:6px 14px;background:transparent;border-radius:20px;">
+          <span style="font-size:13px;color:#888;">My Notes</span>
+        </div>
+      </div>
+      <div style="margin-top:12px;padding:12px;background:#1a1a1a;border-radius:6px;min-height:60px;">
+        <div style="font-size:11px;color:#555;line-height:1.8;">
+          <div style="display:flex;align-items:flex-start;gap:4px;margin-bottom:3px;">
+            <span style="color:#444;">•</span>
+            <span style="opacity:0.5;">数据结构的基本概念</span>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:4px;">
+            <span style="color:#444;">•</span>
+            <span style="opacity:0.5;">线性表与链表的区别</span>
+          </div>
+        </div>
+        <div style="font-size:9px;color:#666;margin-top:8px;">← 用户正在看 AI Notes（灰色文本），同时余光可见 Transcript 标签旁的 spinner 在转</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 状态 B: Transcript 完成，AI Notes 还在生成 -->
+  <div style="border:1px solid #333;border-radius:10px;padding:20px;background:#1a1a1a;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+      <span style="background:#10B981;color:#fff;font-weight:700;padding:2px 10px;border-radius:12px;font-size:13px;">状态 B</span>
+      <span style="color:#fff;font-weight:600;">ASR 完成 → Transcript spinner 消失并短暂显示 ✓</span>
+    </div>
+    <div style="background:#111;border-radius:8px;padding:16px 20px;">
+      <div style="display:flex;gap:6px;align-items:center;">
+        <!-- AI Notes: 选中态 + 仍在 loading -->
+        <div style="display:flex;align-items:center;gap:5px;padding:6px 14px;background:#2a2a2a;border-radius:20px;border:1px solid #444;">
+          <span style="font-size:13px;color:#e0e0e0;font-weight:500;">AI Notes</span>
+          <div style="width:10px;height:10px;border:1.5px solid #555;border-top-color:#8B5CF6;border-radius:50%;animation:spin 1s linear infinite;flex-shrink:0;"></div>
+        </div>
+        <!-- Transcript: 完成，显示 ✓ -->
+        <div style="display:flex;align-items:center;gap:5px;padding:6px 14px;background:transparent;border-radius:20px;">
+          <span style="font-size:13px;color:#ccc;">Transcript</span>
+          <span style="font-size:10px;color:#10B981;flex-shrink:0;">✓</span>
+        </div>
+        <!-- My Notes -->
+        <div style="display:flex;align-items:center;gap:5px;padding:6px 14px;background:transparent;border-radius:20px;">
+          <span style="font-size:13px;color:#888;">My Notes</span>
+        </div>
+      </div>
+      <div style="margin-top:12px;padding:12px;background:#1a1a1a;border-radius:6px;min-height:60px;">
+        <div style="font-size:11px;color:#555;line-height:1.8;">
+          <div style="display:flex;align-items:flex-start;gap:4px;margin-bottom:3px;">
+            <span style="color:#10B981;">•</span>
+            <span style="color:#e0e0e0;font-weight:500;">数据结构的基本概念</span>
+          </div>
+          <div style="margin-left:14px;color:#999;font-size:9px;border-left:2px solid #333;padding-left:6px;margin-bottom:5px;">老师讲解了数据结构的定义与分类...</div>
+          <div style="display:flex;align-items:flex-start;gap:4px;">
+            <span style="color:#444;">•</span>
+            <span style="opacity:0.5;">线性表与链表的区别</span>
+          </div>
+        </div>
+        <div style="font-size:9px;color:#666;margin-top:8px;">← 第1页 bullet 已点亮（黑色+解释），第2页仍灰色。Transcript ✓ 表示可以切过去看了。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 状态 C: 全部完成 -->
+  <div style="border:1px solid #10B981;border-radius:10px;padding:20px;background:#1a1a1a;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+      <span style="background:#10B981;color:#fff;font-weight:700;padding:2px 10px;border-radius:12px;font-size:13px;">状态 C</span>
+      <span style="color:#fff;font-weight:600;">全部完成 → 所有 spinner 和 ✓ 消失，恢复正常标签</span>
+    </div>
+    <div style="background:#111;border-radius:8px;padding:16px 20px;">
+      <div style="display:flex;gap:6px;align-items:center;">
+        <!-- AI Notes: 正常选中态 -->
+        <div style="display:flex;align-items:center;gap:5px;padding:6px 14px;background:#2a2a2a;border-radius:20px;border:1px solid #444;">
+          <span style="font-size:13px;color:#e0e0e0;font-weight:500;">AI Notes</span>
+        </div>
+        <!-- Transcript: 正常未选中 -->
+        <div style="display:flex;align-items:center;gap:5px;padding:6px 14px;background:transparent;border-radius:20px;">
+          <span style="font-size:13px;color:#888;">Transcript</span>
+        </div>
+        <!-- My Notes: 正常 -->
+        <div style="display:flex;align-items:center;gap:5px;padding:6px 14px;background:transparent;border-radius:20px;">
+          <span style="font-size:13px;color:#888;">My Notes</span>
+        </div>
+      </div>
+      <div style="margin-top:12px;padding:12px;background:#1a1a1a;border-radius:6px;min-height:40px;">
+        <div style="font-size:11px;color:#10B981;text-align:center;padding:8px;">
+          ✓ 与当前 NotesPage 完全一致，无任何额外 UI 元素
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 时序说明 -->
+<div style="margin-top:24px;border:1px solid #333;border-radius:10px;padding:20px;background:#1a1a1a;">
+  <h3 style="margin-top:0;font-size:14px;">Spinner 生命周期</h3>
+  <div style="font-family:monospace;font-size:11px;color:#999;line-height:2;background:#111;padding:14px;border-radius:6px;">
+    <div>
+      <span style="color:#888;display:inline-block;width:120px;">AI Notes tab:</span>
+      <span style="color:#555;">────</span><span style="color:#8B5CF6;">●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●</span><span style="color:#10B981;">✓</span><span style="color:#555;">──────</span>
+    </div>
+    <div>
+      <span style="color:#888;display:inline-block;width:120px;">Transcript tab:</span>
+      <span style="color:#555;">────</span><span style="color:#EC4899;">●●●●●●●●●●●●●●●●●</span><span style="color:#10B981;">✓</span><span style="color:#555;">────────────────────</span>
+    </div>
+    <div>
+      <span style="color:#888;display:inline-block;width:120px;">My Notes tab:</span>
+      <span style="color:#555;">──────────────────────────────────────────</span>
+      <span style="color:#666;font-size:9px;"> (无 loading，始终可用)</span>
+    </div>
+    <div style="margin-top:8px;color:#666;font-size:10px;">
+      <span style="display:inline-block;width:120px;"></span>
+      <span style="color:#8B5CF6;">● spinner转动中</span> &nbsp;
+      <span style="color:#10B981;">✓ 完成(显示~1.5s后消失)</span> &nbsp;
+      <span style="color:#555;">─ 无标记</span>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>

@@ -1,0 +1,328 @@
+<h2>渐进式加载：完整用户流程</h2>
+<p class="subtitle">从 LobbyPage 点击"新建"到笔记完全就绪的 6 个阶段</p>
+
+<div style="display:flex;flex-direction:column;gap:24px;margin-top:16px;">
+
+  <!-- 阶段 0 -->
+  <div style="border:1px solid #333;border-radius:10px;padding:20px;background:#1a1a1a;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <span style="background:#F59E0B;color:#000;font-weight:700;padding:2px 10px;border-radius:12px;font-size:13px;">阶段 0</span>
+      <span style="color:#fff;font-weight:600;font-size:15px;">LobbyPage → 点击"新建录音"</span>
+    </div>
+    <div style="background:#111;border-radius:8px;padding:16px;font-family:monospace;font-size:12px;color:#888;line-height:1.8;">
+      <div style="display:flex;gap:12px;">
+        <div style="width:180px;background:#222;border-radius:6px;padding:10px;border:1px solid #333;">
+          <div style="font-size:11px;color:#666;">侧边栏</div>
+          <div style="margin-top:8px;padding:6px 8px;background:#2a2a2a;border-radius:4px;color:#F59E0B;font-size:11px;">📂 我的课程</div>
+          <div style="margin-top:4px;padding:6px 8px;border-radius:4px;font-size:11px;">📄 数据结构 L01</div>
+          <div style="margin-top:4px;padding:6px 8px;border-radius:4px;font-size:11px;">📄 线性代数 L03</div>
+        </div>
+        <div style="flex:1;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <span style="color:#fff;font-size:13px;">我的课程</span>
+            <span style="background:#F59E0B;color:#000;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">+ 新建录音 ← 点击这里</span>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <div style="width:140px;height:80px;background:#222;border-radius:6px;border:1px solid #333;display:flex;align-items:center;justify-content:center;font-size:10px;">数据结构 L01</div>
+            <div style="width:140px;height:80px;background:#222;border-radius:6px;border:1px solid #333;display:flex;align-items:center;justify-content:center;font-size:10px;">线性代数 L03</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p style="color:#999;font-size:12px;margin-top:8px;">→ navigate('/notes/new')，进入 NotesPage</p>
+  </div>
+
+  <!-- 阶段 1 -->
+  <div style="border:1px solid #333;border-radius:10px;padding:20px;background:#1a1a1a;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <span style="background:#3B82F6;color:#fff;font-weight:700;padding:2px 10px;border-radius:12px;font-size:13px;">阶段 1</span>
+      <span style="color:#fff;font-weight:600;font-size:15px;">网关弹窗 — 上传文件</span>
+      <span style="color:#666;font-size:12px;">(NotesPage 路由，sessionId='new')</span>
+    </div>
+    <div style="background:#111;border-radius:8px;padding:16px;position:relative;min-height:200px;">
+      <!-- 背景：NotesPage 空态 + scrim -->
+      <div style="position:absolute;inset:0;border-radius:8px;background:#111;opacity:0.3;font-family:monospace;font-size:10px;color:#555;padding:12px;display:flex;gap:8px;">
+        <div style="width:60px;display:flex;flex-direction:column;gap:4px;">
+          <div style="height:36px;background:#222;border-radius:3px;"></div>
+          <div style="height:36px;background:#222;border-radius:3px;"></div>
+          <div style="height:36px;background:#222;border-radius:3px;"></div>
+        </div>
+        <div style="flex:1;background:#1a1a1a;border-radius:4px;"></div>
+        <div style="width:200px;display:flex;flex-direction:column;gap:6px;padding:8px;">
+          <div style="height:12px;background:#222;border-radius:2px;width:80%;"></div>
+          <div style="height:8px;background:#222;border-radius:2px;width:60%;"></div>
+          <div style="height:8px;background:#222;border-radius:2px;width:90%;"></div>
+          <div style="height:8px;background:#222;border-radius:2px;width:40%;"></div>
+        </div>
+      </div>
+      <!-- Scrim -->
+      <div style="position:absolute;inset:0;border-radius:8px;background:rgba(0,0,0,0.6);"></div>
+      <!-- 上传弹窗 -->
+      <div style="position:relative;z-index:2;max-width:380px;margin:16px auto;background:#1e1e1e;border:1px solid #444;border-radius:12px;padding:20px;">
+        <div style="font-size:14px;color:#fff;font-weight:600;margin-bottom:14px;">上传课件 & 音频</div>
+        <div style="border:1px dashed #555;border-radius:8px;padding:14px;text-align:center;margin-bottom:10px;">
+          <div style="color:#888;font-size:12px;">拖拽 PPT/PDF 到这里</div>
+          <div style="color:#555;font-size:10px;margin-top:4px;">（可选）.ppt .pptx .pdf</div>
+        </div>
+        <div style="border:1px dashed #555;border-radius:8px;padding:14px;text-align:center;margin-bottom:14px;">
+          <div style="color:#888;font-size:12px;">拖拽音频文件到这里</div>
+          <div style="color:#555;font-size:10px;margin-top:4px;">（必需）.mp3 .wav .m4a</div>
+        </div>
+        <div style="background:#F59E0B;color:#000;text-align:center;padding:8px;border-radius:6px;font-size:13px;font-weight:600;">开始处理</div>
+      </div>
+    </div>
+    <p style="color:#999;font-size:12px;margin-top:8px;">→ 背景是 NotesPage 空态（半透明 scrim 遮罩，不可交互）。弹窗复用 UploadPage 的上传 UI 设计。</p>
+  </div>
+
+  <!-- 阶段 2 -->
+  <div style="border:1px solid #333;border-radius:10px;padding:20px;background:#1a1a1a;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <span style="background:#10B981;color:#fff;font-weight:700;padding:2px 10px;border-radius:12px;font-size:13px;">阶段 2</span>
+      <span style="color:#fff;font-weight:600;font-size:15px;">弹窗消失 → 全骨架屏加载态</span>
+      <span style="color:#666;font-size:12px;">(上传成功瞬间，URL → /notes/{session_id})</span>
+    </div>
+    <div style="background:#111;border-radius:8px;padding:12px;font-family:monospace;font-size:11px;color:#888;">
+      <div style="display:flex;gap:8px;">
+        <!-- 左侧缩略图 skeleton -->
+        <div style="width:64px;display:flex;flex-direction:column;gap:5px;">
+          <div style="height:40px;background:linear-gradient(90deg,#222 25%,#2a2a2a 50%,#222 75%);border-radius:4px;animation:shimmer 1.5s infinite;"></div>
+          <div style="height:40px;background:linear-gradient(90deg,#222 25%,#2a2a2a 50%,#222 75%);border-radius:4px;"></div>
+          <div style="height:40px;background:linear-gradient(90deg,#222 25%,#2a2a2a 50%,#222 75%);border-radius:4px;"></div>
+          <div style="font-size:9px;color:#555;text-align:center;margin-top:4px;">正在解析<br/>PPT...</div>
+        </div>
+        <!-- 中间 canvas skeleton -->
+        <div style="flex:1;background:#1a1a1a;border-radius:6px;display:flex;align-items:center;justify-content:center;min-height:140px;border:1px solid #252525;">
+          <div style="text-align:center;">
+            <div style="width:28px;height:28px;border:2px solid #444;border-top-color:#F59E0B;border-radius:50%;margin:0 auto 8px;animation:spin 1s linear infinite;"></div>
+            <div style="color:#555;font-size:11px;">正在提取幻灯片...</div>
+          </div>
+        </div>
+        <!-- 右侧笔记 skeleton -->
+        <div style="width:220px;display:flex;flex-direction:column;gap:6px;">
+          <div style="display:flex;gap:4px;margin-bottom:6px;">
+            <span style="padding:3px 8px;background:#333;border-radius:10px;font-size:10px;color:#888;">AI Notes</span>
+            <span style="padding:3px 8px;background:#222;border-radius:10px;font-size:10px;color:#555;">Transcript</span>
+            <span style="padding:3px 8px;background:#222;border-radius:10px;font-size:10px;color:#555;">My Notes</span>
+          </div>
+          <div style="height:10px;background:#222;border-radius:3px;width:85%;"></div>
+          <div style="height:8px;background:#222;border-radius:3px;width:65%;"></div>
+          <div style="height:8px;background:#222;border-radius:3px;width:90%;"></div>
+          <div style="height:8px;background:#222;border-radius:3px;width:50%;"></div>
+          <div style="height:8px;background:#222;border-radius:3px;width:75%;"></div>
+          <div style="font-size:9px;color:#555;text-align:center;margin-top:8px;">
+            <div style="width:14px;height:14px;border:1.5px solid #444;border-top-color:#3B82F6;border-radius:50%;margin:0 auto 4px;animation:spin 1s linear infinite;"></div>
+            正在提取PPT文字中...
+          </div>
+        </div>
+      </div>
+    </div>
+    <p style="color:#999;font-size:12px;margin-top:8px;">→ 弹窗消失，scrim 解除。三个面板同时显示骨架屏/loading 动画。后端并行：线程A（PPT解析）+ 线程B（音频转换+ASR+对齐）已启动。SSE 连接已建立。</p>
+  </div>
+
+  <!-- 阶段 3 -->
+  <div style="border:1px solid #333;border-radius:10px;padding:20px;background:#1a1a1a;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <span style="background:#8B5CF6;color:#fff;font-weight:700;padding:2px 10px;border-radius:12px;font-size:13px;">阶段 3</span>
+      <span style="color:#fff;font-weight:600;font-size:15px;">PPT 解析完成 → 左栏 + AI Notes 点亮</span>
+      <span style="color:#666;font-size:12px;">(SSE: ppt_parsed，通常 5-15 秒)</span>
+    </div>
+    <div style="background:#111;border-radius:8px;padding:12px;font-family:monospace;font-size:11px;color:#888;">
+      <div style="display:flex;gap:8px;">
+        <!-- 左侧缩略图 已就绪 -->
+        <div style="width:64px;display:flex;flex-direction:column;gap:5px;">
+          <div style="height:40px;background:#2a2a2a;border-radius:4px;border:2px solid #F59E0B;display:flex;align-items:center;justify-content:center;font-size:8px;color:#aaa;">Slide 1</div>
+          <div style="height:40px;background:#2a2a2a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#666;">Slide 2</div>
+          <div style="height:40px;background:#2a2a2a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#666;">Slide 3</div>
+          <div style="font-size:9px;color:#10B981;text-align:center;margin-top:4px;">✓ 已就绪</div>
+        </div>
+        <!-- 中间 canvas 已就绪 -->
+        <div style="flex:1;background:#1a1a1a;border-radius:6px;display:flex;align-items:center;justify-content:center;min-height:140px;border:1px solid #333;">
+          <div style="text-align:center;">
+            <div style="width:100px;height:60px;background:#252525;border-radius:4px;margin:0 auto 6px;display:flex;align-items:center;justify-content:center;color:#777;font-size:10px;">PDF Slide 1</div>
+            <div style="color:#10B981;font-size:10px;">✓ 幻灯片已加载</div>
+          </div>
+        </div>
+        <!-- 右侧 AI Notes：PPT文本灰色显示 -->
+        <div style="width:220px;display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;gap:4px;margin-bottom:6px;">
+            <span style="padding:3px 8px;background:#333;border-radius:10px;font-size:10px;color:#888;">AI Notes</span>
+            <span style="padding:3px 8px;background:#222;border-radius:10px;font-size:10px;color:#555;">Transcript</span>
+            <span style="padding:3px 8px;background:#222;border-radius:10px;font-size:10px;color:#555;">My Notes</span>
+          </div>
+          <div style="font-size:10px;color:#555;line-height:1.6;">
+            <div style="display:flex;align-items:flex-start;gap:4px;margin-bottom:3px;">
+              <span style="color:#444;">•</span>
+              <span style="opacity:0.5;">数据结构的基本概念</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:4px;margin-bottom:3px;">
+              <span style="color:#444;">•</span>
+              <span style="opacity:0.5;">线性表与链表的区别</span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:4px;margin-bottom:3px;">
+              <span style="color:#444;">•</span>
+              <span style="opacity:0.5;">时间复杂度分析 O(n)</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;margin-top:6px;">
+            <div style="width:10px;height:10px;border:1.5px solid #444;border-top-color:#8B5CF6;border-radius:50%;animation:spin 1s linear infinite;"></div>
+            <span style="font-size:9px;color:#8B5CF6;">AI 正在生成笔记...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:8px;padding:8px 12px;background:#1e1e1e;border-radius:6px;border-left:3px solid #8B5CF6;">
+      <p style="color:#ccc;font-size:11px;margin:0;line-height:1.6;">
+        <strong style="color:#8B5CF6;">此时用户可以做：</strong><br/>
+        ✅ 浏览左侧缩略图、切换页面<br/>
+        ✅ 查看 PPT 幻灯片画面<br/>
+        ✅ 看到 AI Notes 中的灰色 PPT 文本（暗示"待增强"）<br/>
+        ✅ 在 My Notes 标签页写笔记<br/>
+        ⏳ Transcript 标签页仍显示 loading（ASR 未完成）<br/>
+        ⏳ AI Notes 的 bullet 文本是灰色的（AI 解释尚未生成）
+      </p>
+    </div>
+  </div>
+
+  <!-- 阶段 4 -->
+  <div style="border:1px solid #333;border-radius:10px;padding:20px;background:#1a1a1a;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <span style="background:#EC4899;color:#fff;font-weight:700;padding:2px 10px;border-radius:12px;font-size:13px;">阶段 4</span>
+      <span style="color:#fff;font-weight:600;font-size:15px;">ASR + 对齐完成 → Transcript 点亮</span>
+      <span style="color:#666;font-size:12px;">(SSE: asr_done，通常 30-120 秒)</span>
+    </div>
+    <div style="background:#111;border-radius:8px;padding:12px;font-family:monospace;font-size:11px;color:#888;">
+      <div style="display:flex;gap:8px;">
+        <div style="width:64px;display:flex;flex-direction:column;gap:5px;">
+          <div style="height:40px;background:#2a2a2a;border-radius:4px;border:2px solid #F59E0B;display:flex;align-items:center;justify-content:center;font-size:8px;color:#aaa;">Slide 1</div>
+          <div style="height:40px;background:#2a2a2a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#666;">Slide 2</div>
+          <div style="height:40px;background:#2a2a2a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#666;">Slide 3</div>
+        </div>
+        <div style="flex:1;background:#1a1a1a;border-radius:6px;display:flex;align-items:center;justify-content:center;min-height:140px;border:1px solid #333;">
+          <div style="width:100px;height:60px;background:#252525;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#777;font-size:10px;">PDF Slide 1</div>
+        </div>
+        <!-- 右侧：切到 Transcript 标签页展示 -->
+        <div style="width:220px;display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;gap:4px;margin-bottom:6px;">
+            <span style="padding:3px 8px;background:#222;border-radius:10px;font-size:10px;color:#555;">AI Notes</span>
+            <span style="padding:3px 8px;background:#333;border-radius:10px;font-size:10px;color:#EC4899;">Transcript ✓</span>
+            <span style="padding:3px 8px;background:#222;border-radius:10px;font-size:10px;color:#555;">My Notes</span>
+          </div>
+          <div style="font-size:10px;line-height:1.6;">
+            <div style="display:flex;gap:6px;margin-bottom:4px;padding:3px 4px;border-radius:3px;background:#1a1a1a;">
+              <span style="color:#EC4899;font-size:9px;flex-shrink:0;">00:12</span>
+              <span style="color:#ccc;">今天我们来讲数据结构的基本概念</span>
+            </div>
+            <div style="display:flex;gap:6px;margin-bottom:4px;padding:3px 4px;border-radius:3px;">
+              <span style="color:#EC4899;font-size:9px;flex-shrink:0;">00:28</span>
+              <span style="color:#ccc;">首先什么是线性表呢</span>
+            </div>
+            <div style="display:flex;gap:6px;margin-bottom:4px;padding:3px 4px;border-radius:3px;">
+              <span style="color:#EC4899;font-size:9px;flex-shrink:0;">00:45</span>
+              <span style="color:#ccc;">线性表是具有相同数据类型的...</span>
+            </div>
+          </div>
+          <div style="font-size:9px;color:#10B981;margin-top:4px;">✓ 转录完成 · 共 47 句</div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:8px;padding:8px 12px;background:#1e1e1e;border-radius:6px;border-left:3px solid #EC4899;">
+      <p style="color:#ccc;font-size:11px;margin:0;line-height:1.6;">
+        <strong style="color:#EC4899;">新增可用：</strong><br/>
+        ✅ Transcript 标签页有内容了，可点击句子播放音频<br/>
+        ✅ 音频播放器可用<br/>
+        ⏳ AI Notes 仍在逐页生成中...
+      </p>
+    </div>
+  </div>
+
+  <!-- 阶段 5 -->
+  <div style="border:1px solid #333;border-radius:10px;padding:20px;background:#1a1a1a;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <span style="background:#10B981;color:#fff;font-weight:700;padding:2px 10px;border-radius:12px;font-size:13px;">阶段 5</span>
+      <span style="color:#fff;font-weight:600;font-size:15px;">AI 笔记逐页点亮 → 灰色变黑色</span>
+      <span style="color:#666;font-size:12px;">(SSE: page_1_ready, page_2_ready, ... 每页 3-8 秒)</span>
+    </div>
+    <div style="background:#111;border-radius:8px;padding:12px;font-family:monospace;font-size:11px;color:#888;">
+      <div style="display:flex;gap:8px;">
+        <div style="width:64px;display:flex;flex-direction:column;gap:5px;">
+          <div style="height:40px;background:#2a2a2a;border-radius:4px;border:2px solid #F59E0B;display:flex;align-items:center;justify-content:center;font-size:8px;color:#aaa;">Slide 1 ✓</div>
+          <div style="height:40px;background:#2a2a2a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#666;">Slide 2 ✓</div>
+          <div style="height:40px;background:#2a2a2a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#555;">Slide 3 ⏳</div>
+        </div>
+        <div style="flex:1;background:#1a1a1a;border-radius:6px;display:flex;align-items:center;justify-content:center;min-height:140px;border:1px solid #333;">
+          <div style="width:100px;height:60px;background:#252525;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#777;font-size:10px;">PDF Slide 1</div>
+        </div>
+        <!-- AI Notes：第1-2页已点亮，第3页还是灰的 -->
+        <div style="width:220px;display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;gap:4px;margin-bottom:6px;">
+            <span style="padding:3px 8px;background:#333;border-radius:10px;font-size:10px;color:#10B981;">AI Notes</span>
+            <span style="padding:3px 8px;background:#222;border-radius:10px;font-size:10px;color:#555;">Transcript</span>
+            <span style="padding:3px 8px;background:#222;border-radius:10px;font-size:10px;color:#555;">My Notes</span>
+          </div>
+          <div style="font-size:10px;line-height:1.8;">
+            <div style="margin-bottom:6px;">
+              <div style="display:flex;align-items:flex-start;gap:4px;">
+                <span style="color:#10B981;">•</span>
+                <span style="color:#e0e0e0;font-weight:500;">数据结构的基本概念</span>
+              </div>
+              <div style="margin-left:14px;color:#999;font-size:9px;line-height:1.5;border-left:2px solid #333;padding-left:6px;margin-top:2px;">
+                数据结构是计算机存储、组织数据的方式。它是指相互之间存在一种或多种特定关系的数据元素的集合...
+              </div>
+            </div>
+            <div style="margin-bottom:6px;">
+              <div style="display:flex;align-items:flex-start;gap:4px;">
+                <span style="color:#10B981;">•</span>
+                <span style="color:#e0e0e0;font-weight:500;">线性表与链表的区别</span>
+              </div>
+              <div style="margin-left:14px;color:#999;font-size:9px;line-height:1.5;border-left:2px solid #333;padding-left:6px;margin-top:2px;">
+                线性表是最基本的数据结构之一，顺序存储 vs 链式存储...
+              </div>
+            </div>
+            <div>
+              <div style="display:flex;align-items:flex-start;gap:4px;">
+                <span style="color:#444;">•</span>
+                <span style="opacity:0.5;color:#888;">时间复杂度分析 O(n)</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:4px;margin-left:14px;margin-top:3px;">
+                <div style="width:8px;height:8px;border:1.5px solid #444;border-top-color:#10B981;border-radius:50%;animation:spin 1s linear infinite;"></div>
+                <span style="font-size:8px;color:#555;">生成中...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:8px;padding:8px 12px;background:#1e1e1e;border-radius:6px;border-left:3px solid #10B981;">
+      <p style="color:#ccc;font-size:11px;margin:0;line-height:1.6;">
+        <strong style="color:#10B981;">逐页点亮效果：</strong><br/>
+        • 第1页 bullet：灰色(opacity:0.5) → 黑色(opacity:1) + AI 解释展开，带 0.2s 过渡动画<br/>
+        • 第2页 bullet：同上，紧随其后点亮<br/>
+        • 第3页 bullet：仍为灰色，显示微小 loading 图标<br/>
+        • 用户可以一边阅读已生成的笔记，一边等待后续页面
+      </p>
+    </div>
+  </div>
+
+  <!-- 阶段 6 -->
+  <div style="border:1px solid #10B981;border-radius:10px;padding:20px;background:#1a1a1a;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <span style="background:#10B981;color:#fff;font-weight:700;padding:2px 10px;border-radius:12px;font-size:13px;">完成</span>
+      <span style="color:#fff;font-weight:600;font-size:15px;">全部就绪 — 标准 NotesPage</span>
+      <span style="color:#666;font-size:12px;">(SSE: all_done，连接关闭)</span>
+    </div>
+    <div style="background:#111;border-radius:8px;padding:12px;font-family:monospace;font-size:11px;color:#888;">
+      <div style="text-align:center;padding:20px;">
+        <div style="color:#10B981;font-size:16px;margin-bottom:6px;">✓</div>
+        <div style="color:#ccc;font-size:12px;">所有模块已就绪。此时的界面 = 现有 NotesPage 的完整状态。</div>
+        <div style="color:#888;font-size:10px;margin-top:4px;">所有交互功能可用：bullet 展开/收起、InlineQA、PageChat、音频播放、导出...</div>
+      </div>
+    </div>
+    <p style="color:#999;font-size:12px;margin-top:8px;">→ SSE 连接关闭。此后 NotesPage 行为与当前版本完全一致，无任何差异。</p>
+  </div>
+
+</div>
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes shimmer { 0% { background-position: -200px 0; } 100% { background-position: 200px 0; } }
+</style>

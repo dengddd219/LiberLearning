@@ -2,6 +2,8 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { uploadFiles } from '../lib/api'
 import { useTranslation } from '../context/TranslationContext'
+import NotesBgShell from '../components/bg/NotesBgShell'
+import LiveBgShell from '../components/bg/LiveBgShell'
 
 // ─── Business logic ───────────────────────────────────────────────────────────
 
@@ -219,21 +221,36 @@ export default function UploadPage() {
   }, [navigate])
 
   return (
-    /* Full-screen overlay — Figma: layout_4H7FSJ */
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="upload-modal-title"
       className="fixed inset-0 flex items-center justify-center"
       style={{
-        backgroundColor: 'rgba(47, 51, 49, 0.2)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
         padding: '24px',
         zIndex: 50,
         fontFamily: 'Inter, system-ui, sans-serif',
+        overflow: 'hidden',
       }}
     >
+      {/* ── Background: NotesPage shell (upload mode) ── */}
+      <div
+        className="absolute inset-0"
+        style={{ opacity: selectedMode === 'upload' ? 1 : 0, transition: 'opacity 0.4s ease', pointerEvents: 'none' }}
+      >
+        <NotesBgShell />
+      </div>
+
+      {/* ── Background: LivePage shell (live mode) ── */}
+      <div
+        className="absolute inset-0"
+        style={{ opacity: selectedMode === 'live' ? 1 : 0, transition: 'opacity 0.4s ease', pointerEvents: 'none' }}
+      >
+        <LiveBgShell />
+      </div>
+
+      {/* ── Dark overlay ── */}
+      <div className="absolute inset-0" style={{ backgroundColor: 'rgba(20, 24, 22, 0.6)', pointerEvents: 'none' }} />
       {/* Modal card — Figma: layout_7HZP3C */}
       <div
         className="relative w-full flex flex-col"

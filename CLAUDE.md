@@ -342,7 +342,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 | 路径 | 内容 |
 |------|------|
-| `frontend/src/pages/LobbyPage.tsx` | 大厅工作台：侧边栏（用户信息 + 新建按钮）+ session 卡片网格/列表视图切换，基于 Figma 实现 |
+| `frontend/src/pages/LobbyPage.tsx` | 大厅工作台：侧边栏 + session 卡片网格/列表视图切换。Icons(L7) / CardMenu 三点菜单(L103) / CourseCard 接口(L199) / ProcessingCard(L237) / DoneCard 网格卡片(L267) / ListRow 列表行(L342) / ListTable(L426) / ProcessingToast(L473) / SettingsPanel(L597) / LobbyPage state(L651) / handleRename(L655) / handleDelete(L664) / toast轮询(L683) / listSessions初始加载(L733) / JSX return(L754) / 侧边栏导航(L803) / 网格/列表切换渲染(L854) |
 | `frontend/src/pages/UploadPage.tsx` | 上传页：PPT + 音频文件上传，调用 `/api/process-mock` |
 | `frontend/src/pages/SessionPage.tsx` | 课中录音页：实时录音 + inline 文字标注 |
 | `frontend/src/pages/ProcessingPage.tsx` | 处理中等待页：流水线进度显示 |
