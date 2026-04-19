@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { getRunLog } from '../lib/api'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -159,21 +159,20 @@ export default function RunLogModal({
   const [error, setError] = useState<'not_found' | 'network' | null>(null)
   const [loading, setLoading] = useState(true)
 
-  async function load() {
+  const handleRetry = useCallback(() => {
     setLoading(true)
     setError(null)
-    try {
-      const data = await getRunLog(sessionId) as RunLog
-      setLog(data)
-    } catch (e: unknown) {
+    getRunLog(sessionId).then(data => {
+      setLog(data as RunLog)
+    }).catch((e: unknown) => {
       const msg = e instanceof Error ? e.message : ''
       setError(msg.includes('404') ? 'not_found' : 'network')
-    } finally {
+    }).finally(() => {
       setLoading(false)
-    }
-  }
+    })
+  }, [sessionId])
 
-  useEffect(() => { load() }, [sessionId])
+  useEffect(() => { handleRetry() }, [handleRetry])
 
   function getFailedPages(log: RunLog): { page_num: number; error: string }[] {
     const step5 = log.steps.step5_notes
@@ -244,7 +243,7 @@ export default function RunLogModal({
             <div style={{ textAlign: 'center', padding: '32px 0' }}>
               <div style={{ fontSize: '13px', color: '#D94F3D', marginBottom: '12px' }}>加载失败，请重试</div>
               <button
-                onClick={load}
+                onClick={handleRetry}
                 style={{
                   padding: '6px 16px', borderRadius: '9999px', border: 'none',
                   backgroundColor: '#F2F2EC', fontSize: '12px', cursor: 'pointer', color: '#292929',
