@@ -1,0 +1,47 @@
+{
+  "session_id": "b24952b5-f391-435f-8e80-220e888b6bab",
+  "started_at": "2026-04-19 15:01:48",
+  "config": {
+    "alignment_version": "v5",
+    "asr_engine": "aliyun",
+    "note_provider": "中转站",
+    "note_model": "claude-sonnet-4-6",
+    "note_passive_template": "passive_ppt_notes",
+    "note_granularity": "detailed"
+  },
+  "steps": {
+    "step2_ppt": {
+      "status": "ok",
+      "ppt_path": "C:\\Users\\19841\\AppData\\Local\\Temp\\liberstudy\\b24952b5-f391-435f-8e80-220e888b6bab\\lec3_38-56_1-4.pdf",
+      "num_pages": 4,
+      "pages_summary": [
+        {
+          "page_num": 1,
+          "ppt_text_len": 42
+        },
+        {
+          "page_num": 2,
+          "ppt_text_len": 182
+        },
+        {
+          "page_num": 3,
+          "ppt_text_len": 133
+        },
+        {
+          "page_num": 4,
+          "ppt_text_len": 434
+        }
+      ],
+      "elapsed_s": 0.5
+    },
+    "step1_audio": {
+      "status": "ok",
+      "wav_path": "C:\\Users\\19841\\AppData\\Local\\Temp\\liberstudy\\b24952b5-f391-435f-8e80-220e888b6bab\\audio.wav",
+      "duration_seconds": 300.009313,
+      "elapsed_s": 2.54
+    }
+  },
+  "finished_at": "2026-04-19 15:01:52",
+  "overall_status": "error",
+  "error": "No module named 'aliyunsdkcore'"
+}

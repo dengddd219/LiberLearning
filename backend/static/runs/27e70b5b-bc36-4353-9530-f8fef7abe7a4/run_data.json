@@ -1,0 +1,1007 @@
+{
+  "session_id": "27e70b5b-bc36-4353-9530-f8fef7abe7a4",
+  "started_at": "2026-04-17 15:12:56",
+  "config": {
+    "alignment_version": "v5",
+    "asr_engine": "aliyun",
+    "note_provider": "中转站",
+    "note_model": "claude-sonnet-4-6",
+    "note_passive_template": "passive_ppt_notes",
+    "note_granularity": "detailed"
+  },
+  "steps": {
+    "step1_audio": {
+      "status": "ok",
+      "wav_path": "C:\\Users\\19841\\AppData\\Local\\Temp\\liberstudy\\27e70b5b-bc36-4353-9530-f8fef7abe7a4\\audio.wav",
+      "duration_seconds": 300.009313,
+      "elapsed_s": 1.85
+    },
+    "step2_ppt": {
+      "status": "ok",
+      "ppt_path": "C:\\Users\\19841\\AppData\\Local\\Temp\\liberstudy\\27e70b5b-bc36-4353-9530-f8fef7abe7a4\\lec3_38-56_1-4.pdf",
+      "num_pages": 4,
+      "pages_summary": [
+        {
+          "page_num": 1,
+          "ppt_text_len": 42
+        },
+        {
+          "page_num": 2,
+          "ppt_text_len": 182
+        },
+        {
+          "page_num": 3,
+          "ppt_text_len": 133
+        },
+        {
+          "page_num": 4,
+          "ppt_text_len": 434
+        }
+      ],
+      "elapsed_s": 0.45
+    },
+    "step3_asr": {
+      "status": "ok",
+      "engine": "aliyun",
+      "language": "en",
+      "num_sentences": 31,
+      "num_raw_segments": 31,
+      "sentences": [
+        {
+          "text": "Okay, so, let's get started.",
+          "start": 109.5,
+          "end": 112.4
+        },
+        {
+          "text": "So, before the break, we have mentioned that, you should try to train a model with two layers and model with six layers, .",
+          "start": 112.4,
+          "end": 123.53
+        },
+        {
+          "text": "And one thing that you may have observed is that a six layer model may not be as good as a simple model.",
+          "start": 123.53,
+          "end": 132.9
+        },
+        {
+          "text": "And this is weird because we have mentioned that, .",
+          "start": 132.9,
+          "end": 137.85
+        },
+        {
+          "text": "Deep neural network becomes powerful because we have more layers.",
+          "start": 137.85,
+          "end": 143.622
+        },
+        {
+          "text": "But now this is not the case.",
+          "start": 143.622,
+          "end": 145.711
+        },
+        {
+          "text": "So, in the rest of this lecture, we are going to discuss several practical aspect in training new network models.",
+          "start": 145.711,
+          "end": 155.26
+        },
+        {
+          "text": "So let's start with the easy thing.",
+          "start": 155.26,
+          "end": 158.44
+        },
+        {
+          "text": "Let's consider a practical scenario in our real life.",
+          "start": 158.44,
+          "end": 163.151
+        },
+        {
+          "text": "That is, I may want to predict who will repay their loan and who will default.",
+          "start": 163.151,
+          "end": 168.691
+        },
+        {
+          "text": "So in such a scenario, a lender helps you to investigate.",
+          "start": 168.691,
+          "end": 173.4
+        },
+        {
+          "text": "This problem.",
+          "start": 173.4,
+          "end": 174.513
+        },
+        {
+          "text": "And you are given the files of one hundred applicants.",
+          "start": 174.513,
+          "end": 178.43
+        },
+        {
+          "text": "Among these five, one hundred applicants, there are five of them defaulted within three years.",
+          "start": 178.43,
+          "end": 185.49
+        },
+        {
+          "text": "So your goal is to build a model and predict who else is going to, default.",
+          "start": 185.49,
+          "end": 192.76
+        },
+        {
+          "text": "For such a job, what you may find is they give you some photos and they find that all the five people who defaulted worn blue shirts during their interviews.",
+          "start": 192.76,
+          "end": 206.55
+        },
+        {
+          "text": "And your model also find that blue shirts is a strong signal for, default.",
+          "start": 206.55,
+          "end": 213.33
+        },
+        {
+          "text": "So whether this is a valid feature or whether there are some problem when we make this conclusion.",
+          "start": 213.33,
+          "end": 221.73
+        },
+        {
+          "text": "This is a very classic, problem of overfitting.",
+          "start": 221.73,
+          "end": 231.691
+        },
+        {
+          "text": "Or, there's no code of evidence that, blue shirts actually predict.",
+          "start": 231.691,
+          "end": 238.18
+        },
+        {
+          "text": "Applicants default behave.",
+          "start": 238.18,
+          "end": 240.39
+        },
+        {
+          "text": "Right, the reason is because all of them are wearing blue shirts.",
+          "start": 240.39,
+          "end": 245.526
+        },
+        {
+          "text": "So you cannot say only those who default, wear such a blue shirts.",
+          "start": 245.526,
+          "end": 250.669
+        },
+        {
+          "text": "This one thing and the other thing is using human logic.",
+          "start": 250.669,
+          "end": 255.526
+        },
+        {
+          "text": "We know that the color of the shirts should have no, no inference with whether he's going to default or not.",
+          "start": 255.526,
+          "end": 264.097
+        },
+        {
+          "text": "So because of that, we know that this feature.",
+          "start": 264.097,
+          "end": 267.24
+        },
+        {
+          "text": "May not be a valid feature.",
+          "start": 267.24,
+          "end": 269.45
+        },
+        {
+          "text": "And this introduce our classic discussion of training error and generalization error.",
+          "start": 269.45,
+          "end": 276.996
+        },
+        {
+          "text": "Training error means, the error on the training data set and generalization error refers to your error on a new data.",
+          "start": 276.996,
+          "end": 287.396
+        },
+        {
+          "text": "And we always say that the performance on the training data does not represents the performance on a new data set.",
+          "start": 287.396,
+          "end": 295.93
+        },
+        {
+          "text": "This is very similar to we make practices for a.",
+          "start": 295.93,
+          "end": 299.99
+        }
+      ],
+      "raw_segments": [
+        {
+          "text": "Okay, so, let's get started.",
+          "start": 109.5,
+          "end": 112.4
+        },
+        {
+          "text": "So, before the break, we have mentioned that, you should try to train a model with two layers and model with six layers, .",
+          "start": 112.68,
+          "end": 123.53
+        },
+        {
+          "text": "And one thing that you may have observed is that a six layer model may not be as good as a simple model.",
+          "start": 123.81,
+          "end": 132.9
+        },
+        {
+          "text": "And this is weird because we have mentioned that, .",
+          "start": 133.19,
+          "end": 137.85
+        },
+        {
+          "text": "Deep neural network becomes powerful because we have more layers.",
+          "start": 138.55,
+          "end": 143.622
+        },
+        {
+          "text": "But now this is not the case.",
+          "start": 143.622,
+          "end": 145.711
+        },
+        {
+          "text": "So, in the rest of this lecture, we are going to discuss several practical aspect in training new network models.",
+          "start": 145.711,
+          "end": 155.26
+        },
+        {
+          "text": "So let's start with the easy thing.",
+          "start": 155.7,
+          "end": 158.44
+        },
+        {
+          "text": "Let's consider a practical scenario in our real life.",
+          "start": 158.72,
+          "end": 163.151
+        },
+        {
+          "text": "That is, I may want to predict who will repay their loan and who will default.",
+          "start": 163.151,
+          "end": 168.691
+        },
+        {
+          "text": "So in such a scenario, a lender helps you to investigate.",
+          "start": 168.691,
+          "end": 173.4
+        },
+        {
+          "text": "This problem.",
+          "start": 173.73,
+          "end": 174.513
+        },
+        {
+          "text": "And you are given the files of one hundred applicants.",
+          "start": 174.513,
+          "end": 178.43
+        },
+        {
+          "text": "Among these five, one hundred applicants, there are five of them defaulted within three years.",
+          "start": 178.79,
+          "end": 185.49
+        },
+        {
+          "text": "So your goal is to build a model and predict who else is going to, default.",
+          "start": 185.77,
+          "end": 192.76
+        },
+        {
+          "text": "For such a job, what you may find is they give you some photos and they find that all the five people who defaulted worn blue shirts during their interviews.",
+          "start": 193.5,
+          "end": 206.55
+        },
+        {
+          "text": "And your model also find that blue shirts is a strong signal for, default.",
+          "start": 206.86,
+          "end": 213.33
+        },
+        {
+          "text": "So whether this is a valid feature or whether there are some problem when we make this conclusion.",
+          "start": 213.81,
+          "end": 221.73
+        },
+        {
+          "text": "This is a very classic, problem of overfitting.",
+          "start": 227.15,
+          "end": 231.691
+        },
+        {
+          "text": "Or, there's no code of evidence that, blue shirts actually predict.",
+          "start": 231.691,
+          "end": 238.18
+        },
+        {
+          "text": "Applicants default behave.",
+          "start": 238.68,
+          "end": 240.39
+        },
+        {
+          "text": "Right, the reason is because all of them are wearing blue shirts.",
+          "start": 240.67,
+          "end": 245.526
+        },
+        {
+          "text": "So you cannot say only those who default, wear such a blue shirts.",
+          "start": 245.526,
+          "end": 250.669
+        },
+        {
+          "text": "This one thing and the other thing is using human logic.",
+          "start": 250.669,
+          "end": 255.526
+        },
+        {
+          "text": "We know that the color of the shirts should have no, no inference with whether he's going to default or not.",
+          "start": 255.526,
+          "end": 264.097
+        },
+        {
+          "text": "So because of that, we know that this feature.",
+          "start": 264.097,
+          "end": 267.24
+        },
+        {
+          "text": "May not be a valid feature.",
+          "start": 267.24,
+          "end": 269.45
+        },
+        {
+          "text": "And this introduce our classic discussion of training error and generalization error.",
+          "start": 270.33,
+          "end": 276.996
+        },
+        {
+          "text": "Training error means, the error on the training data set and generalization error refers to your error on a new data.",
+          "start": 276.996,
+          "end": 287.396
+        },
+        {
+          "text": "And we always say that the performance on the training data does not represents the performance on a new data set.",
+          "start": 287.396,
+          "end": 295.93
+        },
+        {
+          "text": "This is very similar to we make practices for a.",
+          "start": 296.06,
+          "end": 299.99
+        }
+      ],
+      "elapsed_s": 64.89
+    },
+    "step4_alignment": {
+      "status": "ok",
+      "version": "v5",
+      "num_pages": 4,
+      "pages_summary": [
+        {
+          "page_num": 1,
+          "num_segments": 9
+        },
+        {
+          "page_num": 2,
+          "num_segments": 5
+        },
+        {
+          "page_num": 3,
+          "num_segments": 13
+        },
+        {
+          "page_num": 4,
+          "num_segments": 4
+        }
+      ],
+      "aligned_pages": [
+        {
+          "page_num": 1,
+          "ppt_text": "Practical aspects of training / validation",
+          "ppt_bullets": null,
+          "pdf_url": "/slides/27e70b5b-bc36-4353-9530-f8fef7abe7a4/slides_27e70b5b-bc36-4353-9530-f8fef7abe7a4.pdf",
+          "pdf_page_num": 1,
+          "thumbnail_url": "/slides/27e70b5b-bc36-4353-9530-f8fef7abe7a4/slide_001.png",
+          "aligned_segments": [
+            {
+              "text": "Okay, so, let's get started.",
+              "start": 109.5,
+              "end": 112.4,
+              "similarity": 0.1451791524887085
+            },
+            {
+              "text": "So, before the break, we have mentioned that, you should try to train a model with two layers and model with six layers, .",
+              "start": 112.4,
+              "end": 123.53,
+              "similarity": 0.3197159767150879
+            },
+            {
+              "text": "And one thing that you may have observed is that a six layer model may not be as good as a simple model.",
+              "start": 123.53,
+              "end": 132.9,
+              "similarity": 0.2329159677028656
+            },
+            {
+              "text": "And this is weird because we have mentioned that, .",
+              "start": 132.9,
+              "end": 137.85,
+              "similarity": 0.053297482430934906
+            },
+            {
+              "text": "Deep neural network becomes powerful because we have more layers.",
+              "start": 137.85,
+              "end": 143.622,
+              "similarity": 0.18155118823051453
+            },
+            {
+              "text": "But now this is not the case.",
+              "start": 143.622,
+              "end": 145.711,
+              "similarity": 0.060764413326978683
+            },
+            {
+              "text": "So, in the rest of this lecture, we are going to discuss several practical aspect in training new network models.",
+              "start": 145.711,
+              "end": 155.26,
+              "similarity": 0.5209630727767944
+            },
+            {
+              "text": "So let's start with the easy thing.",
+              "start": 155.26,
+              "end": 158.44,
+              "similarity": 0.15553773939609528
+            },
+            {
+              "text": "Let's consider a practical scenario in our real life.",
+              "start": 158.44,
+              "end": 163.151,
+              "similarity": 0.37538430094718933
+            }
+          ],
+          "off_slide_segments": [],
+          "page_start_time": 109.5,
+          "page_end_time": 163.151,
+          "alignment_confidence": 0.22725658822390768,
+          "page_supplement": null
+        },
+        {
+          "page_num": 2,
+          "ppt_text": "Predict Who Will Repay TheirLoans •A lender hires you to investigate who will repay their  loans •You are given complete files on 100 •5 defaulted within 3 years Image creditdebt.org",
+          "ppt_bullets": null,
+          "pdf_url": "/slides/27e70b5b-bc36-4353-9530-f8fef7abe7a4/slides_27e70b5b-bc36-4353-9530-f8fef7abe7a4.pdf",
+          "pdf_page_num": 2,
+          "thumbnail_url": "/slides/27e70b5b-bc36-4353-9530-f8fef7abe7a4/slide_002.png",
+          "aligned_segments": [
+            {
+              "text": "That is, I may want to predict who will repay their loan and who will default.",
+              "start": 163.151,
+              "end": 168.691,
+              "similarity": 0.6160212755203247
+            },
+            {
+              "text": "So in such a scenario, a lender helps you to investigate.",
+              "start": 168.691,
+              "end": 173.4,
+              "similarity": 0.5123690366744995
+            },
+            {
+              "text": "This problem.",
+              "start": 173.4,
+              "end": 174.513,
+              "similarity": 0.1389956921339035
+            },
+            {
+              "text": "And you are given the files of one hundred applicants.",
+              "start": 174.513,
+              "end": 178.43,
+              "similarity": 0.3113328218460083
+            },
+            {
+              "text": "Among these five, one hundred applicants, there are five of them defaulted within three years.",
+              "start": 178.43,
+              "end": 185.49,
+              "similarity": 0.5520224571228027
+            }
+          ],
+          "off_slide_segments": [],
+          "page_start_time": 163.151,
+          "page_end_time": 185.49,
+          "alignment_confidence": 0.42614825665950773,
+          "page_supplement": null
+        },
+        {
+          "page_num": 3,
+          "ppt_text": "A Surprising Finding\n• All 5 people who defaulted wore blue shirts during interviews\n• Your model may find this strong signal as well",
+          "ppt_bullets": null,
+          "pdf_url": "/slides/27e70b5b-bc36-4353-9530-f8fef7abe7a4/slides_27e70b5b-bc36-4353-9530-f8fef7abe7a4.pdf",
+          "pdf_page_num": 3,
+          "thumbnail_url": "/slides/27e70b5b-bc36-4353-9530-f8fef7abe7a4/slide_003.png",
+          "aligned_segments": [
+            {
+              "text": "So your goal is to build a model and predict who else is going to, default.",
+              "start": 185.49,
+              "end": 192.76,
+              "similarity": 0.3416743278503418
+            },
+            {
+              "text": "For such a job, what you may find is they give you some photos and they find that all the five people who defaulted worn blue shirts during their interviews.",
+              "start": 192.76,
+              "end": 206.55,
+              "similarity": 0.6414979696273804
+            },
+            {
+              "text": "And your model also find that blue shirts is a strong signal for, default.",
+              "start": 206.55,
+              "end": 213.33,
+              "similarity": 0.6920678019523621
+            },
+            {
+              "text": "So whether this is a valid feature or whether there are some problem when we make this conclusion.",
+              "start": 213.33,
+              "end": 221.73,
+              "similarity": 0.22715555131435394
+            },
+            {
+              "text": "This is a very classic, problem of overfitting.",
+              "start": 221.73,
+              "end": 231.691,
+              "similarity": 0.3097519278526306
+            },
+            {
+              "text": "Or, there's no code of evidence that, blue shirts actually predict.",
+              "start": 231.691,
+              "end": 238.18,
+              "similarity": 0.5027744770050049
+            },
+            {
+              "text": "Applicants default behave.",
+              "start": 238.18,
+              "end": 240.39,
+              "similarity": 0.3662344813346863
+            },
+            {
+              "text": "Right, the reason is because all of them are wearing blue shirts.",
+              "start": 240.39,
+              "end": 245.526,
+              "similarity": 0.47747087478637695
+            },
+            {
+              "text": "So you cannot say only those who default, wear such a blue shirts.",
+              "start": 245.526,
+              "end": 250.669,
+              "similarity": 0.5231577157974243
+            },
+            {
+              "text": "This one thing and the other thing is using human logic.",
+              "start": 250.669,
+              "end": 255.526,
+              "similarity": 0.19447995722293854
+            },
+            {
+              "text": "We know that the color of the shirts should have no, no inference with whether he's going to default or not.",
+              "start": 255.526,
+              "end": 264.097,
+              "similarity": 0.45600855350494385
+            },
+            {
+              "text": "So because of that, we know that this feature.",
+              "start": 264.097,
+              "end": 267.24,
+              "similarity": 0.17715033888816833
+            },
+            {
+              "text": "May not be a valid feature.",
+              "start": 267.24,
+              "end": 269.45,
+              "similarity": 0.16747432947158813
+            }
+          ],
+          "off_slide_segments": [],
+          "page_start_time": 185.49,
+          "page_end_time": 269.45,
+          "alignment_confidence": 0.39053063896986157,
+          "page_supplement": null
+        },
+        {
+          "page_num": 4,
+          "ppt_text": "Training Error and Generalization Error\n• Training error (bias): model error on the training data\n• Generalization error (variance): model error on new data\n• Example: practice a future exam with past exams\n• Doing well on past exams (training error) doesn’t guarantee a  good score on the future exam (generalization error)\n• Student A gets 0 error on past exams by rote learning\n• Student B  understands the reasons for givenanswers",
+          "ppt_bullets": null,
+          "pdf_url": "/slides/27e70b5b-bc36-4353-9530-f8fef7abe7a4/slides_27e70b5b-bc36-4353-9530-f8fef7abe7a4.pdf",
+          "pdf_page_num": 4,
+          "thumbnail_url": "/slides/27e70b5b-bc36-4353-9530-f8fef7abe7a4/slide_004.png",
+          "aligned_segments": [
+            {
+              "text": "And this introduce our classic discussion of training error and generalization error.",
+              "start": 269.45,
+              "end": 276.996,
+              "similarity": 0.6013460159301758
+            },
+            {
+              "text": "Training error means, the error on the training data set and generalization error refers to your error on a new data.",
+              "start": 276.996,
+              "end": 287.396,
+              "similarity": 0.6732097268104553
+            },
+            {
+              "text": "And we always say that the performance on the training data does not represents the performance on a new data set.",
+              "start": 287.396,
+              "end": 295.93,
+              "similarity": 0.3576148748397827
+            },
+            {
+              "text": "This is very similar to we make practices for a.",
+              "start": 295.93,
+              "end": 299.99,
+              "similarity": 0.23086333274841309
+            }
+          ],
+          "off_slide_segments": [],
+          "page_start_time": 269.45,
+          "page_end_time": 300.009313,
+          "alignment_confidence": 0.4657584875822067,
+          "page_supplement": null
+        }
+      ],
+      "elapsed_s": 10.55
+    },
+    "step5_notes": {
+      "status": "ok",
+      "provider": "中转站",
+      "model": "claude-sonnet-4-6",
+      "template": "passive_ppt_notes",
+      "granularity": "detailed",
+      "num_pages": 4,
+      "pages_summary": [
+        {
+          "page_num": 1,
+          "status": "partial_ready",
+          "num_bullets": 0,
+          "cost": {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "elapsed_s": 0.0,
+            "attempts": 3,
+            "provider": "中转站",
+            "model": "MiniMax-M2.7",
+            "endpoint": "https://api.minimaxi.com/anthropic"
+          }
+        },
+        {
+          "page_num": 2,
+          "status": "partial_ready",
+          "num_bullets": 0,
+          "cost": {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "elapsed_s": 0.0,
+            "attempts": 3,
+            "provider": "中转站",
+            "model": "MiniMax-M2.7",
+            "endpoint": "https://api.minimaxi.com/anthropic"
+          }
+        },
+        {
+          "page_num": 3,
+          "status": "partial_ready",
+          "num_bullets": 0,
+          "cost": {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "elapsed_s": 0.0,
+            "attempts": 3,
+            "provider": "中转站",
+            "model": "MiniMax-M2.7",
+            "endpoint": "https://api.minimaxi.com/anthropic"
+          }
+        },
+        {
+          "page_num": 4,
+          "status": "partial_ready",
+          "num_bullets": 0,
+          "cost": {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "elapsed_s": 0.0,
+            "attempts": 3,
+            "provider": "中转站",
+            "model": "MiniMax-M2.7",
+            "endpoint": "https://api.minimaxi.com/anthropic"
+          }
+        }
+      ],
+      "generated_pages": [
+        {
+          "page_num": 1,
+          "is_off_slide": false,
+          "pdf_url": "/slides/27e70b5b-bc36-4353-9530-f8fef7abe7a4/slides_27e70b5b-bc36-4353-9530-f8fef7abe7a4.pdf",
+          "pdf_page_num": 1,
+          "ppt_text": "Practical aspects of training / validation",
+          "aligned_segments": [
+            {
+              "text": "Okay, so, let's get started.",
+              "start": 109.5,
+              "end": 112.4,
+              "similarity": 0.1451791524887085
+            },
+            {
+              "text": "So, before the break, we have mentioned that, you should try to train a model with two layers and model with six layers, .",
+              "start": 112.4,
+              "end": 123.53,
+              "similarity": 0.3197159767150879
+            },
+            {
+              "text": "And one thing that you may have observed is that a six layer model may not be as good as a simple model.",
+              "start": 123.53,
+              "end": 132.9,
+              "similarity": 0.2329159677028656
+            },
+            {
+              "text": "And this is weird because we have mentioned that, .",
+              "start": 132.9,
+              "end": 137.85,
+              "similarity": 0.053297482430934906
+            },
+            {
+              "text": "Deep neural network becomes powerful because we have more layers.",
+              "start": 137.85,
+              "end": 143.622,
+              "similarity": 0.18155118823051453
+            },
+            {
+              "text": "But now this is not the case.",
+              "start": 143.622,
+              "end": 145.711,
+              "similarity": 0.060764413326978683
+            },
+            {
+              "text": "So, in the rest of this lecture, we are going to discuss several practical aspect in training new network models.",
+              "start": 145.711,
+              "end": 155.26,
+              "similarity": 0.5209630727767944
+            },
+            {
+              "text": "So let's start with the easy thing.",
+              "start": 155.26,
+              "end": 158.44,
+              "similarity": 0.15553773939609528
+            },
+            {
+              "text": "Let's consider a practical scenario in our real life.",
+              "start": 158.44,
+              "end": 163.151,
+              "similarity": 0.37538430094718933
+            }
+          ],
+          "page_start_time": 109.5,
+          "page_end_time": 163.151,
+          "alignment_confidence": 0.22725658822390768,
+          "page_supplement": null,
+          "passive_notes": {
+            "error": "Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': \"login fail: Please carry the API secret key in the 'Authorization' field of the request header\"}, 'request_id': '063110cef7e8d45af38c904fd40504a5'}",
+            "bullets": []
+          },
+          "active_notes": null,
+          "status": "partial_ready",
+          "_cost": {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "elapsed_s": 0.0,
+            "attempts": 3,
+            "provider": "中转站",
+            "model": "MiniMax-M2.7",
+            "endpoint": "https://api.minimaxi.com/anthropic"
+          }
+        },
+        {
+          "page_num": 2,
+          "is_off_slide": false,
+          "pdf_url": "/slides/27e70b5b-bc36-4353-9530-f8fef7abe7a4/slides_27e70b5b-bc36-4353-9530-f8fef7abe7a4.pdf",
+          "pdf_page_num": 2,
+          "ppt_text": "Predict Who Will Repay TheirLoans •A lender hires you to investigate who will repay their  loans •You are given complete files on 100 •5 defaulted within 3 years Image creditdebt.org",
+          "aligned_segments": [
+            {
+              "text": "That is, I may want to predict who will repay their loan and who will default.",
+              "start": 163.151,
+              "end": 168.691,
+              "similarity": 0.6160212755203247
+            },
+            {
+              "text": "So in such a scenario, a lender helps you to investigate.",
+              "start": 168.691,
+              "end": 173.4,
+              "similarity": 0.5123690366744995
+            },
+            {
+              "text": "This problem.",
+              "start": 173.4,
+              "end": 174.513,
+              "similarity": 0.1389956921339035
+            },
+            {
+              "text": "And you are given the files of one hundred applicants.",
+              "start": 174.513,
+              "end": 178.43,
+              "similarity": 0.3113328218460083
+            },
+            {
+              "text": "Among these five, one hundred applicants, there are five of them defaulted within three years.",
+              "start": 178.43,
+              "end": 185.49,
+              "similarity": 0.5520224571228027
+            }
+          ],
+          "page_start_time": 163.151,
+          "page_end_time": 185.49,
+          "alignment_confidence": 0.42614825665950773,
+          "page_supplement": null,
+          "passive_notes": {
+            "error": "Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': \"login fail: Please carry the API secret key in the 'Authorization' field of the request header\"}, 'request_id': '063110ce3b9e3fac13e82f35173b63c1'}",
+            "bullets": []
+          },
+          "active_notes": null,
+          "status": "partial_ready",
+          "_cost": {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "elapsed_s": 0.0,
+            "attempts": 3,
+            "provider": "中转站",
+            "model": "MiniMax-M2.7",
+            "endpoint": "https://api.minimaxi.com/anthropic"
+          }
+        },
+        {
+          "page_num": 3,
+          "is_off_slide": false,
+          "pdf_url": "/slides/27e70b5b-bc36-4353-9530-f8fef7abe7a4/slides_27e70b5b-bc36-4353-9530-f8fef7abe7a4.pdf",
+          "pdf_page_num": 3,
+          "ppt_text": "A Surprising Finding\n• All 5 people who defaulted wore blue shirts during interviews\n• Your model may find this strong signal as well",
+          "aligned_segments": [
+            {
+              "text": "So your goal is to build a model and predict who else is going to, default.",
+              "start": 185.49,
+              "end": 192.76,
+              "similarity": 0.3416743278503418
+            },
+            {
+              "text": "For such a job, what you may find is they give you some photos and they find that all the five people who defaulted worn blue shirts during their interviews.",
+              "start": 192.76,
+              "end": 206.55,
+              "similarity": 0.6414979696273804
+            },
+            {
+              "text": "And your model also find that blue shirts is a strong signal for, default.",
+              "start": 206.55,
+              "end": 213.33,
+              "similarity": 0.6920678019523621
+            },
+            {
+              "text": "So whether this is a valid feature or whether there are some problem when we make this conclusion.",
+              "start": 213.33,
+              "end": 221.73,
+              "similarity": 0.22715555131435394
+            },
+            {
+              "text": "This is a very classic, problem of overfitting.",
+              "start": 221.73,
+              "end": 231.691,
+              "similarity": 0.3097519278526306
+            },
+            {
+              "text": "Or, there's no code of evidence that, blue shirts actually predict.",
+              "start": 231.691,
+              "end": 238.18,
+              "similarity": 0.5027744770050049
+            },
+            {
+              "text": "Applicants default behave.",
+              "start": 238.18,
+              "end": 240.39,
+              "similarity": 0.3662344813346863
+            },
+            {
+              "text": "Right, the reason is because all of them are wearing blue shirts.",
+              "start": 240.39,
+              "end": 245.526,
+              "similarity": 0.47747087478637695
+            },
+            {
+              "text": "So you cannot say only those who default, wear such a blue shirts.",
+              "start": 245.526,
+              "end": 250.669,
+              "similarity": 0.5231577157974243
+            },
+            {
+              "text": "This one thing and the other thing is using human logic.",
+              "start": 250.669,
+              "end": 255.526,
+              "similarity": 0.19447995722293854
+            },
+            {
+              "text": "We know that the color of the shirts should have no, no inference with whether he's going to default or not.",
+              "start": 255.526,
+              "end": 264.097,
+              "similarity": 0.45600855350494385
+            },
+            {
+              "text": "So because of that, we know that this feature.",
+              "start": 264.097,
+              "end": 267.24,
+              "similarity": 0.17715033888816833
+            },
+            {
+              "text": "May not be a valid feature.",
+              "start": 267.24,
+              "end": 269.45,
+              "similarity": 0.16747432947158813
+            }
+          ],
+          "page_start_time": 185.49,
+          "page_end_time": 269.45,
+          "alignment_confidence": 0.39053063896986157,
+          "page_supplement": null,
+          "passive_notes": {
+            "error": "Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': \"login fail: Please carry the API secret key in the 'Authorization' field of the request header\"}, 'request_id': '063110cfa8a60203ba678c139e82fe21'}",
+            "bullets": []
+          },
+          "active_notes": null,
+          "status": "partial_ready",
+          "_cost": {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "elapsed_s": 0.0,
+            "attempts": 3,
+            "provider": "中转站",
+            "model": "MiniMax-M2.7",
+            "endpoint": "https://api.minimaxi.com/anthropic"
+          }
+        },
+        {
+          "page_num": 4,
+          "is_off_slide": false,
+          "pdf_url": "/slides/27e70b5b-bc36-4353-9530-f8fef7abe7a4/slides_27e70b5b-bc36-4353-9530-f8fef7abe7a4.pdf",
+          "pdf_page_num": 4,
+          "ppt_text": "Training Error and Generalization Error\n• Training error (bias): model error on the training data\n• Generalization error (variance): model error on new data\n• Example: practice a future exam with past exams\n• Doing well on past exams (training error) doesn’t guarantee a  good score on the future exam (generalization error)\n• Student A gets 0 error on past exams by rote learning\n• Student B  understands the reasons for givenanswers",
+          "aligned_segments": [
+            {
+              "text": "And this introduce our classic discussion of training error and generalization error.",
+              "start": 269.45,
+              "end": 276.996,
+              "similarity": 0.6013460159301758
+            },
+            {
+              "text": "Training error means, the error on the training data set and generalization error refers to your error on a new data.",
+              "start": 276.996,
+              "end": 287.396,
+              "similarity": 0.6732097268104553
+            },
+            {
+              "text": "And we always say that the performance on the training data does not represents the performance on a new data set.",
+              "start": 287.396,
+              "end": 295.93,
+              "similarity": 0.3576148748397827
+            },
+            {
+              "text": "This is very similar to we make practices for a.",
+              "start": 295.93,
+              "end": 299.99,
+              "similarity": 0.23086333274841309
+            }
+          ],
+          "page_start_time": 269.45,
+          "page_end_time": 300.009313,
+          "alignment_confidence": 0.4657584875822067,
+          "page_supplement": null,
+          "passive_notes": {
+            "error": "Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error', 'message': \"login fail: Please carry the API secret key in the 'Authorization' field of the request header\"}, 'request_id': '063110cf2b99b264701cffe5793cc418'}",
+            "bullets": []
+          },
+          "active_notes": null,
+          "status": "partial_ready",
+          "_cost": {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "elapsed_s": 0.0,
+            "attempts": 3,
+            "provider": "中转站",
+            "model": "MiniMax-M2.7",
+            "endpoint": "https://api.minimaxi.com/anthropic"
+          }
+        }
+      ],
+      "elapsed_s": 13.19
+    }
+  },
+  "finished_at": "2026-04-17 15:14:27",
+  "overall_status": "partial_ready"
+}
