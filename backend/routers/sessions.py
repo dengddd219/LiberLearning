@@ -497,9 +497,13 @@ async def ask_bullet(session_id: str, req: AskRequest):
     return Response(content=png_bytes, media_type="image/png")
 
 
+_RUNS_ROOT = Path("static/runs").resolve()
+
 @router.get("/sessions/{session_id}/run-log")
-async def get_run_log(session_id: str):
-    run_log_path = Path("static") / "runs" / session_id / "run_data.json"
+def get_run_log(session_id: str):
+    run_log_path = (_RUNS_ROOT / session_id / "run_data.json").resolve()
+    if not str(run_log_path).startswith(str(_RUNS_ROOT)):
+        raise HTTPException(status_code=400, detail="invalid session_id")
     if not run_log_path.exists():
         raise HTTPException(status_code=404, detail="run log not found")
     with open(run_log_path, encoding="utf-8") as f:
