@@ -346,15 +346,8 @@ def parse_ppt(
             else:
                 ppt_text = _clean_ppt_text(pdf_page.get_text("text"))
 
-            # Render PNG thumbnail at 1.5x scale (suitable for display)
-            mat = fitz.Matrix(1.5, 1.5)
-            pix = pdf_page.get_pixmap(matrix=mat)
-            png_name = f"slide_{page_num:03d}.png"
-            png_path = Path(slides_output_dir) / png_name
-            pix.save(str(png_path))
-            # thumbnail_url: derive from the actual output dir name (= session_id subdir)
-            slides_dir_name = Path(slides_output_dir).name
-            thumbnail_url = f"/slides/{slides_dir_name}/{png_name}"
+            # No pre-rendering: frontend falls back to on-demand /api/sessions/{id}/slide/{n}.png
+            thumbnail_url = None
 
             pages.append(
                 {

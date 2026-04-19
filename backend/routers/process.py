@@ -28,6 +28,10 @@ from services.events import publish_event
 router = APIRouter(tags=["process"])
 
 MAX_CALLS_PER_DAY = _settings.RATE_LIMIT_MAX_CALLS_PER_DAY
+
+# In-memory cache: ppt_id → {ppt_path, slides_dir, ppt_pages}
+# Entries are consumed on /api/process and cleared.
+_ppt_cache: dict[str, dict] = {}
 DAY_SECONDS = 86400.0
 MAX_AUDIO_SECONDS = _settings.MAX_AUDIO_SECONDS
 
@@ -47,6 +51,53 @@ def process_health():
 def rate_limit_status(request: Request):
     ip = request.client.host
     return get_rate_limit_status(ip, max_calls=MAX_CALLS_PER_DAY, window_seconds=DAY_SECONDS)
+
+
+# ── Upload PPT ahead of processing ────────────────────────────────────────────
+
+@router.post("/upload-ppt")
+async def upload_ppt(ppt: UploadFile = File(...)):
+    """
+    Pre-upload and parse PPT before the audio is ready.
+    Returns ppt_id that can be passed to /api/process to skip re-parsing.
+    """
+    ppt_id = str(uuid.uuid4())
+    tmp_dir = Path(tempfile.gettempdir()) / "liberstudy" / f"ppt_{ppt_id}"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+
+    ppt_path = tmp_dir / (ppt.filename or "slides.pptx")
+    with open(ppt_path, "wb") as f:
+        f.write(await ppt.read())
+
+    slides_dir = str(Path("static") / "slides" / ppt_id)
+    ppt_pages = parse_ppt(str(ppt_path), slides_dir, pdf_name=f"slides_{ppt_id}.pdf")
+
+    # Fix pdf_url to include the ppt_id subdir
+    for page in ppt_pages:
+        if page.get("pdf_url"):
+            pdf_name_only = page["pdf_url"].split("/")[-1]
+            page["pdf_url"] = f"/slides/{ppt_id}/{pdf_name_only}"
+
+    _ppt_cache[ppt_id] = {
+        "ppt_path": str(ppt_path),
+        "slides_dir": slides_dir,
+        "ppt_pages": ppt_pages,
+    }
+
+    return {
+        "ppt_id": ppt_id,
+        "num_pages": len(ppt_pages),
+        "pages": [
+            {
+                "page_num": p["page_num"],
+                "pdf_url": p.get("pdf_url"),
+                "pdf_page_num": p.get("pdf_page_num"),
+                "thumbnail_url": p.get("thumbnail_url"),
+                "ppt_text": p.get("ppt_text", ""),
+            }
+            for p in ppt_pages
+        ],
+    }
 
 
 # ── Phase A: Mock endpoint ─────────────────────────────────────────────────────
@@ -69,6 +120,7 @@ async def process_real(
     audio: UploadFile = File(...),
     language: str = Form("en"),
     user_anchors: str = Form("[]"),
+    ppt_id: Optional[str] = Form(None),
 ):
     # 1. 参数校验
     if language not in ALLOWED_LANGUAGES:
@@ -143,6 +195,7 @@ async def process_real(
         ppt_path=str(ppt_path) if ppt_path else None,
         language=language,
         user_anchors=anchors,
+        ppt_id=ppt_id,
     )
 
     return {"session_id": session_id}
@@ -178,6 +231,7 @@ async def _run_pipeline(
     ppt_path: Optional[str],
     language: str,
     user_anchors: list[dict],
+    ppt_id: Optional[str] = None,
 ):
     """Background task: full processing pipeline with progress updates and SSE events."""
     import asyncio
@@ -234,7 +288,25 @@ async def _run_pipeline(
             db.update_session(session_id, {"progress": {"step": "parsing_ppt", "percent": 30}})
             slides_dir = str(Path("static") / "slides" / session_id)
             ppt_pages: list[dict] = []
-            if ppt_path:
+            if ppt_id and ppt_id in _ppt_cache:
+                # Reuse pre-parsed result; move slides to session-specific subdir
+                cached = _ppt_cache.pop(ppt_id)
+                src_slides = Path(cached["slides_dir"])
+                dst_slides = Path(slides_dir)
+                if src_slides != dst_slides:
+                    if dst_slides.exists():
+                        shutil.rmtree(dst_slides)
+                    shutil.move(str(src_slides), str(dst_slides))
+                ppt_pages = cached["ppt_pages"]
+                # Fix pdf_url / thumbnail_url to use new session_id path
+                for page in ppt_pages:
+                    if page.get("pdf_url"):
+                        pdf_name_only = page["pdf_url"].split("/")[-1]
+                        page["pdf_url"] = f"/slides/{session_id}/{pdf_name_only}"
+                    if page.get("thumbnail_url"):
+                        png_name = page["thumbnail_url"].split("/")[-1]
+                        page["thumbnail_url"] = f"/slides/{session_id}/{png_name}"
+            elif ppt_path:
                 ppt_pages = parse_ppt(ppt_path, slides_dir, pdf_name=f"slides_{session_id}.pdf")
                 for page in ppt_pages:
                     if page.get("pdf_url"):

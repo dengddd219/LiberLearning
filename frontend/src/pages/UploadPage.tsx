@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { uploadFiles } from '../lib/api'
+import { uploadFiles, uploadPpt } from '../lib/api'
 import { useTranslation } from '../context/TranslationContext'
 import NotesBgShell from '../components/bg/NotesBgShell'
 import LiveBgShell from '../components/bg/LiveBgShell'
@@ -183,11 +183,17 @@ export default function UploadPage() {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [selectedMode, setSelectedMode] = useState<'live' | 'upload' | null>('live')
+  const [pptId, setPptId] = useState<string | null>(null)
 
   const handlePpt = useCallback((file: File) => {
     const err = validateFile(file, ['.ppt', '.pptx', '.pdf'])
     setPptError(err)
-    if (!err) setPptFile(file)
+    setPptId(null)
+    if (!err) {
+      setPptFile(file)
+      // Fire-and-forget pre-upload; errors are non-fatal (will re-parse on submit)
+      uploadPpt(file).then(res => setPptId(res.ppt_id)).catch(() => {})
+    }
   }, [])
 
   const handleAudio = useCallback((file: File) => {
@@ -201,14 +207,14 @@ export default function UploadPage() {
     setUploading(true)
     setUploadError(null)
     try {
-      const result = await uploadFiles(pptFile ?? undefined, audioFile)
+      const result = await uploadFiles(pptFile ?? undefined, audioFile, 'en', undefined, pptId ?? undefined)
       navigate(`/processing?session_id=${result.session_id}`)
     } catch (err) {
       console.error('Upload failed:', err)
       setUploadError('上传失败，请检查网络后重试')
       setUploading(false)
     }
-  }, [pptFile, audioFile, navigate])
+  }, [pptFile, audioFile, pptId, navigate])
 
   const canSubmit = !!audioFile && !pptError && !audioError && !uploading
 

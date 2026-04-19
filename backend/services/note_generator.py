@@ -243,7 +243,7 @@ def _get_async_call_fn(provider: str):
             resp = await client.messages.create(
                 model=model,
                 max_tokens=2048,
-                system=system,
+                system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
                 messages=[{"role": "user", "content": user_msg}],
             )
             text_blocks = [b for b in resp.content if isinstance(b, TextBlock)]

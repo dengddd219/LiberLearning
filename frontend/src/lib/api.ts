@@ -17,11 +17,22 @@ export async function apiPost<T>(path: string, body?: FormData | object): Promis
   return res.json()
 }
 
+export async function uploadPpt(pptFile: File): Promise<{
+  ppt_id: string
+  num_pages: number
+  pages: { page_num: number; pdf_url: string | null; pdf_page_num: number; thumbnail_url: string | null; ppt_text: string }[]
+}> {
+  const form = new FormData()
+  form.append('ppt', pptFile)
+  return apiPost('/api/upload-ppt', form)
+}
+
 export async function uploadFiles(
   pptFile?: File,
   audioFile?: File,
   language: string = 'en',
   userAnchors?: { page_num: number; timestamp: number }[],
+  pptId?: string,
 ): Promise<{ session_id: string }> {
   const form = new FormData()
   if (pptFile) form.append('ppt', pptFile)
@@ -30,6 +41,7 @@ export async function uploadFiles(
   if (userAnchors && userAnchors.length > 0) {
     form.append('user_anchors', JSON.stringify(userAnchors))
   }
+  if (pptId) form.append('ppt_id', pptId)
   return apiPost('/api/process', form)
 }
 
