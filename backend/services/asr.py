@@ -427,7 +427,7 @@ def _aliyun_wait_for_result(
     access_key_secret: str,
     task_id: str,
     timeout_seconds: int = 7200,
-    poll_interval: int = 10,
+    poll_interval: int = 5,
 ) -> dict:
     """Poll GetTaskResult until task succeeds. Returns the BizResult dict."""
     import json

@@ -86,7 +86,7 @@ NOTE_ACTIVE_TEMPLATE: str = "active_expand"
 NOTE_GRANULARITY: str = "detailed"
 
 # 每页 LLM 调用最大并发数
-NOTE_MAX_CONCURRENT: int = 5
+NOTE_MAX_CONCURRENT: int = 10
 
 # 每页失败最大重试次数
 NOTE_MAX_RETRIES: int = 3
