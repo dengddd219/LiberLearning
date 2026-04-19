@@ -823,6 +823,7 @@ export default function NotesPage() {
   const [transcriptJustDone, setTranscriptJustDone] = useState(false)
   const [aiNotesJustDone, setAiNotesJustDone] = useState(false)
   const [revealedPages, setRevealedPages] = useState<Set<number>>(new Set())
+  const [pptPageCount, setPptPageCount] = useState<number>(0)
 
   const handleSSEEvent = useCallback(async (event: SSEEvent) => {
     const sid = processingSessionId
@@ -842,6 +843,7 @@ export default function NotesPage() {
 
     if (event.event === 'ppt_parsed') {
       setLoading(false)
+      setPptPageCount(event.data.num_pages)
     }
 
     if (event.event === 'asr_done') {
@@ -1102,6 +1104,9 @@ export default function NotesPage() {
     getSession(sessionId)
       .then((data) => {
         setSession(data as SessionData)
+        if ((data as SessionData).pages?.length) {
+          setPptPageCount((data as SessionData).pages.length)
+        }
         openTab({ sessionId: sessionId!, label: (data as SessionData).ppt_filename ?? sessionId! })
         setLoading(false)
         if ((data as SessionData).status === 'processing') {
