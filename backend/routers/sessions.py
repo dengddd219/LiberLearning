@@ -526,6 +526,7 @@ def get_slide_png(session_id: str, page_num: int):
     # Cache to disk
     slides_dir.mkdir(parents=True, exist_ok=True)
     png_path.write_bytes(png_bytes)
+    return Response(content=png_bytes, media_type="image/png")
 
 
 class AskRequest(BaseModel):

@@ -5,9 +5,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import CanvasToolbar from '../components/CanvasToolbar'
 import { getSession, retryPage, generateMyNote, askBullet } from '../lib/api'
-import { Document, Page, pdfjs } from 'react-pdf'
-import 'react-pdf/dist/Page/AnnotationLayer.css'
-import 'react-pdf/dist/Page/TextLayer.css'
 import { useHighlights } from '../hooks/useHighlights'
 import HighlightLayer from '../components/HighlightLayer'
 import { useTextAnnotations } from '../hooks/useTextAnnotations'
@@ -16,11 +13,6 @@ import NewClassModal from '../components/NewClassModal'
 import type { PptPage } from '../types/session'
 import { useSessionEvents } from '../hooks/useSessionEvents'
 import type { SSEEvent } from '../hooks/useSessionEvents'
-
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString()
 
 const SWEEP_STYLE_ID = 'ai-sweep-animation'
 if (typeof document !== 'undefined' && !document.getElementById(SWEEP_STYLE_ID)) {
@@ -873,6 +865,7 @@ export default function NotesPage() {
   const [transcriptJustDone, setTranscriptJustDone] = useState(false)
   const [aiNotesJustDone, setAiNotesJustDone] = useState(false)
   const [revealedPages, setRevealedPages] = useState<Set<number>>(new Set())
+  const [pptPageCount, setPptPageCount] = useState<number>(0)
 
   const handleSSEEvent = useCallback(async (event: SSEEvent) => {
     const sid = processingSessionId
@@ -892,6 +885,7 @@ export default function NotesPage() {
 
     if (event.event === 'ppt_parsed') {
       setLoading(false)
+      if (event.data.num_pages > 0) setPptPageCount(event.data.num_pages)
     }
 
     if (event.event === 'asr_done') {
@@ -1134,7 +1128,7 @@ export default function NotesPage() {
   const resizeStartXRef = useRef(0)
   const resizeStartWidthRef = useRef(320)
 
-    // Canvas width for react-pdf
+  // Canvas display width in pixels
   const canvasAreaRef = useRef<HTMLDivElement>(null)
   const [canvasWidth, setCanvasWidth] = useState(800)
 
@@ -1186,6 +1180,9 @@ export default function NotesPage() {
     getSession(sessionId)
       .then((data) => {
         setSession(data as SessionData)
+        if ((data as SessionData).pages?.length) {
+          setPptPageCount((data as SessionData).pages.length)
+        }
         openTab({ sessionId: sessionId!, label: (data as SessionData).ppt_filename ?? sessionId! })
         setLoading(false)
         if ((data as SessionData).status === 'processing') {
@@ -1458,7 +1455,26 @@ export default function NotesPage() {
   }
 
   const currentPageData = session?.pages.find((p) => p.page_num === currentPage)
-  const totalPages = session?.pages.length ?? 0
+  const totalPages = session?.pages.length ?? pptPageCount
+
+  const navPages: Array<{ page_num: number; thumbnail_url?: string; pdf_page_num: number }> =
+    session?.pages?.map((p) => ({
+      page_num: p.page_num,
+      thumbnail_url: p.thumbnail_url,
+      pdf_page_num: p.pdf_page_num,
+    })) ??
+    Array.from({ length: pptPageCount }, (_, i) => ({
+      page_num: i + 1,
+      pdf_page_num: i + 1,
+    }))
+
+  const slidePngUrl: string | null = currentPageData
+    ? (currentPageData.thumbnail_url
+        ? `${API_BASE}${currentPageData.thumbnail_url}`
+        : `${API_BASE}/api/sessions/${sessionId}/slide/${currentPageData.pdf_page_num}.png`)
+    : pptPageCount > 0
+      ? `${API_BASE}/api/sessions/${sessionId}/slide/${currentPage}.png`
+      : null
 
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ background: C.bg, fontFamily: FONT_SERIF }}>
@@ -1484,7 +1500,7 @@ export default function NotesPage() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-3" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }} onWheel={(e) => e.stopPropagation()}>
-              {session.pages.map((page) => {
+              {navPages.map((page) => {
                 const isActive = page.page_num === currentPage
                 return (
                   <button
@@ -1561,14 +1577,13 @@ export default function NotesPage() {
               touchAction: 'none',
             }}
           >
-            {!currentPageData && pagePhase === 'processing' && (
+            {!slidePngUrl && pagePhase === 'processing' && (
               <div style={{ width: Math.round(canvasWidth * zoomLevel / 100), maxWidth: '100%', aspectRatio: '16/9', borderRadius: '8px', background: C.white, boxShadow: '0 4px 24px rgba(0,0,0,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
                 <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: C.secondary, borderTopColor: 'transparent' }} />
                 <span style={{ fontSize: '12px', color: C.muted }}>{t('notes_loading')}</span>
               </div>
             )}
-            {currentPageData && (() => {
-              const pdfUrl = currentPageData.pdf_url ? `${API_BASE}${currentPageData.pdf_url}` : null
+            {slidePngUrl && (() => {
               return (
                 <div
                   className="relative"
@@ -1582,39 +1597,22 @@ export default function NotesPage() {
                       boxShadow: '0 4px 24px rgba(0,0,0,0.10)',
                     }}
                   >
-                    {pdfUrl ? (
-                      <Document
-                        file={pdfUrl}
-                        loading={
-                          <div style={{ height: '500px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin"
-                              style={{ borderColor: C.secondary, borderTopColor: 'transparent' }} />
-                          </div>
-                        }
+                    <img
+                      key={slidePngUrl}
+                      src={slidePngUrl}
+                      alt={`第${currentPage}页`}
+                      style={{ width: Math.round(canvasWidth * zoomLevel / 100), maxWidth: '100%', maxHeight: '80vh', display: 'block' }}
+                    />
+                    {/* Play button — 只有 currentPageData 存在时才显示 */}
+                    {currentPageData && (
+                      <button
+                        onClick={() => handleTimestampClick(currentPageData.page_start_time)}
+                        className="absolute top-3 left-3 text-xs px-2 py-0.5 rounded cursor-pointer transition-all duration-150"
+                        style={{ background: 'rgba(47,51,49,0.7)', color: C.white }}
                       >
-                        <Page
-                          pageNumber={currentPageData.pdf_page_num}
-                          width={Math.round(canvasWidth * zoomLevel / 100)}
-                          renderTextLayer={true}
-                          renderAnnotationLayer={false}
-                        />
-                      </Document>
-                    ) : (
-                      <img
-                        src={`${API_BASE}/api/sessions/${sessionId}/slide/${currentPageData.pdf_page_num}.png`}
-                        alt={`第${currentPageData.page_num}页`}
-                        style={{ maxWidth: '100%', maxHeight: '80vh', display: 'block' }}
-                        loading="lazy"
-                      />
+                        ▶ {formatTime(currentPageData.page_start_time)}
+                      </button>
                     )}
-                    {/* Play button */}
-                    <button
-                      onClick={() => handleTimestampClick(currentPageData.page_start_time)}
-                      className="absolute top-3 left-3 text-xs px-2 py-0.5 rounded cursor-pointer transition-all duration-150"
-                      style={{ background: 'rgba(47,51,49,0.7)', color: C.white }}
-                    >
-                      ▶ {formatTime(currentPageData.page_start_time)}
-                    </button>
                     {/* Highlight layer */}
                     <HighlightLayer
                       pageContainerRef={pageContainerRef}
@@ -1639,7 +1637,7 @@ export default function NotesPage() {
                       className="absolute bottom-3 right-3 text-xs px-2 py-0.5 rounded"
                       style={{ background: 'rgba(47,51,49,0.5)', color: C.white, letterSpacing: '0.05em' }}
                     >
-                      SLIDE {String(currentPageData.page_num).padStart(2, '0')} / {String(totalPages).padStart(2, '0')}
+                      SLIDE {String(currentPage).padStart(2, '0')} / {String(totalPages).padStart(2, '0')}
                     </div>
                   </div>
                 </div>
