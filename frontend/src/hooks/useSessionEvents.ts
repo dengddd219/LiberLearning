@@ -2,10 +2,9 @@
 import { useEffect, useRef } from 'react'
 import { API_BASE, getSession } from '../lib/api'
 
-export interface SSEEvent {
-  event: string
-  [key: string]: unknown
-}
+export type SSEEvent =
+  | { event: 'ppt_parsed'; data: { num_pages: number } }
+  | { event: string; [key: string]: unknown }
 
 export function useSessionEvents(
   sessionId: string | undefined,
