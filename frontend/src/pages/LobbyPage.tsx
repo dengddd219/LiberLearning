@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTabs } from '../context/TabsContext'
 import { listSessions, renameSession, deleteSession } from '../lib/api'
 import { useTranslation } from '../context/TranslationContext'
+import RunLogModal from '../components/RunLogModal'
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 
@@ -128,7 +129,7 @@ interface CourseCard {
   date: string
   thumbColor: string
   folderId: string   // '' = no folder / ungrouped
-  status: 'done' | 'processing'
+  status: 'done' | 'processing' | 'live'
 }
 
 const FALLBACK_SESSIONS: CourseCard[] = []
@@ -677,10 +678,17 @@ function DoneCard({ card, onClick, onRename, onDelete, onShare }: {
       </div>
       {/* Footer */}
       <div className="w-44 pt-4 left-[25px] top-[244px] absolute inline-flex justify-between items-center" style={{ borderTop: '1px solid #E3E3DA' }}>
-        <div className="flex justify-start items-center gap-1">
-          <div className="w-3.5 h-3.5 relative" style={{ color: '#72726E' }}><IconNotes /></div>
-          <div className="text-xs font-normal font-['Inter'] leading-4" style={{ color: '#72726E' }}>{card.notes} {t('card_notes_suffix')}</div>
-        </div>
+        {card.status === 'live' ? (
+          <div className="flex justify-start items-center gap-1">
+            <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#E05C40' }} />
+            <div className="text-xs font-semibold font-['Inter'] leading-4" style={{ color: '#E05C40' }}>进行中</div>
+          </div>
+        ) : (
+          <div className="flex justify-start items-center gap-1">
+            <div className="w-3.5 h-3.5 relative" style={{ color: '#72726E' }}><IconNotes /></div>
+            <div className="text-xs font-normal font-['Inter'] leading-4" style={{ color: '#72726E' }}>{card.notes} {t('card_notes_suffix')}</div>
+          </div>
+        )}
         <div className="text-[10.40px] font-bold font-['Inter'] uppercase leading-4 tracking-wide" style={{ color: '#72726E' }}>{card.time}</div>
       </div>
     </div>
@@ -711,7 +719,7 @@ function GridView({ sessions, folders, onCardClick, onRename, onDelete, onShare 
       )}
 
       {allFolders.map(folder => {
-        const cards = sessions.filter(s => s.folderId === folder.id && s.status === 'done')
+        const cards = sessions.filter(s => s.folderId === folder.id && (s.status === 'done' || s.status === 'live'))
         if (cards.length === 0) return null
         return (
           <div key={folder.id}>
@@ -822,8 +830,17 @@ function ListRow({ card, folderName, onClick, isLast, onRename, onDelete, onShar
 
         {/* Notes */}
         <div className="w-32 pl-6 flex-shrink-0 flex items-center gap-2 text-sm font-medium font-['Inter'] leading-5" style={{ color: '#292929' }}>
-          <IconNotes />
-          {card.notes} {t('card_notes_suffix')}
+          {card.status === 'live' ? (
+            <>
+              <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#E05C40' }} />
+              <span style={{ color: '#E05C40', fontWeight: 600 }}>进行中</span>
+            </>
+          ) : (
+            <>
+              <IconNotes />
+              {card.notes} {t('card_notes_suffix')}
+            </>
+          )}
         </div>
       </button>
 
@@ -846,7 +863,7 @@ function ListTable({ sessions, folders, onRowClick, onRename, onDelete, onShare 
   const { t } = useTranslation()
   const allFolders = [{ id: DEFAULT_FOLDER_ID, name: DEFAULT_FOLDER_NAME }, ...folders]
   const folderMap = Object.fromEntries(allFolders.map(f => [f.id, f.name]))
-  const done = sessions.filter(s => s.status === 'done')
+  const done = sessions.filter(s => s.status === 'done' || s.status === 'live')
   return (
     <div className="self-stretch rounded-[32px] shadow-[0px_40px_40px_0px_rgba(47,51,49,0.04)] overflow-hidden" style={{ backgroundColor: '#FFFFFF' }}>
       {/* Header */}
@@ -977,14 +994,24 @@ function ProcessingToast({ toast, onClose, onOpen }: {
   )
 }
 
-function SettingsPanel() {
+function SettingsPanel({
+  sessions,
+  onOpenRunLog,
+}: {
+  sessions: CourseCard[]
+  onOpenRunLog: (sessionId: string) => void
+}) {
   const { uiLang, setUiLang, t } = useTranslation()
+  const [logPickerOpen, setLogPickerOpen] = useState(false)
+  const availableSessions = sessions.filter(s => s.status !== 'processing')
+
   return (
     <div style={{ padding: '48px', fontFamily: 'Inter, system-ui, sans-serif' }}>
       <div style={{ fontSize: '24px', fontWeight: 900, color: '#292929', marginBottom: '40px' }}>
         {t('settings_title')}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', maxWidth: '480px' }}>
+        {/* 语言设置 */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: '14px', fontWeight: 500, color: '#292929' }}>
             {t('settings_language_label')}
@@ -1006,6 +1033,64 @@ function SettingsPanel() {
                 {lang === 'en' ? t('settings_lang_en') : t('settings_lang_zh')}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* 开发工具分区 */}
+        <div>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: '#A8A8A0', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+            开发工具
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '14px', fontWeight: 500, color: '#292929' }}>查看运行日志</span>
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setLogPickerOpen(v => !v)}
+                style={{
+                  padding: '6px 14px', borderRadius: '9999px', border: '1px solid #E3E3DA',
+                  fontSize: '13px', fontWeight: 500, color: '#292929', cursor: 'pointer',
+                  backgroundColor: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '6px',
+                }}
+              >
+                选择课程 <span style={{ fontSize: '10px', color: '#72726E' }}>{logPickerOpen ? '▲' : '▼'}</span>
+              </button>
+              {logPickerOpen && (
+                <div style={{
+                  position: 'absolute', right: 0, top: '100%', marginTop: '4px',
+                  backgroundColor: '#FFFFFF', borderRadius: '12px', zIndex: 100,
+                  boxShadow: '0px 8px 24px rgba(0,0,0,0.10)', minWidth: '240px',
+                  maxHeight: '280px', overflowY: 'auto', padding: '4px',
+                }}>
+                  {availableSessions.length === 0 && (
+                    <div style={{ padding: '12px 16px', fontSize: '13px', color: '#A8A8A0' }}>
+                      暂无课程
+                    </div>
+                  )}
+                  {availableSessions.map(s => (
+                    <button
+                      key={s.id}
+                      onClick={() => {
+                        setLogPickerOpen(false)
+                        onOpenRunLog(s.id)
+                      }}
+                      style={{
+                        display: 'block', width: '100%', textAlign: 'left',
+                        padding: '8px 12px', borderRadius: '8px', border: 'none',
+                        fontSize: '13px', color: '#292929', cursor: 'pointer',
+                        backgroundColor: 'transparent',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(47,51,49,0.05)')}
+                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <div style={{ fontWeight: 500 }}>{s.course}</div>
+                      {s.lecture && (
+                        <div style={{ fontSize: '11px', color: '#A8A8A0', marginTop: '1px' }}>{s.lecture}</div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -1096,11 +1181,25 @@ export default function LobbyPage() {
   const navigate = useNavigate()
   const { openTab } = useTabs()
   const { t } = useTranslation()
+  const mainAreaRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = mainAreaRef.current
+    if (!el) return
+    const handler = (e: WheelEvent) => {
+      e.preventDefault()
+      el.scrollTop += e.deltaY * 0.4
+    }
+    el.addEventListener('wheel', handler, { passive: false })
+    return () => el.removeEventListener('wheel', handler)
+  }, [])
 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [activeNav, setActiveNav] = useState<'courses' | 'settings'>('courses')
   const [sessions, setSessions] = useState<CourseCard[]>(FALLBACK_SESSIONS)
   const [sortBy, setSortBy] = useState<SortBy>('created')
+  const [runLogSessionId, setRunLogSessionId] = useState<string | null>(null)
+  const runLogSession = sessions.find(s => s.id === runLogSessionId)
 
   // activeFolderId: null = 全部课程（默认），string = 指定文件夹
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null)
@@ -1244,7 +1343,7 @@ export default function LobbyPage() {
                 date: s.created_at ? new Date(Number(s.created_at) * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
                 thumbColor: THUMB_COLORS[i % THUMB_COLORS.length],
                 folderId: map[s.session_id] ?? DEFAULT_FOLDER_ID,
-                status: (s.status === 'processing' ? 'processing' : 'done') as 'done' | 'processing',
+                status: (s.status === 'processing' ? 'processing' : s.status === 'live' ? 'live' : 'done') as 'done' | 'processing' | 'live',
               }))
               setSessions(cards)
             })
@@ -1261,7 +1360,7 @@ export default function LobbyPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast?.sessionId, toast?.status])
 
-  useEffect(() => {
+  const refreshSessions = useCallback(() => {
     listSessions()
       .then((data) => {
         const map = sessionFolderMap
@@ -1275,13 +1374,23 @@ export default function LobbyPage() {
           date: s.created_at ? new Date(Number(s.created_at) * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
           thumbColor: THUMB_COLORS[i % THUMB_COLORS.length],
           folderId: map[s.session_id] ?? DEFAULT_FOLDER_ID,
-          status: (s.status === 'processing' ? 'processing' : 'done') as 'done' | 'processing',
+          status: (s.status === 'processing' ? 'processing' : s.status === 'live' ? 'live' : 'done') as 'done' | 'processing' | 'live',
         }))
         setSessions(cards)
       })
       .catch(() => { /* keep empty list on error */ })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    refreshSessions()
+  }, [refreshSessions])
+
+  useEffect(() => {
+    const handler = () => { if (document.visibilityState === 'visible') refreshSessions() }
+    document.addEventListener('visibilitychange', handler)
+    return () => document.removeEventListener('visibilitychange', handler)
+  }, [refreshSessions])
 
   // ── Sorted & filtered sessions for main area ──────────────────────────────
   const displayedSessions = useMemo(() => {
@@ -1319,7 +1428,7 @@ export default function LobbyPage() {
         </div>
 
         {/* New Recording CTA */}
-        <div className="px-3 pb-8 flex-shrink-0">
+        <div className="px-3 pb-3 flex-shrink-0">
           <button
             onClick={() => navigate('/notes/new')}
             className="w-full px-4 py-3 rounded-2xl inline-flex justify-start items-center gap-2 border-none cursor-pointer hover:opacity-90 transition-opacity"
@@ -1328,6 +1437,20 @@ export default function LobbyPage() {
             <IconMic />
             <span className="text-center text-stone-50 text-xs font-semibold font-['Inter'] leading-5 tracking-tight">
               {t('lobby_new_record').split('\n').map((line, i) => <span key={i}>{line}{i === 0 && <br />}</span>)}
+            </span>
+          </button>
+        </div>
+
+        {/* New Live CTA */}
+        <div className="px-3 pb-3 flex-shrink-0">
+          <button
+            onClick={() => navigate('/live?new=1')}
+            className="w-full px-4 py-3 rounded-2xl inline-flex justify-start items-center gap-2 border-none cursor-pointer hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: '#1A6B5A' }}
+          >
+            <IconMic />
+            <span className="text-center text-stone-50 text-xs font-semibold font-['Inter'] leading-5 tracking-tight">
+              New Live
             </span>
           </button>
         </div>
@@ -1420,7 +1543,11 @@ export default function LobbyPage() {
       </aside>
 
       {/* ── Main Area ── */}
-      <div className="flex-1 min-w-0 overflow-y-auto flex flex-col" style={{ backgroundColor: '#F7F7F2', height: '100%' }}>
+      <div
+        ref={mainAreaRef}
+        className="flex-1 min-w-0 overflow-y-auto scroll-ghost flex flex-col"
+        style={{ backgroundColor: '#F7F7F2', height: '100%' }}
+      >
 
         {/* Header */}
         <div className="self-stretch px-12 py-6 backdrop-blur-md inline-flex justify-between items-center sticky top-0 z-10" style={{ backgroundColor: 'rgba(247,247,242,0.65)' }}>
@@ -1463,7 +1590,7 @@ export default function LobbyPage() {
 
         {/* Content */}
         {activeNav === 'settings' ? (
-          <SettingsPanel />
+          <SettingsPanel sessions={sessions} onOpenRunLog={setRunLogSessionId} />
         ) : (
           <div className="w-full max-w-[1400px] px-12 py-8 flex flex-col justify-start items-start gap-24">
             {viewMode === 'grid' ? (
@@ -1472,8 +1599,12 @@ export default function LobbyPage() {
                 folders={folders}
                 onCardClick={(id) => {
                   const card = sessions.find(s => s.id === id)
-                  openTab({ sessionId: id, label: card?.course ?? id })
-                  navigate(`/notes/${id}`)
+                  if (card?.status === 'live') {
+                    navigate(`/live?sessionId=${id}`)
+                  } else {
+                    openTab({ sessionId: id, label: card?.course ?? id })
+                    navigate(`/notes/${id}`)
+                  }
                 }}
                 onRename={handleRename}
                 onDelete={handleDelete}
@@ -1485,8 +1616,12 @@ export default function LobbyPage() {
                 folders={folders}
                 onRowClick={(id) => {
                   const card = sessions.find(s => s.id === id)
-                  openTab({ sessionId: id, label: card?.course ?? id })
-                  navigate(`/notes/${id}`)
+                  if (card?.status === 'live') {
+                    navigate(`/live?sessionId=${id}`)
+                  } else {
+                    openTab({ sessionId: id, label: card?.course ?? id })
+                    navigate(`/notes/${id}`)
+                  }
                 }}
                 onRename={handleRename}
                 onDelete={handleDelete}
@@ -1517,6 +1652,14 @@ export default function LobbyPage() {
         }
         .group:hover .group-hover\\:opacity-100 { opacity: 1 !important; }
       `}</style>
+
+      {runLogSessionId && runLogSession && (
+        <RunLogModal
+          sessionId={runLogSessionId}
+          sessionName={runLogSession.course}
+          onClose={() => setRunLogSessionId(null)}
+        />
+      )}
     </div>
   )
 }
