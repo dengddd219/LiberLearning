@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { uploadPpt, uploadFiles } from '../lib/api'
 import { useTranslation } from '../context/TranslationContext'
+import type { PptPage } from '../types/session'
 
 const MAX_AUDIO_MB = 500
 
@@ -99,8 +100,9 @@ function PillUpload({ label, accept, active, fileName, onFile, icon }: PillUploa
   )
 }
 
+
 interface NewClassModalProps {
-  onUploadSuccess?: (sessionId: string) => void
+  onUploadSuccess?: (sessionId: string, pages: PptPage[]) => void
   onClose: () => void
 }
 
@@ -112,6 +114,7 @@ export default function NewClassModal({ onUploadSuccess, onClose }: NewClassModa
   const [pptError, setPptError] = useState<string | null>(null)
   const [audioError, setAudioError] = useState<string | null>(null)
   const [pptId, setPptId] = useState<string | null>(null)
+  const [pptPages, setPptPages] = useState<PptPage[]>([])
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [selectedMode, setSelectedMode] = useState<'live' | 'upload' | null>('live')
@@ -123,7 +126,7 @@ export default function NewClassModal({ onUploadSuccess, onClose }: NewClassModa
     setPptId(null)
     if (!err) {
       setPptFile(file)
-      uploadPpt(file).then(res => setPptId(res.ppt_id)).catch(() => {})
+      uploadPpt(file).then(res => { setPptId(res.ppt_id); setPptPages(res.pages) }).catch(() => {})
     }
   }, [])
 
@@ -151,7 +154,7 @@ export default function NewClassModal({ onUploadSuccess, onClose }: NewClassModa
       setUploadError(null)
       try {
         const result = await uploadFiles(pptFile ?? undefined, audioFile, 'en', undefined, pptId ?? undefined)
-        onUploadSuccess(result.session_id)
+        onUploadSuccess(result.session_id, pptPages)
       } catch (err) {
         console.error('Upload failed:', err)
         setUploadError('上传失败，请检查网络后重试')
@@ -162,7 +165,7 @@ export default function NewClassModal({ onUploadSuccess, onClose }: NewClassModa
         state: { phase: 'processing', pptFile: pptFile ?? null, audioFile, pptId: pptId ?? null },
       })
     }
-  }, [pptFile, audioFile, pptId, navigate, onUploadSuccess])
+  }, [pptFile, audioFile, pptId, pptPages, navigate, onUploadSuccess])
 
   const canSubmit = !!audioFile && !pptError && !audioError && !uploading
 

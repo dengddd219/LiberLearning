@@ -48,7 +48,8 @@ ALIGNMENT_LOW_CONFIDENCE_THRESHOLD: float = 0.60
 # ASR 引擎，可选值：
 #   "whisper"  OpenAI Whisper API（支持中英文）
 #   "aliyun"   阿里云录音文件识别 RESTful API（支持中英文，需配置 ALIYUN_* + OSS 环境变量）
-ASR_ENGINE: str = "aliyun"  # 用阿里云
+#   "race"     同时跑 aliyun + whisper，谁先完成用谁
+ASR_ENGINE: str = "race"
 
 # Whisper 模型（目前 API 只有 whisper-1）
 ASR_WHISPER_MODEL: str = "whisper-1"

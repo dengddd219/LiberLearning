@@ -1132,23 +1132,27 @@ export default function LobbyPage() {
   const refreshSessions = useCallback(() => {
     listSessions()
       .then((data) => {
-        const map = sessionFolderMap
-        const cards: CourseCard[] = data.map((s, i) => ({
-          id: s.session_id,
-          course: s.ppt_filename ?? '未命名课程',
-          lecture: '',
-          duration: formatDuration(s.total_duration),
-          notes: 0,
-          time: formatTimeAgo(s.created_at ? Number(s.created_at) : null),
-          date: s.created_at ? new Date(Number(s.created_at) * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
-          thumbColor: THUMB_COLORS[i % THUMB_COLORS.length],
-          folderId: map[s.session_id] ?? DEFAULT_FOLDER_ID,
-          status: (s.status === 'processing' ? 'processing' : s.status === 'live' ? 'live' : 'done') as 'done' | 'processing' | 'live',
-        }))
-        setSessions(cards)
+        setSessionFolderMap(map => {
+          const cards: CourseCard[] = data.map((s, i) => ({
+            id: s.session_id,
+            course: s.ppt_filename ?? '未命名课程',
+            lecture: '',
+            duration: formatDuration(s.total_duration),
+            notes: 0,
+            time: formatTimeAgo(s.created_at ? Number(s.created_at) : null),
+            date: s.created_at ? new Date(Number(s.created_at) * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
+            thumbColor: THUMB_COLORS[i % THUMB_COLORS.length],
+            folderId: map[s.session_id] ?? DEFAULT_FOLDER_ID,
+            status: (s.status === 'processing' ? 'processing' : s.status === 'live' ? 'live' : 'done') as 'done' | 'processing' | 'live',
+          }))
+          setSessions(cards)
+          return map
+        })
       })
-      .catch(() => { /* keep empty list on error */ })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+      .catch((err) => {
+        console.warn('[LobbyPage] listSessions failed, retrying in 3s:', err)
+        setTimeout(refreshSessions, 3000)
+      })
   }, [])
 
   useEffect(() => {

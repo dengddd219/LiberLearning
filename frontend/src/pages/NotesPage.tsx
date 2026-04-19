@@ -2,6 +2,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useTabs } from '../context/TabsContext'
 import { useTranslation } from '../context/TranslationContext'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import CanvasToolbar from '../components/CanvasToolbar'
 import { getSession, retryPage, generateMyNote, askBullet } from '../lib/api'
 import { Document, Page, pdfjs } from 'react-pdf'
@@ -12,6 +13,7 @@ import HighlightLayer from '../components/HighlightLayer'
 import { useTextAnnotations } from '../hooks/useTextAnnotations'
 import TextAnnotationLayer from '../components/TextAnnotationLayer'
 import NewClassModal from '../components/NewClassModal'
+import type { PptPage } from '../types/session'
 import { useSessionEvents } from '../hooks/useSessionEvents'
 import type { SSEEvent } from '../hooks/useSessionEvents'
 
@@ -28,6 +30,12 @@ if (typeof document !== 'undefined' && !document.getElementById(SWEEP_STYLE_ID))
     @keyframes ai-shimmer-sweep {
       0% { background-position: 200% 50%; }
       100% { background-position: -100% 50%; }
+    }
+    @keyframes ellipsis {
+      0%   { width: 0; }
+      33%  { width: 0.5em; }
+      66%  { width: 1em; }
+      100% { width: 1.5em; }
     }
     .ai-bullet-reveal {
       color: transparent;
@@ -176,6 +184,7 @@ interface SessionData {
   audio_url: string
   total_duration: number
   pages: PageData[]
+  progress?: { step: string; percent: number } | null
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
@@ -359,6 +368,47 @@ function LineRevealSpan({ text, revealed }: { text: string; revealed: boolean })
   )
 }
 
+// ─── renderMd：简单 Markdown → JSX（处理 ## heading、- bullet、**bold**）───
+function renderMd(text: string): React.ReactNode {
+  const lines = text.split('\n')
+  const nodes: React.ReactNode[] = []
+
+  const inlineBold = (s: string, key: string): React.ReactNode => {
+    const parts = s.split(/(\*\*[^*]+\*\*)/)
+    return (
+      <span key={key}>
+        {parts.map((p, i) =>
+          p.startsWith('**') && p.endsWith('**')
+            ? <strong key={i} style={{ fontWeight: 600 }}>{p.slice(2, -2)}</strong>
+            : p
+        )}
+      </span>
+    )
+  }
+
+  lines.forEach((line, i) => {
+    if (line.startsWith('## ')) {
+      nodes.push(
+        <div key={i} style={{ fontWeight: 600, fontSize: '14px', marginTop: i === 0 ? 0 : '10px', marginBottom: '4px', color: '#292929' }}>
+          {inlineBold(line.slice(3), `h${i}`)}
+        </div>
+      )
+    } else if (line.startsWith('- ')) {
+      nodes.push(
+        <div key={i} style={{ display: 'flex', gap: '6px', marginBottom: '2px' }}>
+          <span style={{ flexShrink: 0, marginTop: '2px', color: '#72726E' }}>•</span>
+          <span>{inlineBold(line.slice(2), `b${i}`)}</span>
+        </div>
+      )
+    } else if (line.trim() === '') {
+      nodes.push(<div key={i} style={{ height: '4px' }} />)
+    } else {
+      nodes.push(<div key={i}>{inlineBold(line, `t${i}`)}</div>)
+    }
+  })
+  return <>{nodes}</>
+}
+
 // ─── StreamingExpandText：AI 扩写完成后全文 drop-in shimmer ───
 function StreamingExpandText({ text }: { text: string }) {
   const ref = useRef<HTMLSpanElement>(null)
@@ -380,9 +430,9 @@ function StreamingExpandText({ text }: { text: string }) {
   return (
     <span
       ref={ref}
-      style={{ fontSize: '13px', color: 'transparent', lineHeight: '1.7', whiteSpace: 'pre-wrap', display: 'block' }}
+      style={{ fontSize: '13px', color: 'transparent', lineHeight: '1.7', display: 'block' }}
     >
-      {text}
+      {renderMd(text)}
     </span>
   )
 }
@@ -861,11 +911,37 @@ export default function NotesPage() {
 
   useSessionEvents(processingSessionId, pagePhase === 'processing', handleSSEEvent)
 
-  const handleUploadSuccess = useCallback((newSessionId: string) => {
+  const handleUploadSuccess = useCallback((newSessionId: string, pages: PptPage[]) => {
     setProcessingSessionId(newSessionId)
     setPagePhase('processing')
-    setLoading(true)
+    setLoading(false)
     window.history.replaceState(null, '', `/notes/${newSessionId}`)
+    if (pages.length > 0) {
+      const tempSession: SessionData = {
+        session_id: newSessionId,
+        status: 'processing',
+        ppt_filename: '',
+        audio_url: '',
+        total_duration: 0,
+        pages: pages.map((p) => ({
+          page_num: p.page_num,
+          status: 'processing',
+          pdf_url: p.pdf_url ?? '',
+          pdf_page_num: p.pdf_page_num,
+          thumbnail_url: p.thumbnail_url ?? undefined,
+          ppt_text: p.ppt_text,
+          page_start_time: 0,
+          page_end_time: 0,
+          alignment_confidence: 0,
+          active_notes: null,
+          passive_notes: null,
+          page_supplement: null,
+        })),
+      }
+      setSession(tempSession)
+    } else {
+      setLoading(true)
+    }
   }, [])
 
   const [playingSegIdx, setPlayingSegIdx] = useState<number | null>(null)
@@ -975,6 +1051,16 @@ export default function NotesPage() {
   const [drawerModelDDOpen, setDrawerModelDDOpen] = useState(false)
   const drawerModelBtnRef = useRef<HTMLButtonElement>(null)
 
+  useEffect(() => {
+    if (!drawerModelDDOpen) return
+    const handler = (e: MouseEvent) => {
+      if (drawerModelBtnRef.current?.contains(e.target as Node)) return
+      setDrawerModelDDOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [drawerModelDDOpen])
+
   // 切换页面时收回抽屉
   const drawerPrevPageRef = useRef(currentPage)
   useEffect(() => {
@@ -1022,7 +1108,7 @@ export default function NotesPage() {
       ].filter(Boolean).join('\n\n')
 
       let full = ''
-      await askBullet(sessionId, currentPage, -1, context, '', q, '中转站', (chunk) => {
+      await askBullet(sessionId, currentPage, -1, context, '', q, drawerModel === 'Auto' ? '中转站' : drawerModel, (chunk) => {
         full += chunk
         setPageChatStreamingText(full)
       })
@@ -1729,9 +1815,9 @@ export default function NotesPage() {
                         >
                           {isExpanding ? (
                             <div
-                              style={{ fontSize: '13px', color: '#72726E', lineHeight: '1.7', whiteSpace: 'pre-wrap' }}
+                              style={{ fontSize: '13px', color: '#72726E', lineHeight: '1.7' }}
                             >
-                              {expandState.aiText}
+                              {renderMd(expandState.aiText)}
                               <span style={{ opacity: 0.5 }}>▋</span>
                             </div>
                           ) : (
@@ -2067,12 +2153,11 @@ export default function NotesPage() {
               ? (drawerHeightPx != null ? `${drawerHeightPx}px` : '80%')
               : drawerPhase === 'input' ? '210px' : '0px'
             const models = [
-              { id: 'Auto', label: 'Auto', logo: '✦', cls: 'logo-auto' },
-              { id: 'Sonnet 4.6', label: 'Sonnet 4.6', logo: '✦', cls: 'logo-claude' },
-              { id: 'Opus 4.6', label: 'Opus 4.6', logo: '✦', cls: 'logo-claude' },
-              { id: 'Gemini 3.1 Pro', label: 'Gemini 3.1 Pro', logo: 'G', cls: 'logo-gemini' },
-              { id: 'GPT-5.2', label: 'GPT-5.2', logo: 'G', cls: 'logo-gpt' },
-              { id: 'GPT-5.4', label: 'GPT-5.4', logo: 'G', cls: 'logo-gpt' },
+              { id: 'Auto', label: 'Auto（中转站）', logo: '✦', cls: 'logo-auto' },
+              { id: '中转站', label: '中转站', logo: '✦', cls: 'logo-claude' },
+              { id: '通义千问', label: '通义千问', logo: 'Q', cls: 'logo-qwen' },
+              { id: 'DeepSeek', label: 'DeepSeek', logo: 'D', cls: 'logo-deepseek' },
+              { id: '豆包', label: '豆包', logo: 'B', cls: 'logo-doubao' },
             ]
             return (
               <>
@@ -2195,13 +2280,16 @@ export default function NotesPage() {
                         </div>
                       </div>
                     ))}
-                    {pageChatStreaming && pageChatStreamingText && (
+                    {pageChatStreaming && (
                       <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
                         <div style={{
                           maxWidth: '86%', padding: '7px 11px', fontSize: '13px', lineHeight: '1.55',
                           borderRadius: '12px 12px 12px 2px', background: C.sidebar, color: C.fg, whiteSpace: 'pre-wrap',
                         }}>
-                          {pageChatStreamingText}<span style={{ opacity: 0.5 }}>▋</span>
+                          {pageChatStreamingText
+                            ? <>{pageChatStreamingText}<span style={{ opacity: 0.5 }}>▋</span></>
+                            : <span style={{ opacity: 0.5 }}>正在思考<span style={{ display: 'inline-block', animation: 'ellipsis 1.2s steps(3, end) infinite', width: '1.5em', overflow: 'hidden', verticalAlign: 'bottom' }}>...</span></span>
+                          }
                         </div>
                       </div>
                     )}
@@ -2242,8 +2330,8 @@ export default function NotesPage() {
                           if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault()
                             if (pageChatInput.trim()) {
-                              handlePageChatSend()
                               setDrawerPhase('full')
+                              handlePageChatSend()
                             }
                           }
                         }}
@@ -2281,7 +2369,7 @@ export default function NotesPage() {
                           </button>
                           {drawerModelDDOpen && (() => {
                             const rect = drawerModelBtnRef.current?.getBoundingClientRect()
-                            return (
+                            return createPortal(
                               <div
                                 onClick={e => e.stopPropagation()}
                                 style={{
@@ -2310,13 +2398,15 @@ export default function NotesPage() {
                                       <div style={{
                                         width: '20px', height: '20px', borderRadius: '50%',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        fontSize: m.cls === 'logo-gemini' || m.cls === 'logo-gpt' ? '9px' : '11px',
+                                        fontSize: m.cls === 'logo-qwen' || m.cls === 'logo-deepseek' || m.cls === 'logo-doubao' ? '9px' : '11px',
                                         fontWeight: '700', color: '#fff',
                                         background: m.cls === 'logo-auto'
                                           ? 'linear-gradient(135deg,#EAE9E0,#D0CFC5)'
                                           : m.cls === 'logo-claude' ? '#d97757'
-                                          : m.cls === 'logo-gemini' ? 'linear-gradient(135deg,#4285f4,#ea4335,#fbbc05,#34a853)'
-                                          : '#10a37f',
+                                          : m.cls === 'logo-qwen' ? '#5B8FF9'
+                                          : m.cls === 'logo-deepseek' ? '#2563EB'
+                                          : m.cls === 'logo-doubao' ? '#1DB954'
+                                          : '#798C00',
                                         ...(m.cls === 'logo-auto' ? { color: '#798C00' } : {}),
                                       }}>
                                         {m.logo}
@@ -2341,7 +2431,7 @@ export default function NotesPage() {
                                 </div>
                               ))}
                             </div>
-                            )
+                            , document.body)
                           })()}
                         </div>
 
@@ -2363,8 +2453,8 @@ export default function NotesPage() {
                             type="button"
                             onClick={() => {
                               if (pageChatInput.trim()) {
-                                handlePageChatSend()
                                 setDrawerPhase('full')
+                                handlePageChatSend()
                               }
                             }}
                             disabled={pageChatStreaming || !pageChatInput.trim()}
@@ -2437,6 +2527,37 @@ export default function NotesPage() {
       {session?.audio_url && (
         <audio ref={audioRef} src={`${API_BASE}${session.audio_url}`} preload="metadata" style={{ display: 'none' }} />
       )}
+
+      {/* Processing progress bar — bottom-left, shown while pipeline is running */}
+      {pagePhase === 'processing' && session && (() => {
+        const progress = (session as SessionData & { progress?: { step: string; percent: number } | null }).progress
+        const stepLabels: Record<string, string> = {
+          converting: '音频处理中',
+          transcribing: '转录中',
+          aligning: '语义对齐中',
+          generating: '生成笔记中',
+          parsing_ppt: 'PPT 解析中',
+          uploading: '上传中',
+        }
+        const label = progress ? (stepLabels[progress.step] ?? progress.step) : '处理中'
+        const percent = progress?.percent ?? 0
+        return (
+          <div style={{
+            position: 'fixed', bottom: '20px', left: '20px', zIndex: 60,
+            background: 'rgba(41,41,41,0.92)', borderRadius: '10px',
+            padding: '10px 14px', minWidth: '200px', backdropFilter: 'blur(8px)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span style={{ fontSize: '11px', color: '#D0CFC5', fontWeight: 500 }}>{label}</span>
+              <span style={{ fontSize: '11px', color: '#72726E' }}>{percent}%</span>
+            </div>
+            <div style={{ height: '3px', background: 'rgba(255,255,255,0.12)', borderRadius: '2px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${percent}%`, background: '#2D6A4F', borderRadius: '2px', transition: 'width 0.4s ease' }} />
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Upload overlay — shown when no session yet */}
       {pagePhase === 'upload' && (

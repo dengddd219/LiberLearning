@@ -1,0 +1,44 @@
+{
+  "session_id": "186b7511-ca3c-4242-9f9c-40fdc128d556",
+  "started_at": "2026-04-19 21:53:44",
+  "config": {
+    "alignment_version": "v5",
+    "asr_engine": "aliyun",
+    "note_provider": "中转站",
+    "note_model": "claude-sonnet-4-6",
+    "note_passive_template": "passive_ppt_notes",
+    "note_granularity": "detailed"
+  },
+  "steps": {
+    "step2_ppt": {
+      "status": "ok",
+      "ppt_path": "C:\\Users\\19841\\AppData\\Local\\Temp\\liberstudy\\186b7511-ca3c-4242-9f9c-40fdc128d556\\lec3_38-56_1-4.pdf",
+      "num_pages": 4,
+      "pages_summary": [
+        {
+          "page_num": 1,
+          "ppt_text_len": 42
+        },
+        {
+          "page_num": 2,
+          "ppt_text_len": 182
+        },
+        {
+          "page_num": 3,
+          "ppt_text_len": 133
+        },
+        {
+          "page_num": 4,
+          "ppt_text_len": 434
+        }
+      ],
+      "elapsed_s": 0.34
+    },
+    "step1_audio": {
+      "status": "ok",
+      "wav_path": "C:\\Users\\19841\\AppData\\Local\\Temp\\liberstudy\\186b7511-ca3c-4242-9f9c-40fdc128d556\\audio.wav",
+      "duration_seconds": 60.009313,
+      "elapsed_s": 2.15
+    }
+  }
+}

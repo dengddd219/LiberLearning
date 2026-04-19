@@ -472,13 +472,72 @@ def transcribe(
     Routes based on settings.ASR_ENGINE:
       - "aliyun": Alibaba Cloud RESTful ASR (supports zh + en)
       - "whisper": OpenAI Whisper API
+      - "race": Run both concurrently, use whichever finishes first
 
     Returns:
         (sentences, raw_segments)
-
-    Args:
-        prompt: Domain vocabulary hint for Whisper. Ignored by Aliyun ASR.
     """
+    if _settings.ASR_ENGINE == "race":
+        return _transcribe_race(wav_path, language, prompt=prompt)
     if _settings.ASR_ENGINE == "aliyun":
         return transcribe_aliyun(wav_path, language)
     return transcribe_openai(wav_path, language, prompt=prompt)
+
+
+def _transcribe_race(
+    wav_path: str,
+    language: str = "en",
+    prompt: Optional[str] = None,
+) -> tuple[list[dict], list[dict]]:
+    """
+    Run Aliyun ASR and Whisper concurrently in threads.
+    Return the result from whichever finishes first; cancel the other.
+    """
+    import concurrent.futures
+    import logging
+    logger = logging.getLogger(__name__)
+
+    result_holder: list = []
+
+    def _run_aliyun():
+        return ("aliyun", transcribe_aliyun(wav_path, language))
+
+    def _run_whisper():
+        return ("whisper", transcribe_openai(wav_path, language, prompt=prompt))
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        futures = {
+            executor.submit(_run_aliyun): "aliyun",
+            executor.submit(_run_whisper): "whisper",
+        }
+        winner_name = None
+        winner_result = None
+        for fut in concurrent.futures.as_completed(futures):
+            try:
+                name, result = fut.result()
+                if winner_result is None:
+                    winner_name = name
+                    winner_result = result
+                    logger.info(f"ASR race: {name} won")
+                    # Cancel remaining (best-effort, won't interrupt blocking I/O
+                    # but prevents starting if not yet running)
+                    for other in futures:
+                        if other is not fut:
+                            other.cancel()
+                    break
+            except Exception as e:
+                logger.warning(f"ASR race: {futures[fut]} failed: {e}")
+
+        if winner_result is None:
+            # Both failed — wait for second one as last resort
+            for fut in concurrent.futures.as_completed(futures):
+                try:
+                    name, result = fut.result()
+                    winner_name = name
+                    winner_result = result
+                    break
+                except Exception as e:
+                    logger.error(f"ASR race: both engines failed. Last error: {e}")
+                    raise
+
+    return winner_result
