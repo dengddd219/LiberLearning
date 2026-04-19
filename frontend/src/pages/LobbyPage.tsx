@@ -1003,6 +1003,17 @@ function SettingsPanel({
 }) {
   const { uiLang, setUiLang, t } = useTranslation()
   const [logPickerOpen, setLogPickerOpen] = useState(false)
+  const logPickerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!logPickerOpen) return
+    function h(e: MouseEvent) {
+      if (logPickerRef.current && !logPickerRef.current.contains(e.target as Node)) {
+        setLogPickerOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [logPickerOpen])
   const availableSessions = sessions.filter(s => s.status !== 'processing')
 
   return (
@@ -1043,8 +1054,9 @@ function SettingsPanel({
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: '14px', fontWeight: 500, color: '#292929' }}>查看运行日志</span>
-            <div style={{ position: 'relative' }}>
+            <div style={{ position: 'relative' }} ref={logPickerRef}>
               <button
+                type="button"
                 onClick={() => setLogPickerOpen(v => !v)}
                 style={{
                   padding: '6px 14px', borderRadius: '9999px', border: '1px solid #E3E3DA',
