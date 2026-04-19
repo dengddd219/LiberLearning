@@ -1044,7 +1044,7 @@ export default function NotesPage() {
   const resizeStartXRef = useRef(0)
   const resizeStartWidthRef = useRef(320)
 
-    // Canvas width for react-pdf
+  // Canvas display width in pixels
   const canvasAreaRef = useRef<HTMLDivElement>(null)
   const [canvasWidth, setCanvasWidth] = useState(800)
 
