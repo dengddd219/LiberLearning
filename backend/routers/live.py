@@ -1,11 +1,21 @@
 """
 Live router.
-  WebSocket /ws/live-asr  — 接收音频 chunk，转发阿里云流式 ASR，推回识别结果
+  WebSocket /ws/live-asr  — 接收音频 chunk，转发阿里云 NLS 流式 ASR，推回识别结果
   POST /api/live/explain  — 接收页码+转录文本，SSE 流式返回 Claude 解释
 """
 import os
 import json
 import asyncio
+import time
+import uuid
+import hmac
+import hashlib
+import base64
+import urllib.request
+import urllib.parse
+from datetime import datetime, timezone
+
+import websockets
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -13,12 +23,60 @@ import anthropic
 
 router = APIRouter(tags=["live"])
 
+# ── NLS Token 缓存 ─────────────────────────────────────────────────────────────
+_nls_token: str = ""
+_nls_token_expire: float = 0.0
+
+
+def _get_nls_token() -> str:
+    """获取阿里云 NLS token，10分钟内复用缓存。"""
+    global _nls_token, _nls_token_expire
+    if _nls_token and time.time() < _nls_token_expire - 30:
+        return _nls_token
+
+    ak_id = os.environ.get("ALIYUN_ACCESS_KEY_ID", "")
+    ak_secret = os.environ.get("ALIYUN_ACCESS_KEY_SECRET", "")
+    if not ak_id or not ak_secret:
+        raise RuntimeError("ALIYUN_ACCESS_KEY_ID / ALIYUN_ACCESS_KEY_SECRET not set")
+
+    params = {
+        "AccessKeyId": ak_id,
+        "Action": "CreateToken",
+        "Format": "JSON",
+        "RegionId": "cn-shanghai",
+        "SignatureMethod": "HMAC-SHA1",
+        "SignatureNonce": str(uuid.uuid4()),
+        "SignatureVersion": "1.0",
+        "Timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "Version": "2019-02-28",
+    }
+    keys = sorted(params.keys())
+    query = "&".join([f"{k}={urllib.parse.quote(str(params[k]), safe='')}" for k in keys])
+    string_to_sign = "GET&%2F&" + urllib.parse.quote(query, safe="")
+    sig = base64.b64encode(
+        hmac.new((ak_secret + "&").encode(), string_to_sign.encode(), hashlib.sha1).digest()
+    ).decode()
+    query += "&Signature=" + urllib.parse.quote(sig, safe="")
+
+    req = urllib.request.Request("https://nls-meta.cn-shanghai.aliyuncs.com/?" + query)
+    with urllib.request.urlopen(req, timeout=10) as r:
+        data = json.loads(r.read())
+
+    token_obj = data.get("Token", {})
+    _nls_token = token_obj.get("Id", "")
+    _nls_token_expire = float(token_obj.get("ExpireTime", 0))
+    if not _nls_token:
+        raise RuntimeError(f"NLS token empty, response: {data}")
+    return _nls_token
+
+
 # ── POST /api/live/explain ─────────────────────────────────────────────────────
 
 class ExplainRequest(BaseModel):
     page_num: int
     ppt_text: str
     transcript: str
+
 
 @router.post("/live/explain")
 async def live_explain(req: ExplainRequest):
@@ -56,52 +114,183 @@ async def live_explain(req: ExplainRequest):
 
 # ── WebSocket /ws/live-asr ─────────────────────────────────────────────────────
 
+NLS_URL = "wss://nls-gateway.cn-shanghai.aliyuncs.com/ws/v1"
+PCM_FRAME_SIZE = 3200  # 100ms @ 16kHz mono s16le
+
+
 @router.websocket("/ws/live-asr")
 async def live_asr(websocket: WebSocket):
     """
-    接收前端音频 chunk（binary），转发给阿里云 NLS 流式 ASR，
-    将识别结果推回前端。
-
-    当前实现：mock 模式（每收到 chunk 返回占位文字），
-    阿里云 NLS 集成作为 TODO 在此函数内标记。
+    接收前端音频 chunk（audio/webm），经 ffmpeg 转码为 PCM 16kHz，
+    转发给阿里云 NLS 流式 ASR，将识别结果推回前端。
+    消息格式：{text: str, is_final: bool, timestamp: float}
     """
     await websocket.accept()
 
-    # 累积 chunk 计数（用于 mock 输出）
-    chunk_count = 0
-
+    # 获取 NLS token 和 AppKey
     try:
-        while True:
-            try:
-                data = await asyncio.wait_for(websocket.receive_bytes(), timeout=30.0)
-            except asyncio.TimeoutError:
-                # 心跳超时，关闭连接
+        token = _get_nls_token()
+        app_key = os.environ.get("ALIYUN_ASR_APP_KEY", "")
+        if not app_key:
+            raise RuntimeError("ALIYUN_ASR_APP_KEY not set")
+    except Exception as e:
+        await websocket.send_text(json.dumps({"error": str(e)}))
+        await websocket.close()
+        return
+
+    # 启动 ffmpeg 子进程：stdin=webm, stdout=PCM s16le 16kHz mono
+    ffmpeg_cmd = [
+        "ffmpeg", "-loglevel", "quiet",
+        "-f", "webm", "-i", "pipe:0",
+        "-ar", "16000", "-ac", "1", "-f", "s16le", "pipe:1",
+    ]
+    try:
+        ffmpeg = await asyncio.create_subprocess_exec(
+            *ffmpeg_cmd,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+    except Exception as e:
+        await websocket.send_text(json.dumps({"error": f"ffmpeg start failed: {e}"}))
+        await websocket.close()
+        return
+
+    nls_ws = None
+    try:
+        # 连接阿里云 NLS
+        nls_ws = await websockets.connect(f"{NLS_URL}?token={token}")
+
+        # 发送 StartTranscription 指令
+        task_id = str(uuid.uuid4()).replace("-", "")
+        start_msg = {
+            "header": {
+                "message_id": str(uuid.uuid4()).replace("-", ""),
+                "task_id": task_id,
+                "namespace": "SpeechTranscriber",
+                "name": "StartTranscription",
+                "appkey": app_key,
+            },
+            "payload": {
+                "format": "pcm",
+                "sample_rate": 16000,
+                "enable_intermediate_result": True,
+                "enable_punctuation_prediction": True,
+                "enable_inverse_text_normalization": True,
+            },
+        }
+        await nls_ws.send(json.dumps(start_msg))
+
+        # 等待 TranscriptionStarted
+        started = False
+        for _ in range(10):
+            raw = await asyncio.wait_for(nls_ws.recv(), timeout=5.0)
+            msg = json.loads(raw)
+            if msg.get("header", {}).get("name") == "TranscriptionStarted":
+                started = True
                 break
+        if not started:
+            raise RuntimeError("NLS did not respond with TranscriptionStarted")
 
-            chunk_count += 1
+        elapsed = 0.0  # 用于 timestamp 字段（秒）
 
-            # TODO: 集成阿里云 NLS 流式 ASR
-            # 参考文档：https://nls-portal.console.aliyun.com/
-            # SDK：nls-python-sdk or websockets 直接连接
-            # wss://nls-gateway.cn-shanghai.aliyuncs.com/ws/v1
-            # 认证：token 通过 POST https://nls-meta.cn-shanghai.aliyuncs.com 获取
-            #
-            # 当前 mock：每 20 个 chunk（约 5 秒）返回一条占位识别结果
-            if chunk_count % 20 == 0:
-                result = {
-                    "text": f"（模拟转录第 {chunk_count // 20} 句）",
-                    "is_final": True,
-                    "timestamp": chunk_count * 0.25,
-                }
-                await websocket.send_text(json.dumps(result))
-            else:
-                # 非 final 的实时预览（mock）
-                result = {
-                    "text": "…",
-                    "is_final": False,
-                    "timestamp": chunk_count * 0.25,
-                }
-                await websocket.send_text(json.dumps(result))
+        async def feed_ffmpeg():
+            """从前端收 webm bytes → 写 ffmpeg stdin"""
+            try:
+                while True:
+                    data = await asyncio.wait_for(websocket.receive_bytes(), timeout=30.0)
+                    ffmpeg.stdin.write(data)
+                    await ffmpeg.stdin.drain()
+            except (WebSocketDisconnect, asyncio.TimeoutError):
+                pass
+            finally:
+                try:
+                    ffmpeg.stdin.close()
+                except Exception:
+                    pass
+
+        async def read_ffmpeg_send_nls():
+            """读 ffmpeg stdout PCM → 分帧发 NLS"""
+            nonlocal elapsed
+            try:
+                while True:
+                    frame = await asyncio.wait_for(
+                        ffmpeg.stdout.read(PCM_FRAME_SIZE), timeout=5.0
+                    )
+                    if not frame:
+                        break
+                    await nls_ws.send(frame)
+                    elapsed += PCM_FRAME_SIZE / (16000 * 2)  # bytes / (samples/s * bytes/sample)
+            except asyncio.TimeoutError:
+                pass
+            except Exception:
+                pass
+            finally:
+                # 发 StopTranscription，让 NLS 刷出最后结果
+                try:
+                    stop_msg = {
+                        "header": {
+                            "message_id": str(uuid.uuid4()).replace("-", ""),
+                            "task_id": task_id,
+                            "namespace": "SpeechTranscriber",
+                            "name": "StopTranscription",
+                            "appkey": app_key,
+                        },
+                    }
+                    await nls_ws.send(json.dumps(stop_msg))
+                except Exception:
+                    pass
+
+        async def recv_nls_push_client():
+            """收 NLS 消息 → 推回前端"""
+            try:
+                async for raw in nls_ws:
+                    msg = json.loads(raw)
+                    name = msg.get("header", {}).get("name", "")
+                    payload = msg.get("payload", {})
+
+                    if name == "TranscriptionResultChanged":
+                        text = payload.get("result", "")
+                        if text:
+                            await websocket.send_text(json.dumps({
+                                "text": text,
+                                "is_final": False,
+                                "timestamp": round(elapsed, 2),
+                            }))
+                    elif name == "SentenceEnd":
+                        text = payload.get("result", "")
+                        if text:
+                            await websocket.send_text(json.dumps({
+                                "text": text,
+                                "is_final": True,
+                                "timestamp": round(elapsed, 2),
+                            }))
+                    elif name == "TranscriptionCompleted":
+                        break
+            except Exception:
+                pass
+
+        await asyncio.gather(
+            feed_ffmpeg(),
+            read_ffmpeg_send_nls(),
+            recv_nls_push_client(),
+        )
 
     except WebSocketDisconnect:
         pass
+    except Exception as e:
+        try:
+            await websocket.send_text(json.dumps({"error": str(e)}))
+        except Exception:
+            pass
+    finally:
+        try:
+            ffmpeg.terminate()
+            await ffmpeg.wait()
+        except Exception:
+            pass
+        if nls_ws:
+            try:
+                await nls_ws.close()
+            except Exception:
+                pass
