@@ -41,6 +41,10 @@ export async function retryPage(sessionId: string, pageNum: number) {
   return apiPost(`/api/sessions/${sessionId}/page/${pageNum}/retry`)
 }
 
+export async function getRunLog(sessionId: string): Promise<unknown> {
+  return apiGet(`/api/sessions/${sessionId}/run-log`)
+}
+
 export async function renameSession(sessionId: string, newName: string): Promise<void> {
   const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`, {
     method: 'PATCH',
@@ -65,6 +69,10 @@ export async function listSessions(): Promise<
   }[]
 > {
   return apiGet('/api/sessions')
+}
+
+export async function createLiveSession(name?: string): Promise<{ session_id: string }> {
+  return apiPost('/api/sessions/live', { name: name ?? '' })
 }
 
 /**
