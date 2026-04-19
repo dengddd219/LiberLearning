@@ -197,6 +197,23 @@ def sessions_health():
     return {"status": "ok", "router": "sessions"}
 
 
+class CreateLiveRequest(BaseModel):
+    name: Optional[str] = None
+
+
+@router.post("/sessions/live")
+def create_live_session(req: CreateLiveRequest = CreateLiveRequest()):
+    import db as _db
+    import uuid
+    session_id = f"live-{uuid.uuid4().hex[:8]}"
+    name = (req.name or "").strip() or "Live 课堂"
+    _db.save_session(session_id, {
+        "status": "live",
+        "ppt_filename": name,
+    })
+    return {"session_id": session_id}
+
+
 @router.get("/settings")
 def get_settings():
     """返回当前后端所有策略配置，供前端展示。"""
@@ -264,6 +281,8 @@ async def generate_my_note(session_id: str, page_num: int, req: MyNoteRequest):
         api_key = os.environ.get("ANTHROPIC_API_KEY", "")
         base_url = os.environ.get("ANTHROPIC_BASE_URL", "").strip() or None
         kwargs = {"base_url": base_url} if base_url else {}
+        if base_url:
+            kwargs["default_headers"] = {"Authorization": f"Bearer {api_key}"}
         client = _anthropic.AsyncAnthropic(api_key=api_key, **kwargs)
         model = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
         async with client.messages.stream(
@@ -296,7 +315,7 @@ async def generate_my_note(session_id: str, page_num: int, req: MyNoteRequest):
 
     import os
     from services.note_generator import (
-        PROVIDER_ZHONGZHUAN, PROVIDER_ZHIZENGZENG,
+        PROVIDER_ZHONGZHUAN,
         PROVIDER_QWEN, PROVIDER_DEEPSEEK, PROVIDER_DOUBAO,
     )
 
@@ -321,12 +340,6 @@ async def generate_my_note(session_id: str, page_num: int, req: MyNoteRequest):
             base_url="https://ark.cn-beijing.volces.com/api/v3",
             api_key=os.environ.get("VOLC_API_KEY", ""),
             model=os.environ.get("DOUBAO_MODEL", "doubao-pro-4k"),
-        )
-    elif provider == PROVIDER_ZHIZENGZENG:
-        gen = stream_openai_compat(
-            base_url=os.environ.get("OPENAI_BASE_URL", "").strip() or "https://api.openai.com/v1",
-            api_key=os.environ.get("OPENAI_API_KEY", ""),
-            model=os.environ.get("ANTHROPIC_MODEL", "gpt-4o-mini"),
         )
     else:
         raise HTTPException(status_code=400, detail=f"Unknown provider: {provider}")
@@ -394,7 +407,7 @@ class AskRequest(BaseModel):
 async def ask_bullet(session_id: str, req: AskRequest):
     """针对单条 bullet 的流式问答。返回 text/event-stream (SSE)。"""
     from services.note_generator import (
-        PROVIDER_ZHONGZHUAN, PROVIDER_ZHIZENGZENG,
+        PROVIDER_ZHONGZHUAN,
         PROVIDERS,
     )
 
@@ -424,6 +437,8 @@ async def ask_bullet(session_id: str, req: AskRequest):
         api_key = os.environ.get("ANTHROPIC_API_KEY", "")
         base_url = os.environ.get("ANTHROPIC_BASE_URL", "").strip() or None
         kwargs = {"base_url": base_url} if base_url else {}
+        if base_url:
+            kwargs["default_headers"] = {"Authorization": f"Bearer {api_key}"}
         client = _anthropic.AsyncAnthropic(api_key=api_key, **kwargs)
         model = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
         async with client.messages.stream(
@@ -474,15 +489,18 @@ async def ask_bullet(session_id: str, req: AskRequest):
             api_key=os.environ.get("VOLC_API_KEY", ""),
             model=os.environ.get("DOUBAO_MODEL", "doubao-pro-4k"),
         )
-    elif req.model == PROVIDER_ZHIZENGZENG:
-        gen = stream_openai_compat(
-            base_url=os.environ.get("OPENAI_BASE_URL", "").strip() or "https://api.openai.com/v1",
-            api_key=os.environ.get("OPENAI_API_KEY", ""),
-            model=os.environ.get("ANTHROPIC_MODEL", "gpt-4o-mini"),
-        )
     else:
         raise HTTPException(status_code=400, detail=f"Unknown model: {req.model}")
 
     return StreamingResponse(gen, media_type="text/event-stream")
 
     return Response(content=png_bytes, media_type="image/png")
+
+
+@router.get("/sessions/{session_id}/run-log")
+async def get_run_log(session_id: str):
+    run_log_path = Path("static") / "runs" / session_id / "run_data.json"
+    if not run_log_path.exists():
+        raise HTTPException(status_code=404, detail="run log not found")
+    with open(run_log_path, encoding="utf-8") as f:
+        return json.load(f)
