@@ -443,18 +443,24 @@ async def _run_pipeline(
 
         placeholders = [_make_placeholder(p) for p in pages_without_audio]
 
+        # 无音频页面无需 LLM，立即写 DB + 推送
+        for ph in placeholders:
+            db.replace_page(session_id, ph)
+            publish_event(session_id, "page_ready", {"page_num": ph["page_num"]})
+
+        async def _on_page_done(noted_page: dict):
+            db.replace_page(session_id, noted_page)
+            publish_event(session_id, "page_ready", {"page_num": noted_page["page_num"]})
+
         llm_results = await generate_notes_for_all_pages(
             pages_with_audio, provider=_settings.NOTE_PROVIDER,
+            on_page_done=_on_page_done,
         ) if pages_with_audio else []
 
-        # Merge and sort by page_num to preserve original order
+        # Merge and sort by page_num to preserve original order (for run_data stats)
         all_noted = {p["page_num"]: p for p in placeholders}
         all_noted.update({p["page_num"]: p for p in llm_results})
         generated_pages = [all_noted[p["page_num"]] for p in aligned_page_dicts]
-
-        for noted_page in generated_pages:
-            db.replace_page(session_id, noted_page)
-            publish_event(session_id, "page_ready", {"page_num": noted_page["page_num"]})
 
         t5_end = _time.time()
         run_data["steps"]["step5_notes"] = {

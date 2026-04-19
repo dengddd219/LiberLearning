@@ -410,6 +410,7 @@ async def _execute_llm_batch(
     call_fn,
     semaphore: asyncio.Semaphore,
     call_meta: dict | None = None,
+    on_result=None,
 ) -> list[tuple[LLMTask, dict, dict]]:
     """
     Stage 2: Pure concurrent network layer.
@@ -446,6 +447,8 @@ async def _execute_llm_batch(
                     task.page.page_num, in_tok, out_tok, elapsed,
                     attempt + 1, MAX_RETRIES,
                 )
+                if on_result:
+                    await on_result(task, data, usage)
                 return task, data, usage
             except Exception as e:
                 last_err = e
@@ -466,10 +469,13 @@ async def _execute_llm_batch(
             "bullets": [],
             "ai_expansion": "",
         }
-        return task, failed_data, {
+        failed_usage = {
             "input_tokens": 0, "output_tokens": 0,
             "elapsed_s": 0.0, "attempts": MAX_RETRIES, **base_meta,
         }
+        if on_result:
+            await on_result(task, failed_data, failed_usage)
+        return task, failed_data, failed_usage
 
     return list(await asyncio.gather(*[_call_one(t) for t in tasks]))
 
@@ -546,6 +552,7 @@ async def generate_notes_for_all_pages(
     template: str = _settings.NOTE_PASSIVE_TEMPLATE,
     granularity: str = _settings.NOTE_GRANULARITY,
     provider: str = PROVIDER_ZHONGZHUAN,
+    on_page_done=None,
 ) -> list[dict]:
     """
     Generate notes for every page concurrently using the specified template.
@@ -580,7 +587,14 @@ async def generate_notes_for_all_pages(
     tasks, expanded_pages = _prepare_tasks(typed_pages, system_prompt, template, is_passive)
 
     # Stage 2: concurrent LLM calls
-    results = await _execute_llm_batch(tasks, call_fn, semaphore, call_meta)
+    _on_result = None
+    if on_page_done:
+        async def _on_result(task, data, usage):
+            merged = _parse_and_merge([task.page], [(task, data, usage)], is_passive)
+            if merged:
+                await on_page_done(merged[0])
+
+    results = await _execute_llm_batch(tasks, call_fn, semaphore, call_meta, on_result=_on_result)
 
     # Stage 3: stitch results back
     return _parse_and_merge(expanded_pages, results, is_passive)
