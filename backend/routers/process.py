@@ -202,6 +202,11 @@ async def process_real(
 
 
 
+def _extract_ppt_bullets(ppt_text: str) -> list[str]:
+    """Split PPT text into individual bullet lines."""
+    return [l.strip() for l in ppt_text.splitlines() if l.strip()] or ["(no slide text)"]
+
+
 def _build_initial_pages(ppt_pages: list[dict]) -> list[dict]:
     """Construct initial page data after PPT parsing — no notes, no alignment."""
     return [
@@ -412,13 +417,42 @@ async def _run_pipeline(
         t5_start = _time.time()
         db.update_session(session_id, {"progress": {"step": "generating", "percent": 85}})
 
-        generated_pages = []
-        for page_dict in aligned_page_dicts:
-            page_results = await generate_notes_for_all_pages(
-                [page_dict], provider=_settings.NOTE_PROVIDER,
-            )
-            noted_page = page_results[0]
-            generated_pages.append(noted_page)
+        # Split pages: those with audio coverage go to LLM concurrently; empty pages get placeholders.
+        pages_with_audio = [p for p in aligned_page_dicts if p.get("aligned_segments")]
+        pages_without_audio = [p for p in aligned_page_dicts if not p.get("aligned_segments")]
+
+        def _make_placeholder(page_dict: dict) -> dict:
+            return {
+                **page_dict,
+                "status": "ready",
+                "passive_notes": {
+                    "bullets": [
+                        {
+                            "ppt_text": b,
+                            "level": 0,
+                            "ai_comment": "本页无对应课堂讲解录音，以下内容仅基于 PPT 文本整理。",
+                            "timestamp_start": -1,
+                            "timestamp_end": -1,
+                        }
+                        for b in _extract_ppt_bullets(page_dict.get("ppt_text", ""))
+                    ]
+                },
+                "active_notes": None,
+                "_cost": {"input_tokens": 0, "output_tokens": 0},
+            }
+
+        placeholders = [_make_placeholder(p) for p in pages_without_audio]
+
+        llm_results = await generate_notes_for_all_pages(
+            pages_with_audio, provider=_settings.NOTE_PROVIDER,
+        ) if pages_with_audio else []
+
+        # Merge and sort by page_num to preserve original order
+        all_noted = {p["page_num"]: p for p in placeholders}
+        all_noted.update({p["page_num"]: p for p in llm_results})
+        generated_pages = [all_noted[p["page_num"]] for p in aligned_page_dicts]
+
+        for noted_page in generated_pages:
             db.replace_page(session_id, noted_page)
             publish_event(session_id, "page_ready", {"page_num": noted_page["page_num"]})
 

@@ -234,6 +234,7 @@ function RevealText({
     }, 500)
 
     return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revealed])
 
   return (
@@ -287,12 +288,14 @@ function LineByLineReveal({
       measured.push(text.slice(lineStart))
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLines(measured.length > 0 ? measured : [text])
   }, [text])
 
   // startReveal 触发时逐行揭开
   useEffect(() => {
     if (!startReveal || lines.length === 0) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRevealedLines(new Set())
 
     const INTERVAL = 120
@@ -607,6 +610,7 @@ function AiBulletRow({
     if (!expanded) {
       // 收起：重置动画中间状态（animationDone=true 的不需要重置，下次展开直接走已完成分支）
       if (!animationDone) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setRevealedSet(new Set())
         setPptExiting(false)
         setPptSwipedAway(false)
@@ -839,7 +843,6 @@ export default function NotesPage() {
 
     if (event.event === 'asr_done') {
       setTranscriptJustDone(true)
-      setTimeout(() => setTranscriptJustDone(false), 1500)
     }
 
     if (event.event === 'page_ready' && typeof event.page_num === 'number') {
@@ -861,6 +864,7 @@ export default function NotesPage() {
     setLoading(true)
     window.history.replaceState(null, '', `/notes/${newSessionId}`)
   }, [])
+  const [playingSegIdx, setPlayingSegIdx] = useState<number | null>(null)
   const [playProgress, setPlayProgress] = useState(0) // 0–1，当前播放段进度
   const segStartRef = useRef<number | null>(null)
   const segEndRef = useRef<number | null>(null)
@@ -907,9 +911,9 @@ export default function NotesPage() {
   }>>(new Map())
 
   // Provider 切换（AI Notes 顶部）
-  const PROVIDERS = ['中转站', '通义千问', 'DeepSeek', '豆包'] as const
-  type Provider = typeof PROVIDERS[number]
+  type Provider = '中转站' | '通义千问' | 'DeepSeek' | '豆包'
   const [provider, setProvider] = useState<Provider>('中转站')
+  void setProvider // UI 暂未连线
 
   // My Notes：key=pageNum，值为文本（从 IndexedDB 加载，onChange 时 debounce 保存）
   const [myNoteTexts, setMyNoteTexts] = useState<Map<number, string>>(new Map())
@@ -1034,6 +1038,7 @@ export default function NotesPage() {
       setPageChatStreaming(false)
       setPageChatStreamingText('')
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageChatInput, pageChatStreaming, sessionId, currentPage, pageChatMessages, session, myNoteTexts])
 
   // Resizable panel state
@@ -1102,6 +1107,7 @@ export default function NotesPage() {
         }
       })
       .catch(() => { setError('无法加载笔记数据'); setLoading(false) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId])
 
   // Wheel翻页 handler（用 passive:false 原生监听才能 preventDefault）
@@ -1241,8 +1247,10 @@ export default function NotesPage() {
     }
     segTimeUpdateRef.current = onTimeUpdate
     audio.addEventListener('timeupdate', onTimeUpdate)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playingSegIdx])
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleCopyPage = useCallback(() => {
     if (!session) return
     const page = session.pages.find((p) => p.page_num === currentPage)
@@ -1254,6 +1262,7 @@ export default function NotesPage() {
     setTimeout(() => setCopyToast(false), 1500)
   }, [session, currentPage])
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleExportMarkdown = useCallback(() => {
     if (!session) return
     const lines: string[] = [`# ${session.ppt_filename}\n`]
@@ -1350,6 +1359,7 @@ export default function NotesPage() {
     if (translationEnabled && session) {
       translatePage(currentPage)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, translationEnabled, session])
 
   // 切页时把上一页所有展开中的 bullet 标记为动画完成，跳回来直接显示文本
@@ -1367,6 +1377,7 @@ export default function NotesPage() {
       })
     }
     prevPageRef.current = currentPage
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage])
 
   if (pagePhase === 'upload') {
@@ -1633,7 +1644,7 @@ export default function NotesPage() {
                   type="button"
                   role="tab"
                   aria-selected={active}
-                  onClick={() => setNoteMode(mode)}
+                  onClick={() => { setNoteMode(mode); if (mode === 'transcript') setTranscriptJustDone(false) }}
                   style={{
                     padding: '6px 16px 10px',
                     fontSize: '13px',

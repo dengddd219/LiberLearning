@@ -1,0 +1,44 @@
+{
+  "audio_path": "C:/Users/19841/Desktop/github/Liberstudy-test/DL/test/test1 LLM C3/GMT20260206-103304_Recording(1)_5min.m4a",
+  "ppt_path": "C:/Users/19841/Desktop/github/Liberstudy-test/DL/test/test1 LLM C3/lec3_38-56.pdf",
+  "audio_duration_s": 300.009313,
+  "num_ppt_pages": 19,
+  "num_segments": 31,
+  "num_aligned_pages": 19,
+  "step_timings": {
+    "step1_audio_convert": 0.46,
+    "step1_get_duration": 0.1,
+    "step2_ppt_parse": 0.05,
+    "step3_asr": 43.43,
+    "step4_alignment": 5.99,
+    "step5_notes_total": 112.39
+  },
+  "total_elapsed_s": 162.42,
+  "note_latencies_per_page": [
+    7.47,
+    12.87,
+    11.63,
+    15.15,
+    5.51,
+    5.6,
+    5.7,
+    3.16,
+    4.44,
+    2.18,
+    1.99,
+    2.28,
+    3.3,
+    2.66,
+    1.71,
+    4.2,
+    4.06,
+    9.64,
+    8.83
+  ],
+  "config": {
+    "asr_engine": "aliyun",
+    "alignment_version": "v5",
+    "note_provider": "中转站",
+    "note_model": "claude-sonnet-4-6"
+  }
+}
