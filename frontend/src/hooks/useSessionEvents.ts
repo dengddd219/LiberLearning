@@ -4,6 +4,11 @@ import { API_BASE, getSession } from '../lib/api'
 
 export type SSEEvent =
   | { event: 'ppt_parsed'; data: { num_pages: number } }
+  | { event: 'page_ready'; page_num: number }
+  | { event: 'asr_done' }
+  | { event: 'all_done'; status?: string }
+  | { event: 'error'; message?: string }
+  | { event: '_poll'; status?: string; [key: string]: unknown }
   | { event: string; [key: string]: unknown }
 
 export function useSessionEvents(
