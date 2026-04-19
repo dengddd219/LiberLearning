@@ -5,7 +5,6 @@ import { TranslationProvider } from './context/TranslationContext'
 import TopBar from './components/TopBar'
 import LobbyPage from './pages/LobbyPage'
 import LivePage from './pages/LivePage'
-import UploadPage from './pages/UploadPage'
 import ProcessingPage from './pages/ProcessingPage'
 import NotesPage from './pages/NotesPage'
 import DetailedNotePage from './pages/DetailedNotePage'
@@ -19,7 +18,6 @@ function App() {
         <Routes>
           <Route path="/"                        element={<LobbyPage />} />
           <Route path="/live" element={<LivePage />} />
-          <Route path="/upload"                  element={<UploadPage />} />
           <Route path="/processing"              element={<ProcessingPage />} />
           <Route path="/notes/new"              element={<NotesPage />} />
           <Route path="/notes/:sessionId"        element={<NotesPage />} />

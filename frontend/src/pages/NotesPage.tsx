@@ -771,7 +771,7 @@ function AiBulletRow({
               onClick={() => setAskOpen(v => !v)}
               style={{
                 padding: '4px 10px', borderRadius: '6px', fontSize: '11px',
-                border: `1px solid ${askOpen ? C.secondary : C.secondary}`,
+                border: `1px solid ${C.secondary}`,
                 background: askOpen ? C.secondary : 'transparent',
                 color: askOpen ? '#fff' : C.secondary,
                 cursor: 'pointer',
@@ -815,7 +815,7 @@ export default function NotesPage() {
   type PagePhase = 'upload' | 'processing' | 'ready'
   const isNewSession = !sessionId || sessionId === 'new'
   const location = useLocation()
-  const initialPhase: PagePhase = location.state?.phase ?? (isNewSession ? 'upload' : 'ready')
+  const initialPhase: PagePhase = location.state?.phase === 'processing' ? 'processing' : isNewSession ? 'upload' : 'ready'
   const [pagePhase, setPagePhase] = useState<PagePhase>(initialPhase)
   const [processingSessionId, setProcessingSessionId] = useState<string | undefined>(isNewSession ? undefined : sessionId)
   const navigate = useNavigate()
@@ -867,6 +867,7 @@ export default function NotesPage() {
     setLoading(true)
     window.history.replaceState(null, '', `/notes/${newSessionId}`)
   }, [])
+
   const [playingSegIdx, setPlayingSegIdx] = useState<number | null>(null)
   const [playProgress, setPlayProgress] = useState(0) // 0–1，当前播放段进度
   const segStartRef = useRef<number | null>(null)
@@ -875,7 +876,6 @@ export default function NotesPage() {
   const [transcriptClickCount, setTranscriptClickCount] = useState<number>(() => {
     return parseInt(localStorage.getItem('liberstudy_transcript_clicks') ?? '0', 10)
   })
-  const [copyToast, setCopyToast] = useState(false)
   const [retrying, setRetrying] = useState<number | null>(null)
   const [navVisible, setNavVisible] = useState(false)
 
@@ -914,9 +914,7 @@ export default function NotesPage() {
   }>>(new Map())
 
   // Provider 切换（AI Notes 顶部）
-  type Provider = '中转站' | '通义千问' | 'DeepSeek' | '豆包'
-  const [provider, setProvider] = useState<Provider>('中转站')
-  void setProvider // UI 暂未连线
+  const provider = '中转站' as const
 
   // My Notes：key=pageNum，值为文本（从 IndexedDB 加载，onChange 时 debounce 保存）
   const [myNoteTexts, setMyNoteTexts] = useState<Map<number, string>>(new Map())
@@ -1252,45 +1250,6 @@ export default function NotesPage() {
     audio.addEventListener('timeupdate', onTimeUpdate)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playingSegIdx])
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleCopyPage = useCallback(() => {
-    if (!session) return
-    const page = session.pages.find((p) => p.page_num === currentPage)
-    if (!page) return
-    const bullets = page.passive_notes?.bullets.map((b) => `• ${b.ppt_text}`).join('\n') ?? ''
-    const text = `## 第 ${page.page_num} 页\n\n${bullets}`
-    navigator.clipboard.writeText(text)
-    setCopyToast(true)
-    setTimeout(() => setCopyToast(false), 1500)
-  }, [session, currentPage])
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleExportMarkdown = useCallback(() => {
-    if (!session) return
-    const lines: string[] = [`# ${session.ppt_filename}\n`]
-    session.pages.forEach((page) => {
-      lines.push(`## 第 ${page.page_num} 页`)
-      if (page.active_notes) {
-        lines.push(`\n> 我的笔记：${page.active_notes.user_note}`)
-        lines.push(`\n${page.active_notes.ai_expansion}`)
-      }
-      if (page.passive_notes) {
-        page.passive_notes.bullets.forEach((b) => lines.push(`- ${b.ppt_text}`))
-      }
-      if (page.page_supplement) {
-        lines.push(`\n**脱离课件内容：**\n${page.page_supplement.content}`)
-      }
-      lines.push('')
-    })
-    const blob = new Blob([lines.join('\n')], { type: 'text/markdown' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `LiberStudy_${session.ppt_filename}_${new Date().toISOString().slice(0, 10)}.md`
-    a.click()
-    URL.revokeObjectURL(url)
-  }, [session])
 
   const handleExpandMyNote = useCallback(async (pageNum: number) => {
     if (!sessionId) return
@@ -2473,18 +2432,6 @@ export default function NotesPage() {
       >
         LiberStudy · {new Date().getFullYear()}
       </footer>
-
-      {/* Copy toast */}
-      {copyToast && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed bottom-12 left-1/2 -translate-x-1/2 text-sm px-4 py-2 rounded-full shadow-lg z-50"
-          style={{ background: C.fg, color: C.white }}
-        >
-          已复制到剪贴板
-        </div>
-      )}
 
       {/* Audio player (hidden, driven by timestamp clicks) */}
       {session?.audio_url && (

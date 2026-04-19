@@ -80,26 +80,10 @@ function IconNotes() {
   )
 }
 
-function IconBell() {
-  return (
-    <svg width="16" height="20" viewBox="0 0 16 20" fill="none">
-      <path
-        d="M8 0C8 0 3 3 3 9v4l-2 2v1h14v-1l-2-2V9C13 3 8 0 8 0Z"
-        stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"
-      />
-      <path d="M6 16a2 2 0 0 0 4 0" stroke="currentColor" strokeWidth="1.3" />
-    </svg>
-  )
-}
-
-function IconFolder({ open }: { open?: boolean }) {
+function IconFolder() {
   return (
     <svg width="14" height="12" viewBox="0 0 14 12" fill="none">
-      {open ? (
-        <path d="M1 2.5C1 1.67 1.67 1 2.5 1H5.5L7 3H12.5C13.33 3 14 3.67 14 4.5V9.5C14 10.33 13.33 11 12.5 11H1.5C0.67 11 0 10.33 0 9.5V2.5Z" stroke="currentColor" strokeWidth="1.2" fill="none" />
-      ) : (
-        <path d="M1 2.5C1 1.67 1.67 1 2.5 1H5.5L7 3H12.5C13.33 3 14 3.67 14 4.5V9.5C14 10.33 13.33 11 12.5 11H1.5C0.67 11 0 10.33 0 9.5V2.5Z" stroke="currentColor" strokeWidth="1.2" fill="none" />
-      )}
+      <path d="M1 2.5C1 1.67 1.67 1 2.5 1H5.5L7 3H12.5C13.33 3 14 3.67 14 4.5V9.5C14 10.33 13.33 11 12.5 11H1.5C0.67 11 0 10.33 0 9.5V2.5Z" stroke="currentColor" strokeWidth="1.2" fill="none" />
     </svg>
   )
 }
@@ -271,84 +255,6 @@ function ContextMenu({ actions }: { actions: MenuAction[] }) {
   )
 }
 
-// ─── Old CardMenu (for grid card top-right, larger button) ───────────────────
-
-interface CardMenuProps {
-  onRename: () => void
-  onDelete: () => void
-  onShare: () => void
-}
-
-function CardMenu({ onRename, onDelete, onShare }: CardMenuProps) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [open])
-
-  return (
-    <div ref={ref} style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
-      <button
-        type="button"
-        aria-label="更多操作"
-        onClick={() => setOpen(v => !v)}
-        style={{
-          width: '28px', height: '28px', borderRadius: '9999px', border: 'none',
-          backgroundColor: open ? 'rgba(41,41,41,0.08)' : 'transparent',
-          color: '#72726E', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transition: 'background-color 0.15s',
-        }}
-        onMouseEnter={e => { if (!open) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'rgba(41,41,41,0.06)' }}
-        onMouseLeave={e => { if (!open) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent' }}
-      >
-        <svg width="14" height="4" viewBox="0 0 14 4" fill="none">
-          <circle cx="2" cy="2" r="1.5" fill="currentColor" />
-          <circle cx="7" cy="2" r="1.5" fill="currentColor" />
-          <circle cx="12" cy="2" r="1.5" fill="currentColor" />
-        </svg>
-      </button>
-
-      {open && (
-        <div style={{
-          position: 'absolute', top: '32px', right: '0',
-          backgroundColor: '#FFFFFF', borderRadius: '12px',
-          boxShadow: '0px 4px 16px -2px rgba(47,51,49,0.14), 0px 0px 0px 1px rgba(175,179,176,0.12)',
-          padding: '4px', zIndex: 50, minWidth: '120px',
-          fontFamily: 'Inter, system-ui, sans-serif',
-        }}>
-          {([
-            { label: 'Rename', action: onRename, color: '#292929' },
-            { label: 'Delete', action: onDelete, color: '#D94F3D' },
-            { label: 'Share', action: onShare, color: '#72726E' },
-          ] as const).map(({ label, action, color }) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => { setOpen(false); action() }}
-              style={{
-                display: 'block', width: '100%', padding: '7px 12px', textAlign: 'left',
-                background: 'none', border: 'none', borderRadius: '8px',
-                fontSize: '13px', fontWeight: 500, color, cursor: 'pointer', transition: 'background-color 0.12s',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'rgba(47,51,49,0.05)')}
-              onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ─── Sidebar folder tree ──────────────────────────────────────────────────────
 
 interface SidebarFolderTreeProps {
@@ -484,7 +390,7 @@ function SidebarFolderTree({
                 }}
               >
                 <span style={{ color: '#72726E', flexShrink: 0 }}><IconChevron open={isOpen} /></span>
-                <span style={{ color: '#72726E', flexShrink: 0 }}><IconFolder open={isOpen} /></span>
+                <span style={{ color: '#72726E', flexShrink: 0 }}><IconFolder /></span>
                 <span style={{
                   fontSize: '12px', fontWeight: isFolderActive ? 600 : 500, color: '#292929',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -648,7 +554,11 @@ function DoneCard({ card, onClick, onRename, onDelete, onShare }: {
       <div className="w-56 h-72 left-0 top-0 absolute bg-white/0 rounded-[32px] shadow-[0px_40px_40px_-15px_rgba(47,51,49,0.04)]" />
       {/* ... menu */}
       <div style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 10 }}>
-        <CardMenu onRename={onRename} onDelete={onDelete} onShare={onShare} />
+        <ContextMenu actions={[
+          { label: 'Rename', color: '#292929', action: onRename },
+          { label: 'Delete', color: '#D94F3D', action: onDelete },
+          { label: 'Share', color: '#72726E', action: onShare },
+        ]} />
       </div>
       {/* Thumbnail */}
       <div className="w-44 left-[25px] top-[44px] absolute rounded-md inline-flex flex-col justify-center items-start overflow-hidden" style={{ backgroundColor: '#F2F2EC' }}>
@@ -706,6 +616,7 @@ function GridView({ sessions, folders, onCardClick, onRename, onDelete, onShare 
   onShare: (id: string) => void
 }) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const allFolders = [{ id: DEFAULT_FOLDER_ID, name: DEFAULT_FOLDER_NAME }, ...folders]
   const processing = sessions.filter(s => s.status === 'processing')
 
@@ -750,7 +661,7 @@ function GridView({ sessions, folders, onCardClick, onRename, onDelete, onShare 
         <div className="flex flex-col items-center justify-center py-16 w-full">
           <p className="text-sm mb-4" style={{ color: '#D0CFC5' }}>{t('lobby_empty_hint')}</p>
           <button
-            onClick={() => {}}
+            onClick={() => navigate('/notes/new')}
             className="px-4 py-2 text-white text-sm rounded-full cursor-pointer hover:opacity-85 border-none"
             style={{ backgroundColor: '#798C00' }}
           >
@@ -846,7 +757,11 @@ function ListRow({ card, folderName, onClick, isLast, onRename, onDelete, onShar
 
       {/* ... menu */}
       <div className="px-4 flex-shrink-0">
-        <CardMenu onRename={onRename} onDelete={onDelete} onShare={onShare} />
+        <ContextMenu actions={[
+          { label: 'Rename', color: '#292929', action: onRename },
+          { label: 'Delete', color: '#D94F3D', action: onDelete },
+          { label: 'Share', color: '#72726E', action: onShare },
+        ]} />
       </div>
     </div>
   )
@@ -892,107 +807,10 @@ function ListTable({ sessions, folders, onRowClick, onRename, onDelete, onShare 
   )
 }
 
-// ─── Processing Toast ─────────────────────────────────────────────────────────
+
+// ─── Settings Panel ─────────────────────────────────────────────────────────
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
-
-interface ToastState {
-  sessionId: string
-  step: string
-  status: 'processing' | 'ready' | 'partial_ready' | 'error'
-  errorMsg?: string
-}
-
-function ProcessingToast({ toast, onClose, onOpen }: {
-  toast: ToastState
-  onClose: () => void
-  onOpen: () => void
-}) {
-  const { t } = useTranslation()
-  const isDone = toast.status === 'ready' || toast.status === 'partial_ready'
-  const isError = toast.status === 'error'
-
-  const STEP_LABELS: Record<string, string> = {
-    uploading: t('toast_step_uploading'),
-    converting: t('toast_step_converting'),
-    parsing_ppt: t('toast_step_parsing_ppt'),
-    transcribing: t('toast_step_transcribing'),
-    aligning: t('toast_step_aligning'),
-    generating: t('toast_step_generating'),
-  }
-
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      style={{
-        position: 'fixed', bottom: '24px', left: '24px', zIndex: 100,
-        display: 'flex', alignItems: 'flex-start', gap: '12px',
-        padding: '16px 20px', backgroundColor: '#FFFFFF', borderRadius: '20px',
-        boxShadow: '0px 8px 24px -4px rgba(47,51,49,0.18), 0px 0px 0px 1px rgba(175,179,176,0.12)',
-        fontFamily: 'Inter, system-ui, sans-serif', minWidth: '260px', maxWidth: '320px',
-        animation: 'slideInToast 0.25s ease',
-      }}
-    >
-      <div style={{ flexShrink: 0, paddingTop: '2px' }}>
-        {isDone ? (
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <circle cx="9" cy="9" r="8.25" stroke="#292929" strokeWidth="1.5" fill="none" />
-            <path d="M5.5 9l2.5 2.5 4.5-4.5" stroke="#292929" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        ) : isError ? (
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <circle cx="9" cy="9" r="8.25" stroke="rgba(224,92,64,0.8)" strokeWidth="1.5" fill="none" />
-            <path d="M6 6l6 6M12 6l-6 6" stroke="rgba(224,92,64,0.8)" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-        ) : (
-          <div className="animate-spin" style={{ width: '18px', height: '18px' }}>
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <circle cx="9" cy="9" r="7.5" stroke="rgba(95,94,94,0.2)" strokeWidth="2" />
-              <path d="M9 1.5C4.86 1.5 1.5 4.86 1.5 9" stroke="#292929" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-          </div>
-        )}
-      </div>
-
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: '13px', fontWeight: 600, color: '#292929', marginBottom: '2px' }}>
-          {isDone ? t('toast_done_title') : isError ? t('toast_error_title') : t('toast_processing_title')}
-        </div>
-        <div style={{ fontSize: '11px', color: '#72726E' }}>
-          {isDone ? t('toast_done_sub') : isError ? (toast.errorMsg || t('toast_default_sub')) : (STEP_LABELS[toast.step] ?? '处理中…')}
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px', flexShrink: 0 }}>
-        {isDone && (
-          <button
-            onClick={onOpen}
-            style={{
-              fontSize: '11px', fontWeight: 700, color: '#FFFFFF', background: '#798C00',
-              border: 'none', borderRadius: '9999px', padding: '4px 12px', cursor: 'pointer', whiteSpace: 'nowrap',
-            }}
-          >
-            {t('toast_view')}
-          </button>
-        )}
-        <button
-          onClick={onClose}
-          aria-label="关闭通知"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: '20px', height: '20px', borderRadius: '9999px',
-            backgroundColor: 'rgba(175,179,176,0.15)', color: '#292929', border: 'none', cursor: 'pointer', flexShrink: 0,
-          }}
-        >
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-        </button>
-      </div>
-    </div>
-  )
-}
 
 function SettingsPanel({
   sessions,
@@ -1242,11 +1060,6 @@ export default function LobbyPage() {
     localStorage.setItem(LS_SESSION_FOLDERS_KEY, JSON.stringify(sessionFolderMap))
   }, [sessionFolderMap])
 
-  // 当 sessions 从 API 加载后，将 localStorage 的 folderId 映射应用回去
-  function applyFolderMap(cards: CourseCard[], map: Record<string, string>): CourseCard[] {
-    return cards.map(c => ({ ...c, folderId: map[c.id] ?? DEFAULT_FOLDER_ID }))
-  }
-
   // ── pending new folder (行内新建) ─────────────────────────────────────────
   const [pendingNewFolderId, setPendingNewFolderId] = useState<string | null>(null)
 
@@ -1316,63 +1129,6 @@ export default function LobbyPage() {
     alert('分享功能即将上线')
   }, [])
 
-  // ── Background processing toast ───────────────────────────────────────────
-
-  const [toast, setToast] = useState<ToastState | null>(null)
-
-  const handleUploaded = useCallback((sessionId: string) => {
-    setToast({ sessionId, step: 'uploading', status: 'processing' })
-  }, [])
-
-  useEffect(() => {
-    if (!toast || toast.status !== 'processing') return
-    const { sessionId } = toast
-    let stopped = false
-
-    const poll = setInterval(async () => {
-      try {
-        const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`)
-        if (!res.ok || stopped) return
-        const data = await res.json()
-
-        if (data.progress?.step) {
-          setToast(prev => prev ? { ...prev, step: data.progress.step } : prev)
-        }
-
-        if (data.status === 'ready' || data.status === 'partial_ready') {
-          stopped = true
-          clearInterval(poll)
-          setToast(prev => prev ? { ...prev, status: data.status } : prev)
-          listSessions()
-            .then((refreshed) => {
-              const map = JSON.parse(localStorage.getItem(LS_SESSION_FOLDERS_KEY) ?? '{}')
-              const cards: CourseCard[] = refreshed.map((s, i) => ({
-                id: s.session_id,
-                course: s.ppt_filename ?? '未命名课程',
-                lecture: '',
-                duration: formatDuration(s.total_duration),
-                notes: 0,
-                time: formatTimeAgo(s.created_at ? Number(s.created_at) : null),
-                date: s.created_at ? new Date(Number(s.created_at) * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
-                thumbColor: THUMB_COLORS[i % THUMB_COLORS.length],
-                folderId: map[s.session_id] ?? DEFAULT_FOLDER_ID,
-                status: (s.status === 'processing' ? 'processing' : s.status === 'live' ? 'live' : 'done') as 'done' | 'processing' | 'live',
-              }))
-              setSessions(cards)
-            })
-            .catch(() => {})
-        } else if (data.status === 'error') {
-          stopped = true
-          clearInterval(poll)
-          setToast(prev => prev ? { ...prev, status: 'error', errorMsg: data.error } : prev)
-        }
-      } catch { /* 网络抖动继续轮询 */ }
-    }, 2000)
-
-    return () => { stopped = true; clearInterval(poll) }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast?.sessionId, toast?.status])
-
   const refreshSessions = useCallback(() => {
     listSessions()
       .then((data) => {
@@ -1419,11 +1175,6 @@ export default function LobbyPage() {
       return b.date.localeCompare(a.date)
     })
   }, [sessions, activeFolderId, sortBy])
-
-  // suppress unused warning
-  void handleUploaded
-  void IconBell
-  void applyFolderMap
 
   return (
     <div className="w-full flex font-['Inter'] overflow-hidden" style={{ backgroundColor: '#F7F7F2', height: 'calc(100vh - 40px)', marginTop: '40px' }}>
@@ -1630,19 +1381,6 @@ export default function LobbyPage() {
           </div>
         )}
       </div>
-
-      {toast && (
-        <ProcessingToast
-          toast={toast}
-          onClose={() => setToast(null)}
-          onOpen={() => {
-            const card = sessions.find(s => s.id === toast.sessionId)
-            openTab({ sessionId: toast.sessionId, label: card?.course ?? toast.sessionId })
-            navigate(`/notes/${toast.sessionId}`)
-            setToast(null)
-          }}
-        />
-      )}
 
       <style>{`
         @keyframes slideInToast {

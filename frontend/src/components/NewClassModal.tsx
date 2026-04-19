@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { uploadFiles } from '../lib/api'
+import { uploadPpt, uploadFiles } from '../lib/api'
 import { useTranslation } from '../context/TranslationContext'
 
 const MAX_AUDIO_MB = 500
@@ -100,7 +100,7 @@ function PillUpload({ label, accept, active, fileName, onFile, icon }: PillUploa
 }
 
 interface NewClassModalProps {
-  onUploadSuccess: (sessionId: string) => void
+  onUploadSuccess?: (sessionId: string) => void
   onClose: () => void
 }
 
@@ -111,6 +111,7 @@ export default function NewClassModal({ onUploadSuccess, onClose }: NewClassModa
   const [audioFile, setAudioFile] = useState<File | null>(null)
   const [pptError, setPptError] = useState<string | null>(null)
   const [audioError, setAudioError] = useState<string | null>(null)
+  const [pptId, setPptId] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [selectedMode, setSelectedMode] = useState<'live' | 'upload' | null>('live')
@@ -119,7 +120,11 @@ export default function NewClassModal({ onUploadSuccess, onClose }: NewClassModa
   const handlePpt = useCallback((file: File) => {
     const err = validateFile(file, ['.ppt', '.pptx', '.pdf'])
     setPptError(err)
-    if (!err) setPptFile(file)
+    setPptId(null)
+    if (!err) {
+      setPptFile(file)
+      uploadPpt(file).then(res => setPptId(res.ppt_id)).catch(() => {})
+    }
   }, [])
 
   const handleAudio = useCallback((file: File) => {
@@ -141,17 +146,23 @@ export default function NewClassModal({ onUploadSuccess, onClose }: NewClassModa
 
   const handleSubmit = useCallback(async () => {
     if (!audioFile) return
-    setUploading(true)
-    setUploadError(null)
-    try {
-      const result = await uploadFiles(pptFile ?? undefined, audioFile)
-      onUploadSuccess(result.session_id)
-    } catch (err) {
-      console.error('Upload failed:', err)
-      setUploadError('上传失败，请检查网络后重试')
-      setUploading(false)
+    if (onUploadSuccess) {
+      setUploading(true)
+      setUploadError(null)
+      try {
+        const result = await uploadFiles(pptFile ?? undefined, audioFile, 'en', undefined, pptId ?? undefined)
+        onUploadSuccess(result.session_id)
+      } catch (err) {
+        console.error('Upload failed:', err)
+        setUploadError('上传失败，请检查网络后重试')
+        setUploading(false)
+      }
+    } else {
+      navigate('/notes/new', {
+        state: { phase: 'processing', pptFile: pptFile ?? null, audioFile, pptId: pptId ?? null },
+      })
     }
-  }, [pptFile, audioFile, onUploadSuccess])
+  }, [pptFile, audioFile, pptId, navigate, onUploadSuccess])
 
   const canSubmit = !!audioFile && !pptError && !audioError && !uploading
 
@@ -439,7 +450,7 @@ export default function NewClassModal({ onUploadSuccess, onClose }: NewClassModa
             {uploadError}
           </p>
         )}
+        </div>
       </div>
-    </div>
   )
 }
