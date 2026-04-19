@@ -13,7 +13,8 @@ import { useTextAnnotations } from '../hooks/useTextAnnotations'
 import TextAnnotationLayer from '../components/TextAnnotationLayer'
 import NotesBgShell from '../components/bg/NotesBgShell'
 import UploadModal from '../components/UploadModal'
-import { useSessionEvents, SSEEvent } from '../hooks/useSessionEvents'
+import { useSessionEvents } from '../hooks/useSessionEvents'
+import type { SSEEvent } from '../hooks/useSessionEvents'
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
