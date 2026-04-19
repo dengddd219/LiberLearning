@@ -1014,7 +1014,7 @@ function SettingsPanel({
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [logPickerOpen])
-  const availableSessions = sessions.filter(s => s.status !== 'processing')
+  const availableSessions = sessions.filter(s => s.status === 'done')
 
   return (
     <div style={{ padding: '48px', fontFamily: 'Inter, system-ui, sans-serif' }}>
@@ -1080,6 +1080,7 @@ function SettingsPanel({
                   )}
                   {availableSessions.map(s => (
                     <button
+                      type="button"
                       key={s.id}
                       onClick={() => {
                         setLogPickerOpen(false)
