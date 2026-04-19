@@ -843,7 +843,7 @@ export default function NotesPage() {
 
     if (event.event === 'ppt_parsed') {
       setLoading(false)
-      setPptPageCount(event.data.num_pages)
+      if (event.data.num_pages > 0) setPptPageCount(event.data.num_pages)
     }
 
     if (event.event === 'asr_done') {
