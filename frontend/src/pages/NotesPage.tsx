@@ -11,8 +11,7 @@ import { useHighlights } from '../hooks/useHighlights'
 import HighlightLayer from '../components/HighlightLayer'
 import { useTextAnnotations } from '../hooks/useTextAnnotations'
 import TextAnnotationLayer from '../components/TextAnnotationLayer'
-import NotesBgShell from '../components/bg/NotesBgShell'
-import UploadModal from '../components/UploadModal'
+import NewClassModal from '../components/NewClassModal'
 import { useSessionEvents } from '../hooks/useSessionEvents'
 import type { SSEEvent } from '../hooks/useSessionEvents'
 
@@ -814,8 +813,9 @@ export default function NotesPage() {
   const [noteMode, setNoteMode] = useState<'my' | 'ai' | 'transcript'>('ai')
 
   type PagePhase = 'upload' | 'processing' | 'ready'
-  const [pagePhase, setPagePhase] = useState<PagePhase>(sessionId ? 'ready' : 'upload')
-  const [processingSessionId, setProcessingSessionId] = useState<string | undefined>(sessionId)
+  const isNewSession = !sessionId || sessionId === 'new'
+  const [pagePhase, setPagePhase] = useState<PagePhase>(isNewSession ? 'upload' : 'ready')
+  const [processingSessionId, setProcessingSessionId] = useState<string | undefined>(isNewSession ? undefined : sessionId)
   const navigate = useNavigate()
 
   const [transcriptJustDone, setTranscriptJustDone] = useState(false)
@@ -1096,7 +1096,7 @@ export default function NotesPage() {
   }, [])
 
   useEffect(() => {
-    if (!sessionId) return
+    if (!sessionId || sessionId === 'new') return
     getSession(sessionId)
       .then((data) => {
         setSession(data as SessionData)
@@ -1381,21 +1381,7 @@ export default function NotesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage])
 
-  if (pagePhase === 'upload') {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 50 }}>
-        <div className="absolute inset-0" style={{ pointerEvents: 'none' }}>
-          <NotesBgShell />
-        </div>
-        <div className="absolute inset-0" style={{ backgroundColor: 'rgba(20, 24, 22, 0.6)', pointerEvents: 'none' }} />
-        <div style={{ position: 'relative', zIndex: 2 }}>
-          <UploadModal onSuccess={handleUploadSuccess} onClose={() => navigate('/')} />
-        </div>
-      </div>
-    )
-  }
-
-  if (loading) {
+  if (loading && pagePhase === 'ready') {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: C.bg }}>
         <div className="text-center">
@@ -1407,7 +1393,7 @@ export default function NotesPage() {
     )
   }
 
-  if (error || !session) {
+  if ((error || !session) && pagePhase === 'ready') {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: C.bg }}>
         <div className="text-center">
@@ -1424,8 +1410,8 @@ export default function NotesPage() {
     )
   }
 
-  const currentPageData = session.pages.find((p) => p.page_num === currentPage)
-  const totalPages = session.pages.length
+  const currentPageData = session?.pages.find((p) => p.page_num === currentPage)
+  const totalPages = session?.pages.length ?? 0
 
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ background: C.bg, fontFamily: FONT_SERIF }}>
@@ -1528,6 +1514,12 @@ export default function NotesPage() {
               touchAction: 'none',
             }}
           >
+            {!currentPageData && pagePhase === 'processing' && (
+              <div style={{ width: Math.round(canvasWidth * zoomLevel / 100), maxWidth: '100%', aspectRatio: '16/9', borderRadius: '8px', background: C.white, boxShadow: '0 4px 24px rgba(0,0,0,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
+                <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: C.secondary, borderTopColor: 'transparent' }} />
+                <span style={{ fontSize: '12px', color: C.muted }}>{t('notes_loading')}</span>
+              </div>
+            )}
             {currentPageData && (() => {
               const pdfUrl = currentPageData.pdf_url ? `${API_BASE}${currentPageData.pdf_url}` : null
               return (
@@ -2493,8 +2485,15 @@ export default function NotesPage() {
       )}
 
       {/* Audio player (hidden, driven by timestamp clicks) */}
-      {session.audio_url && (
+      {session?.audio_url && (
         <audio ref={audioRef} src={`${API_BASE}${session.audio_url}`} preload="metadata" style={{ display: 'none' }} />
+      )}
+
+      {/* Upload overlay — shown when no session yet */}
+      {pagePhase === 'upload' && (
+        <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 50, backgroundColor: 'rgba(20, 24, 22, 0.6)' }}>
+          <NewClassModal onUploadSuccess={handleUploadSuccess} onClose={() => navigate('/')} />
+        </div>
       )}
     </div>
   )

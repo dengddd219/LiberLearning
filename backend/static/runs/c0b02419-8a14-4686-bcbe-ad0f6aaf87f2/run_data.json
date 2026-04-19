@@ -1,0 +1,47 @@
+{
+  "session_id": "c0b02419-8a14-4686-bcbe-ad0f6aaf87f2",
+  "started_at": "2026-04-19 19:21:12",
+  "config": {
+    "alignment_version": "v5",
+    "asr_engine": "aliyun",
+    "note_provider": "中转站",
+    "note_model": "claude-sonnet-4-6",
+    "note_passive_template": "passive_ppt_notes",
+    "note_granularity": "detailed"
+  },
+  "steps": {
+    "step2_ppt": {
+      "status": "ok",
+      "ppt_path": "C:\\Users\\19841\\AppData\\Local\\Temp\\liberstudy\\c0b02419-8a14-4686-bcbe-ad0f6aaf87f2\\lec3_38-56_1-4.pdf",
+      "num_pages": 4,
+      "pages_summary": [
+        {
+          "page_num": 1,
+          "ppt_text_len": 42
+        },
+        {
+          "page_num": 2,
+          "ppt_text_len": 182
+        },
+        {
+          "page_num": 3,
+          "ppt_text_len": 133
+        },
+        {
+          "page_num": 4,
+          "ppt_text_len": 434
+        }
+      ],
+      "elapsed_s": 0.29
+    },
+    "step1_audio": {
+      "status": "ok",
+      "wav_path": "C:\\Users\\19841\\AppData\\Local\\Temp\\liberstudy\\c0b02419-8a14-4686-bcbe-ad0f6aaf87f2\\audio.wav",
+      "duration_seconds": 60.009313,
+      "elapsed_s": 1.17
+    }
+  },
+  "finished_at": "2026-04-19 19:21:59",
+  "overall_status": "error",
+  "error": "SDK.HttpError HTTPConnectionPool(host='filetrans.cn-shanghai.aliyuncs.com', port=80): Read timed out. (read timeout=10)"
+}

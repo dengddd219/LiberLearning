@@ -1440,7 +1440,7 @@ export default function LobbyPage() {
           </div>
         </div>
 
-        {/* New Recording CTA */}
+        {/* New Class CTA */}
         <div className="px-3 pb-3 flex-shrink-0">
           <button
             onClick={() => navigate('/notes/new')}
@@ -1450,20 +1450,6 @@ export default function LobbyPage() {
             <IconMic />
             <span className="text-center text-stone-50 text-xs font-semibold font-['Inter'] leading-5 tracking-tight">
               {t('lobby_new_record').split('\n').map((line, i) => <span key={i}>{line}{i === 0 && <br />}</span>)}
-            </span>
-          </button>
-        </div>
-
-        {/* New Live CTA */}
-        <div className="px-3 pb-3 flex-shrink-0">
-          <button
-            onClick={() => navigate('/live?new=1')}
-            className="w-full px-4 py-3 rounded-2xl inline-flex justify-start items-center gap-2 border-none cursor-pointer hover:opacity-90 transition-opacity"
-            style={{ backgroundColor: '#1A6B5A' }}
-          >
-            <IconMic />
-            <span className="text-center text-stone-50 text-xs font-semibold font-['Inter'] leading-5 tracking-tight">
-              New Live
             </span>
           </button>
         </div>
