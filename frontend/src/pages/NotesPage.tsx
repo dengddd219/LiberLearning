@@ -1418,7 +1418,18 @@ export default function NotesPage() {
   }
 
   const currentPageData = session?.pages.find((p) => p.page_num === currentPage)
-  const totalPages = session?.pages.length ?? 0
+  const totalPages = session?.pages.length ?? pptPageCount
+
+  const navPages: Array<{ page_num: number; thumbnail_url?: string; pdf_page_num: number }> =
+    session?.pages?.map((p) => ({
+      page_num: p.page_num,
+      thumbnail_url: p.thumbnail_url,
+      pdf_page_num: p.pdf_page_num,
+    })) ??
+    Array.from({ length: pptPageCount }, (_, i) => ({
+      page_num: i + 1,
+      pdf_page_num: i + 1,
+    }))
 
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ background: C.bg, fontFamily: FONT_SERIF }}>
@@ -1444,7 +1455,7 @@ export default function NotesPage() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-3" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }} onWheel={(e) => e.stopPropagation()}>
-              {session.pages.map((page) => {
+              {navPages.map((page) => {
                 const isActive = page.page_num === currentPage
                 return (
                   <button
