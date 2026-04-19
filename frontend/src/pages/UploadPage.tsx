@@ -208,7 +208,7 @@ export default function UploadPage() {
     setUploadError(null)
     try {
       const result = await uploadFiles(pptFile ?? undefined, audioFile, 'en', undefined, pptId ?? undefined)
-      navigate(`/notes/${result.session_id}`)
+      navigate(`/notes/${result.session_id}`, { state: { phase: 'processing' } })
     } catch (err) {
       console.error('Upload failed:', err)
       setUploadError('上传失败，请检查网络后重试')

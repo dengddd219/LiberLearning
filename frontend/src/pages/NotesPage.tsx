@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useTabs } from '../context/TabsContext'
 import { useTranslation } from '../context/TranslationContext'
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -814,7 +814,9 @@ export default function NotesPage() {
 
   type PagePhase = 'upload' | 'processing' | 'ready'
   const isNewSession = !sessionId || sessionId === 'new'
-  const [pagePhase, setPagePhase] = useState<PagePhase>(isNewSession ? 'upload' : 'ready')
+  const location = useLocation()
+  const initialPhase: PagePhase = location.state?.phase ?? (isNewSession ? 'upload' : 'ready')
+  const [pagePhase, setPagePhase] = useState<PagePhase>(initialPhase)
   const [processingSessionId, setProcessingSessionId] = useState<string | undefined>(isNewSession ? undefined : sessionId)
   const navigate = useNavigate()
 
