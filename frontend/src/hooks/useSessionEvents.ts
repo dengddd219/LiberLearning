@@ -37,11 +37,14 @@ export function useSessionEvents(
       es.close()
       pollTimer = setInterval(async () => {
         try {
-          const data = await getSession(sessionId) as { status?: string }
+          const data = await getSession(sessionId) as { status?: string; error?: string }
           onEventRef.current({ event: '_poll', ...(data as Record<string, unknown>) })
           if (data.status === 'ready' || data.status === 'partial_ready') {
             if (pollTimer) clearInterval(pollTimer)
             onEventRef.current({ event: 'all_done', status: data.status })
+          } else if (data.status === 'error') {
+            if (pollTimer) clearInterval(pollTimer)
+            onEventRef.current({ event: 'error', message: data.error })
           }
         } catch { /* ignore fetch errors during polling */ }
       }, 3000)

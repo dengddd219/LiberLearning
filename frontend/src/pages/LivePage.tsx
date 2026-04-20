@@ -4,6 +4,7 @@ import { useTranslation } from '../context/TranslationContext'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import CanvasToolbar from '../components/CanvasToolbar'
 import { getSession, retryPage, generateMyNote, askBullet } from '../lib/api'
+import { openAskDB, STORE_NAME, MY_NOTES_STORE, PAGE_CHAT_STORE } from '../lib/askDb'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
@@ -18,31 +19,6 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 ).toString()
 
 // ─── IndexedDB：持久化（ask_history / my_notes / page_chat） ───
-const DB_NAME = 'liberstudy_ask'
-const STORE_NAME = 'ask_history'
-const MY_NOTES_STORE = 'my_notes'
-const PAGE_CHAT_STORE = 'page_chat'
-
-function openAskDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 2)
-    req.onupgradeneeded = () => {
-      const db = req.result
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME)
-      }
-      if (!db.objectStoreNames.contains(MY_NOTES_STORE)) {
-        db.createObjectStore(MY_NOTES_STORE)
-      }
-      if (!db.objectStoreNames.contains(PAGE_CHAT_STORE)) {
-        db.createObjectStore(PAGE_CHAT_STORE)
-      }
-    }
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error)
-  })
-}
-
 function askKey(sessionId: string, pageNum: number, bulletIndex: number) {
   return `${sessionId}:${pageNum}:${bulletIndex}`
 }

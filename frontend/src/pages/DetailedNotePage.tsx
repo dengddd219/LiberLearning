@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getSession } from '../lib/api'
 import { useTranslation } from '../context/TranslationContext'
+import { openAskDB, MY_NOTES_STORE } from '../lib/askDb'
 
 interface Bullet { text: string; ai_comment: string; timestamp_start: number; timestamp_end: number }
 interface PageData {
@@ -20,22 +21,7 @@ interface SessionData {
 }
 
 // ─── 读取 IndexedDB my_notes ───
-const DB_NAME = 'liberstudy_ask'
-const MY_NOTES_STORE = 'my_notes'
-
-function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 2)
-    req.onupgradeneeded = () => {
-      const db = req.result
-      if (!db.objectStoreNames.contains('ask_history')) db.createObjectStore('ask_history')
-      if (!db.objectStoreNames.contains(MY_NOTES_STORE)) db.createObjectStore(MY_NOTES_STORE)
-      if (!db.objectStoreNames.contains('page_chat')) db.createObjectStore('page_chat')
-    }
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error)
-  })
-}
+const openDB = openAskDB
 
 async function loadAllMyNotes(sessionId: string, pageNums: number[]): Promise<Map<number, string>> {
   const db = await openDB()

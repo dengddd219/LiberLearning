@@ -70,13 +70,21 @@ async def upload_ppt(ppt: UploadFile = File(...)):
         f.write(await ppt.read())
 
     slides_dir = str(Path("static") / "slides" / ppt_id)
-    ppt_pages = parse_ppt(str(ppt_path), slides_dir, pdf_name=f"slides_{ppt_id}.pdf")
+    ppt_pages = parse_ppt(
+        str(ppt_path),
+        slides_dir,
+        pdf_name=f"slides_{ppt_id}.pdf",
+        enable_background_render=False,
+    )
 
-    # Fix pdf_url to include the ppt_id subdir
+    # Fix asset URLs to include the ppt_id subdir
     for page in ppt_pages:
         if page.get("pdf_url"):
             pdf_name_only = page["pdf_url"].split("/")[-1]
             page["pdf_url"] = f"/slides/{ppt_id}/{pdf_name_only}"
+        if page.get("thumbnail_url"):
+            png_name = page["thumbnail_url"].split("/")[-1]
+            page["thumbnail_url"] = f"/slides/{ppt_id}/{png_name}"
 
     _ppt_cache[ppt_id] = {
         "ppt_path": str(ppt_path),

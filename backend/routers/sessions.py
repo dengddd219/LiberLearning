@@ -389,15 +389,24 @@ def _json_to_markdown(raw: str) -> str:
             parts.append("")
         return "\n".join(parts).strip()
     except Exception:
+        # Avoid leaking model internal reasoning fields when JSON parse fails.
+        if "_thought_process" in raw:
+            return "## 生成结果解析失败\n- 请重试一次"
         return raw
 
 
 @router.post("/sessions/{session_id}/page/{page_num}/my-notes")
 async def generate_my_note(session_id: str, page_num: int, req: MyNoteRequest):
     """流式生成 My Notes AI 扩写。返回 text/event-stream，每个 SSE event 是一个文本 chunk。"""
-    from services.note_generator import PROVIDERS
+    from services.note_generator import (
+        PROVIDER_ZHONGZHUAN,
+        PROVIDER_QWEN,
+        PROVIDER_DEEPSEEK,
+        PROVIDER_DOUBAO,
+    )
+    my_notes_providers = [PROVIDER_ZHONGZHUAN, PROVIDER_QWEN, PROVIDER_DEEPSEEK, PROVIDER_DOUBAO]
 
-    if req.provider not in PROVIDERS:
+    if req.provider not in my_notes_providers:
         raise HTTPException(status_code=400, detail=f"Unknown provider: {req.provider}")
 
     user_msg = _build_my_note_user_msg(req.user_note, req.ppt_text, session_id, page_num)
@@ -448,10 +457,6 @@ async def generate_my_note(session_id: str, page_num: int, req: MyNoteRequest):
         yield "data: [DONE]\n\n"
 
     import os
-    from services.note_generator import (
-        PROVIDER_ZHONGZHUAN,
-        PROVIDER_QWEN, PROVIDER_DEEPSEEK, PROVIDER_DOUBAO,
-    )
 
     provider = req.provider
 

@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import CanvasToolbar from '../components/CanvasToolbar'
 import { getSession, retryPage, generateMyNote, askBullet } from '../lib/api'
+import { openAskDB, STORE_NAME, MY_NOTES_STORE, PAGE_CHAT_STORE } from '../lib/askDb'
 import { useHighlights } from '../hooks/useHighlights'
 import HighlightLayer from '../components/HighlightLayer'
 import { useTextAnnotations } from '../hooks/useTextAnnotations'
@@ -46,31 +47,6 @@ if (typeof document !== 'undefined' && !document.getElementById(SWEEP_STYLE_ID))
 }
 
 // ─── IndexedDB：持久化（ask_history / my_notes / page_chat） ───
-const DB_NAME = 'liberstudy_ask'
-const STORE_NAME = 'ask_history'
-const MY_NOTES_STORE = 'my_notes'
-const PAGE_CHAT_STORE = 'page_chat'
-
-function openAskDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 2)
-    req.onupgradeneeded = () => {
-      const db = req.result
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME)
-      }
-      if (!db.objectStoreNames.contains(MY_NOTES_STORE)) {
-        db.createObjectStore(MY_NOTES_STORE)
-      }
-      if (!db.objectStoreNames.contains(PAGE_CHAT_STORE)) {
-        db.createObjectStore(PAGE_CHAT_STORE)
-      }
-    }
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error)
-  })
-}
-
 function askKey(sessionId: string, pageNum: number, bulletIndex: number) {
   return `${sessionId}:${pageNum}:${bulletIndex}`
 }
@@ -180,6 +156,26 @@ interface SessionData {
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
+const ABSOLUTE_URL_RE = /^https?:\/\//i
+
+function withApiBase(url?: string | null): string | null {
+  if (!url) return null
+  return ABSOLUTE_URL_RE.test(url) ? url : `${API_BASE}${url}`
+}
+
+type NotesPerfRecord = {
+  sessionId: string
+  durationMs: number
+  source: 'primary' | 'fallback' | 'failed'
+  slide: number
+  timestamp: string
+}
+
+function pushNotesPerf(record: NotesPerfRecord) {
+  const w = window as Window & { __liberstudyNotesPerf?: NotesPerfRecord[] }
+  w.__liberstudyNotesPerf = w.__liberstudyNotesPerf ?? []
+  w.__liberstudyNotesPerf.push(record)
+}
 
 const FONT_SERIF = "Inter, 'PingFang SC', 'Microsoft YaHei', sans-serif"
 const C = {
@@ -452,6 +448,10 @@ function InlineQA({
   const { t } = useTranslation()
 
   useEffect(() => {
+    if (!sessionId) {
+      setMessages([])
+      return
+    }
     loadAskHistory(sessionId, pageNum, bulletIndex).then(setMessages)
   }, [sessionId, pageNum, bulletIndex])
 
@@ -461,7 +461,7 @@ function InlineQA({
 
   async function handleSend() {
     const q = input.trim()
-    if (!q || streaming) return
+    if (!sessionId || !q || streaming) return
 
     const userMsg: AskMessage = { role: 'user', content: q, model, timestamp: Date.now() }
     const newMessages = [...messages, userMsg]
@@ -633,6 +633,7 @@ function AiBulletRow({
   const { t } = useTranslation()
   const hasComment = !!bullet.ai_comment
   const indent = bullet.level * 16
+  const isTitleLine = bulletIndex === 0
   const [hovered, setHovered] = useState(false)
 
   const [askOpen, setAskOpen] = useState(false)
@@ -730,9 +731,9 @@ function AiBulletRow({
             {bullet.level === 0 ? '' : '•'}
           </span>
           <span style={{
-            fontSize: bullet.level === 0 ? '15px' : '14px',
+            fontSize: isTitleLine ? '15px' : '14px',
             color: '#292929', lineHeight: '1.625',
-            fontWeight: bullet.level === 0 ? '600' : '400',
+            fontWeight: isTitleLine ? '700' : '400',
             opacity: !expanded
               ? (translationEnabled && !translatedPptText ? 0.4 : (hasComment ? 1 : 0.5))
               : 1,
@@ -754,7 +755,7 @@ function AiBulletRow({
             <span style={{ color: '#D0CFC5', flexShrink: 0, marginTop: '2px', fontSize: '14px' }}>
               {bullet.level === 0 ? '' : '•'}
             </span>
-            <p style={{ fontSize: bullet.level === 0 ? '15px' : '14px', lineHeight: '1.625', fontWeight: bullet.level === 0 ? '600' : '400', margin: 0, minHeight: '1.4em' }}>
+            <p style={{ fontSize: isTitleLine ? '15px' : '14px', lineHeight: '1.625', fontWeight: isTitleLine ? '700' : '400', margin: 0, minHeight: '1.4em' }}>
               {animationDone
                 ? <span style={{ color: '#292929' }}>{pptText}</span>
                 : <RevealText revealed={pptRevealed} muted={false} highlight={false}>{pptText}</RevealText>
@@ -861,15 +862,20 @@ export default function NotesPage() {
   const [pagePhase, setPagePhase] = useState<PagePhase>(initialPhase)
   const [processingSessionId, setProcessingSessionId] = useState<string | undefined>(isNewSession ? undefined : sessionId)
   const navigate = useNavigate()
+  const activeSessionId = session?.session_id || processingSessionId || (!isNewSession ? sessionId : undefined)
 
   const [transcriptJustDone, setTranscriptJustDone] = useState(false)
   const [aiNotesJustDone, setAiNotesJustDone] = useState(false)
   const [revealedPages, setRevealedPages] = useState<Set<number>>(new Set())
   const [pptPageCount, setPptPageCount] = useState<number>(0)
+  const lastPipelineTickMsRef = useRef<number>(Date.now())
+  const [pipelineSyncLagging, setPipelineSyncLagging] = useState(false)
 
   const handleSSEEvent = useCallback(async (event: SSEEvent) => {
     const sid = processingSessionId
     if (!sid) return
+    lastPipelineTickMsRef.current = Date.now()
+    if (pipelineSyncLagging) setPipelineSyncLagging(false)
 
     if (event.event === 'error') {
       setError(typeof event.message === 'string' ? event.message : '处理失败')
@@ -884,8 +890,9 @@ export default function NotesPage() {
     } catch { /* ignore fetch errors */ }
 
     if (event.event === 'ppt_parsed') {
+      const eventData = event.data as { num_pages?: number } | undefined
       setLoading(false)
-      if (event.data.num_pages > 0) setPptPageCount(event.data.num_pages)
+      if ((eventData?.num_pages ?? 0) > 0) setPptPageCount(eventData!.num_pages!)
     }
 
     if (event.event === 'asr_done') {
@@ -901,15 +908,40 @@ export default function NotesPage() {
       setAiNotesJustDone(true)
       setTimeout(() => setAiNotesJustDone(false), 1500)
     }
-  }, [processingSessionId, loading])
+  }, [processingSessionId, loading, pipelineSyncLagging])
 
   useSessionEvents(processingSessionId, pagePhase === 'processing', handleSSEEvent)
+
+  useEffect(() => {
+    if (pagePhase !== 'processing' || !processingSessionId) return
+    const timer = setInterval(async () => {
+      const idleMs = Date.now() - lastPipelineTickMsRef.current
+      if (idleMs > 15000) setPipelineSyncLagging(true)
+      try {
+        const data = await getSession(processingSessionId) as SessionData & { error?: string }
+        setSession(data as SessionData)
+        if (data.status === 'ready' || data.status === 'partial_ready') {
+          setPagePhase('ready')
+          setPipelineSyncLagging(false)
+          lastPipelineTickMsRef.current = Date.now()
+        } else if (data.status === 'error') {
+          setError(data.error ?? '处理失败')
+          setPagePhase('ready')
+          setPipelineSyncLagging(false)
+          lastPipelineTickMsRef.current = Date.now()
+        }
+      } catch {
+        // keep waiting; lag hint will tell user we are retrying state sync
+      }
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [pagePhase, processingSessionId])
 
   const handleUploadSuccess = useCallback((newSessionId: string, pages: PptPage[]) => {
     setProcessingSessionId(newSessionId)
     setPagePhase('processing')
     setLoading(false)
-    window.history.replaceState(null, '', `/notes/${newSessionId}`)
+    navigate(`/notes/${newSessionId}`, { replace: true, state: { phase: 'processing' } })
     if (pages.length > 0) {
       const tempSession: SessionData = {
         session_id: newSessionId,
@@ -932,11 +964,12 @@ export default function NotesPage() {
           page_supplement: null,
         })),
       }
+      setPptPageCount(pages.length)
       setSession(tempSession)
     } else {
       setLoading(true)
     }
-  }, [])
+  }, [navigate])
 
   const [playingSegIdx, setPlayingSegIdx] = useState<number | null>(null)
   const [playProgress, setPlayProgress] = useState(0) // 0–1，当前播放段进度
@@ -1044,6 +1077,11 @@ export default function NotesPage() {
   const [drawerModel, setDrawerModel] = useState('Auto')
   const [drawerModelDDOpen, setDrawerModelDDOpen] = useState(false)
   const drawerModelBtnRef = useRef<HTMLButtonElement>(null)
+  const firstSlidePerfRef = useRef<{ startMs: number; reported: boolean; sessionId: string }>({
+    startMs: 0,
+    reported: false,
+    sessionId: '',
+  })
 
   useEffect(() => {
     if (!drawerModelDDOpen) return
@@ -1054,6 +1092,16 @@ export default function NotesPage() {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [drawerModelDDOpen])
+
+  useEffect(() => {
+    const sid = sessionId ?? 'new'
+    firstSlidePerfRef.current = {
+      startMs: typeof performance !== 'undefined' ? performance.now() : Date.now(),
+      reported: false,
+      sessionId: sid,
+    }
+    console.info(`[Perf][Notes] enter session=${sid}`)
+  }, [sessionId])
 
   // 切换页面时收回抽屉
   const drawerPrevPageRef = useRef(currentPage)
@@ -1085,7 +1133,7 @@ export default function NotesPage() {
 
   const handlePageChatSend = useCallback(async () => {
     const q = pageChatInput.trim()
-    if (!q || pageChatStreaming || !sessionId) return
+    if (!q || pageChatStreaming || !activeSessionId) return
     const userMsg: PageChatMessage = { role: 'user', content: q, timestamp: Date.now() }
     const currentMsgs = pageChatMessages.get(currentPage) ?? []
     const newMsgs = [...currentMsgs, userMsg]
@@ -1102,25 +1150,25 @@ export default function NotesPage() {
       ].filter(Boolean).join('\n\n')
 
       let full = ''
-      await askBullet(sessionId, currentPage, -1, context, '', q, drawerModel === 'Auto' ? '中转站' : drawerModel, (chunk) => {
+      await askBullet(activeSessionId, currentPage, -1, context, '', q, drawerModel === 'Auto' ? '中转站' : drawerModel, (chunk) => {
         full += chunk
         setPageChatStreamingText(full)
       })
       const aiMsg: PageChatMessage = { role: 'ai', content: full, timestamp: Date.now() }
       const finalMsgs = [...newMsgs, aiMsg]
       setPageChatMessages(prev => { const m = new Map(prev); m.set(currentPage, finalMsgs); return m })
-      await savePageChat(sessionId, currentPage, finalMsgs)
+      await savePageChat(activeSessionId, currentPage, finalMsgs)
     } catch (err) {
       const errMsg: PageChatMessage = { role: 'ai', content: `出错了：${err instanceof Error ? err.message : '未知错误'}`, timestamp: Date.now() }
       const finalMsgs = [...newMsgs, errMsg]
       setPageChatMessages(prev => { const m = new Map(prev); m.set(currentPage, finalMsgs); return m })
-      await savePageChat(sessionId, currentPage, finalMsgs)
+      await savePageChat(activeSessionId, currentPage, finalMsgs)
     } finally {
       setPageChatStreaming(false)
       setPageChatStreamingText('')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageChatInput, pageChatStreaming, sessionId, currentPage, pageChatMessages, session, myNoteTexts])
+  }, [pageChatInput, pageChatStreaming, activeSessionId, currentPage, pageChatMessages, session, myNoteTexts])
 
   // Resizable panel state
   const [notesPanelWidth, setNotesPanelWidth] = useState(500)
@@ -1335,13 +1383,13 @@ export default function NotesPage() {
   }, [playingSegIdx])
 
   const handleExpandMyNote = useCallback(async (pageNum: number) => {
-    if (!sessionId) return
+    if (!activeSessionId) return
     const userNote = myNoteTexts.get(pageNum) ?? ''
     if (!userNote.trim()) return
     const pptText = session?.pages.find(p => p.page_num === pageNum)?.ppt_text ?? ''
     patchMyNoteExpandState(pageNum, { userNote, aiText: '', status: 'expanding' })
     try {
-      await generateMyNote(sessionId, pageNum, userNote, pptText, provider, (chunk) => {
+      await generateMyNote(activeSessionId, pageNum, userNote, pptText, provider, (chunk) => {
         setMyNoteExpandStates(prev => {
           const current = prev.get(pageNum)
           if (!current) return prev
@@ -1354,21 +1402,21 @@ export default function NotesPage() {
     } catch {
       patchMyNoteExpandState(pageNum, { status: 'idle' })
     }
-  }, [sessionId, session, provider, myNoteTexts, patchMyNoteExpandState])
+  }, [activeSessionId, session, provider, myNoteTexts, patchMyNoteExpandState])
 
   const handleRetryPage = useCallback(async (pageNum: number) => {
-    if (!sessionId || retrying !== null) return
+    if (!activeSessionId || retrying !== null) return
     setRetrying(pageNum)
     try {
-      await retryPage(sessionId, pageNum)
-      const data = await getSession(sessionId)
+      await retryPage(activeSessionId, pageNum)
+      const data = await getSession(activeSessionId)
       setSession(data as SessionData)
     } catch {
       // keep current state
     } finally {
       setRetrying(null)
     }
-  }, [sessionId, retrying])
+  }, [activeSessionId, retrying])
 
   const translatePage = useCallback(async (pageNum: number) => {
     if (!session) return
@@ -1425,6 +1473,75 @@ export default function NotesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage])
 
+  const currentPageData = session?.pages.find((p) => p.page_num === currentPage)
+  const totalPages = session?.pages.length ?? pptPageCount
+
+  const navPages: Array<{ page_num: number; thumbnail_url?: string; pdf_page_num: number }> =
+    session?.pages?.map((p) => ({
+      page_num: p.page_num,
+      thumbnail_url: p.thumbnail_url,
+      pdf_page_num: p.pdf_page_num,
+    })) ??
+    Array.from({ length: pptPageCount }, (_, i) => ({
+      page_num: i + 1,
+      pdf_page_num: i + 1,
+    }))
+
+  const buildSessionSlideUrl = (pageNum: number): string | null =>
+    activeSessionId ? `${API_BASE}/api/sessions/${activeSessionId}/slide/${pageNum}.png` : null
+
+  const primarySlideUrl: string | null = currentPageData
+    ? (withApiBase(currentPageData.thumbnail_url) ?? buildSessionSlideUrl(currentPageData.pdf_page_num))
+    : pptPageCount > 0
+      ? buildSessionSlideUrl(currentPage)
+      : null
+
+  const fallbackSlideUrl: string | null = currentPageData
+    ? buildSessionSlideUrl(currentPageData.pdf_page_num)
+    : buildSessionSlideUrl(currentPage)
+
+  const draftOutlineLines: string[] = (currentPageData?.ppt_text ?? '')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .flatMap((line) => {
+      const trimmed = line.trim()
+      if (!trimmed) return []
+      if (!trimmed.includes('•')) return [trimmed]
+      return trimmed
+        .split('•')
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .map((part) => `• ${part}`)
+    })
+
+  const [resolvedSlideUrl, setResolvedSlideUrl] = useState<string | null>(null)
+  useEffect(() => {
+    setResolvedSlideUrl(primarySlideUrl)
+  }, [primarySlideUrl])
+
+  const reportFirstSlidePaint = useCallback((source: 'primary' | 'fallback' | 'failed') => {
+    const perf = firstSlidePerfRef.current
+    if (perf.reported) return
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+    const durationMs = now - perf.startMs
+    perf.reported = true
+    const record: NotesPerfRecord = {
+      sessionId: perf.sessionId,
+      durationMs,
+      source,
+      slide: currentPage,
+      timestamp: new Date().toISOString(),
+    }
+    pushNotesPerf(record)
+    console.info(`[Perf][Notes] first-slide-painted source=${source} duration=${durationMs.toFixed(1)}ms slide=${currentPage} session=${perf.sessionId}`)
+  }, [currentPage])
+
+  useEffect(() => {
+    if (!resolvedSlideUrl && pagePhase !== 'processing') {
+      reportFirstSlidePaint('failed')
+    }
+  }, [resolvedSlideUrl, pagePhase, reportFirstSlidePaint])
+
   if (loading && pagePhase === 'ready') {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: C.bg }}>
@@ -1453,28 +1570,6 @@ export default function NotesPage() {
       </div>
     )
   }
-
-  const currentPageData = session?.pages.find((p) => p.page_num === currentPage)
-  const totalPages = session?.pages.length ?? pptPageCount
-
-  const navPages: Array<{ page_num: number; thumbnail_url?: string; pdf_page_num: number }> =
-    session?.pages?.map((p) => ({
-      page_num: p.page_num,
-      thumbnail_url: p.thumbnail_url,
-      pdf_page_num: p.pdf_page_num,
-    })) ??
-    Array.from({ length: pptPageCount }, (_, i) => ({
-      page_num: i + 1,
-      pdf_page_num: i + 1,
-    }))
-
-  const slidePngUrl: string | null = currentPageData
-    ? (currentPageData.thumbnail_url
-        ? `${API_BASE}${currentPageData.thumbnail_url}`
-        : `${API_BASE}/api/sessions/${sessionId}/slide/${currentPageData.pdf_page_num}.png`)
-    : pptPageCount > 0
-      ? `${API_BASE}/api/sessions/${sessionId}/slide/${currentPage}.png`
-      : null
 
   return (
     <div className="flex flex-col h-screen overflow-hidden" style={{ background: C.bg, fontFamily: FONT_SERIF }}>
@@ -1513,10 +1608,20 @@ export default function NotesPage() {
                     style={{ height: '80px', borderRadius: '6px', background: C.divider, boxShadow: isActive ? '0px 0px 0px 2px rgba(95,94,94,1)' : '0 1px 3px rgba(0,0,0,0.08)', opacity: isActive ? 1 : 0.7 }}
                   >
                     <img
-                      src={page.thumbnail_url ? `${API_BASE}${page.thumbnail_url}` : `${API_BASE}/api/sessions/${sessionId}/slide/${page.pdf_page_num}.png`}
+                      src={withApiBase(page.thumbnail_url) ?? (buildSessionSlideUrl(page.pdf_page_num) ?? '')}
                       alt={`第${page.page_num}页`}
                       style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                       loading="lazy"
+                      onError={(e) => {
+                        const fallback = buildSessionSlideUrl(page.pdf_page_num)
+                        if (!fallback) return
+                        if (e.currentTarget.dataset.fallbackApplied === '1') {
+                          e.currentTarget.style.opacity = '0'
+                          return
+                        }
+                        e.currentTarget.dataset.fallbackApplied = '1'
+                        e.currentTarget.src = fallback
+                      }}
                     />
                     <span className="absolute top-1 left-1.5 flex items-center justify-center" style={{ background: C.fg, color: C.white, fontSize: '8px', fontWeight: '700', borderRadius: '3px', padding: '1px 5px', minWidth: '16px' }}>
                       {page.page_num}
@@ -1577,13 +1682,18 @@ export default function NotesPage() {
               touchAction: 'none',
             }}
           >
-            {!slidePngUrl && pagePhase === 'processing' && (
+            {!resolvedSlideUrl && pagePhase === 'processing' && (
               <div style={{ width: Math.round(canvasWidth * zoomLevel / 100), maxWidth: '100%', aspectRatio: '16/9', borderRadius: '8px', background: C.white, boxShadow: '0 4px 24px rgba(0,0,0,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
                 <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: C.secondary, borderTopColor: 'transparent' }} />
                 <span style={{ fontSize: '12px', color: C.muted }}>{t('notes_loading')}</span>
               </div>
             )}
-            {slidePngUrl && (() => {
+            {!resolvedSlideUrl && pagePhase !== 'processing' && (
+              <div style={{ width: Math.round(canvasWidth * zoomLevel / 100), maxWidth: '100%', aspectRatio: '16/9', borderRadius: '8px', background: C.white, boxShadow: '0 4px 24px rgba(0,0,0,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: '12px', color: C.muted }}>当前页图片加载失败</span>
+              </div>
+            )}
+            {resolvedSlideUrl && (() => {
               return (
                 <div
                   className="relative"
@@ -1598,21 +1708,25 @@ export default function NotesPage() {
                     }}
                   >
                     <img
-                      key={slidePngUrl}
-                      src={slidePngUrl}
-                      alt={`第${currentPage}页`}
-                      style={{ width: Math.round(canvasWidth * zoomLevel / 100), maxWidth: '100%', maxHeight: '80vh', display: 'block' }}
+                      key={resolvedSlideUrl}
+                      src={resolvedSlideUrl}
+                      alt=""
+                      style={{ width: Math.round(canvasWidth * zoomLevel / 100), maxWidth: '100%', maxHeight: '80vh', display: 'block', objectFit: 'contain' }}
+                      onLoad={() => {
+                        if (resolvedSlideUrl === fallbackSlideUrl) {
+                          reportFirstSlidePaint('fallback')
+                        } else {
+                          reportFirstSlidePaint('primary')
+                        }
+                      }}
+                      onError={() => {
+                        if (fallbackSlideUrl && resolvedSlideUrl !== fallbackSlideUrl) {
+                          setResolvedSlideUrl(fallbackSlideUrl)
+                        } else {
+                          setResolvedSlideUrl(null)
+                        }
+                      }}
                     />
-                    {/* Play button — 只有 currentPageData 存在时才显示 */}
-                    {currentPageData && (
-                      <button
-                        onClick={() => handleTimestampClick(currentPageData.page_start_time)}
-                        className="absolute top-3 left-3 text-xs px-2 py-0.5 rounded cursor-pointer transition-all duration-150"
-                        style={{ background: 'rgba(47,51,49,0.7)', color: C.white }}
-                      >
-                        ▶ {formatTime(currentPageData.page_start_time)}
-                      </button>
-                    )}
                     {/* Highlight layer */}
                     <HighlightLayer
                       pageContainerRef={pageContainerRef}
@@ -1954,7 +2068,7 @@ export default function NotesPage() {
                           translationEnabled={translationEnabled}
                           translatedPptText={translatedTexts.get(currentPage)?.bullets[i]}
                           translatedAiComment={translatedTexts.get(currentPage)?.aiComments[i]}
-                          sessionId={sessionId ?? ''}
+                          sessionId={activeSessionId ?? ''}
                           pageNum={currentPage}
                           bulletIndex={i}
                         />
@@ -1965,13 +2079,27 @@ export default function NotesPage() {
 
                 {/* Processing placeholder: show ppt_text as grey text */}
                 {pagePhase === 'processing' && !currentPageData?.passive_notes && currentPageData?.ppt_text && (
-                  <div className="ai-bullet-placeholder" style={{ padding: '8px 0' }}>
-                    {currentPageData.ppt_text.split('\n').filter(Boolean).map((line, i) => (
-                      <div key={`draft-${i}`} style={{ fontSize: '13px', lineHeight: '1.8', color: C.muted }}>
-                        • {line}
-                      </div>
-                    ))}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '12px' }}>
+                  <div className="ai-bullet-placeholder" style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {draftOutlineLines.map((line, i) => {
+                      const isBullet = line.startsWith('• ')
+                      if (!isBullet) {
+                        return (
+                          <div key={`draft-h-${i}`} style={{ fontSize: '13px', lineHeight: '1.5', color: '#8C8F8D', fontWeight: 600, marginTop: i === 0 ? 0 : 4 }}>
+                            {line}
+                          </div>
+                        )
+                      }
+                      return (
+                        <div key={`draft-b-${i}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                          <span style={{ color: '#AFB3B0', marginTop: '2px' }}>•</span>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '13px', lineHeight: '1.7', color: C.muted }}>{line.slice(2)}</div>
+                            <div style={{ marginTop: '4px', height: '6px', width: `${70 + ((i * 13) % 25)}%`, borderRadius: '999px', background: 'rgba(175,179,176,0.18)' }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px' }}>
                       <span className="inline-block w-3 h-3 border-2 border-transparent rounded-full animate-spin" style={{ borderColor: '#D0CFC5', borderTopColor: '#8B5CF6' }} />
                       <span style={{ fontSize: '11px', color: C.muted }}>AI 正在生成笔记...</span>
                     </div>
@@ -2553,6 +2681,11 @@ export default function NotesPage() {
             <div style={{ height: '3px', background: 'rgba(255,255,255,0.12)', borderRadius: '2px', overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${percent}%`, background: '#2D6A4F', borderRadius: '2px', transition: 'width 0.4s ease' }} />
             </div>
+            {pipelineSyncLagging && (
+              <div style={{ marginTop: '8px', fontSize: '10px', color: '#AFB3B0' }}>
+                网络波动，正在重试同步状态...
+              </div>
+            )}
           </div>
         )
       })()}

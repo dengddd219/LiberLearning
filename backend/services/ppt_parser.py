@@ -8,6 +8,8 @@ import os
 import shutil
 import subprocess
 import tempfile
+import threading
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -28,6 +30,45 @@ _BULLET_START = re.compile(
     r"|^\s*[A-Z][a-z].*[:\.]$"                       # Title-like: starts uppercase, ends : or .
     r")"
 )
+
+_logger = logging.getLogger(__name__)
+
+
+def _render_page_png(pdf_path: Path, slides_output_dir: Path, page_num: int, scale: float = 1.5) -> str:
+    """Render one PDF page to slide_{page_num:03d}.png and return its relative URL."""
+    png_name = f"slide_{page_num:03d}.png"
+    png_path = slides_output_dir / png_name
+    if png_path.exists():
+        return f"/slides/{png_name}"
+
+    doc = fitz.open(str(pdf_path))
+    try:
+        if page_num < 1 or page_num > len(doc):
+            raise ValueError(f"page_num out of range: {page_num} / {len(doc)}")
+        page = doc[page_num - 1]
+        mat = fitz.Matrix(scale, scale)
+        pix = page.get_pixmap(matrix=mat, alpha=False)
+        png_path.write_bytes(pix.tobytes("png"))
+    finally:
+        doc.close()
+    return f"/slides/{png_name}"
+
+
+def _render_remaining_pages_async(pdf_path: Path, slides_output_dir: Path, start_page: int = 2) -> None:
+    """Best-effort background renderer for non-first pages."""
+    try:
+        doc = fitz.open(str(pdf_path))
+        try:
+            total = len(doc)
+        finally:
+            doc.close()
+        for page_num in range(max(1, start_page), total + 1):
+            png_path = slides_output_dir / f"slide_{page_num:03d}.png"
+            if png_path.exists():
+                continue
+            _render_page_png(pdf_path, slides_output_dir, page_num)
+    except Exception as exc:
+        _logger.warning("Background slide pre-render failed: %s", exc)
 
 
 def _clean_ppt_text(raw_text: str) -> str:
@@ -272,6 +313,7 @@ def parse_ppt(
     ppt_path: str,
     slides_output_dir: str,
     pdf_name: str = "slides.pdf",
+    enable_background_render: bool = True,
 ) -> list[dict]:
     """
     Full PPT parsing pipeline:
@@ -333,8 +375,11 @@ def parse_ppt(
         shutil.copy2(src_pdf, dest_pdf)
         pdf_url = f"/slides/{pdf_name}"
 
-        # --- Per-page: text + PNG thumbnail ---
-        doc = fitz.open(src_pdf)
+        # --- Per-page: text + first-page thumbnail ---
+        # Use copied PDF path so background rendering remains valid
+        # even after TemporaryDirectory is cleaned up.
+        pdf_for_render = dest_pdf
+        doc = fitz.open(str(pdf_for_render))
         pages = []
 
         for i, pdf_page in enumerate(doc):
@@ -346,8 +391,12 @@ def parse_ppt(
             else:
                 ppt_text = _clean_ppt_text(pdf_page.get_text("text"))
 
-            # No pre-rendering: frontend falls back to on-demand /api/sessions/{id}/slide/{n}.png
-            thumbnail_url = None
+            # First page: synchronous render for fast first paint.
+            # Remaining pages: background pre-render + on-demand fallback endpoint.
+            if page_num == 1:
+                thumbnail_url = _render_page_png(pdf_for_render, Path(slides_output_dir), page_num)
+            else:
+                thumbnail_url = f"/slides/slide_{page_num:03d}.png"
 
             pages.append(
                 {
@@ -365,5 +414,14 @@ def parse_ppt(
             )
 
         doc.close()
+
+        if enable_background_render:
+            # Render remaining pages asynchronously to reduce first-open latency.
+            bg = threading.Thread(
+                target=_render_remaining_pages_async,
+                args=(pdf_for_render, Path(slides_output_dir), 2),
+                daemon=True,
+            )
+            bg.start()
 
     return pages

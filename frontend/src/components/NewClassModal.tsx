@@ -109,6 +109,7 @@ interface NewClassModalProps {
 export default function NewClassModal({ onUploadSuccess, onClose }: NewClassModalProps) {
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const pptUploadReqIdRef = useRef(0)
   const [pptFile, setPptFile] = useState<File | null>(null)
   const [audioFile, setAudioFile] = useState<File | null>(null)
   const [pptError, setPptError] = useState<string | null>(null)
@@ -124,9 +125,21 @@ export default function NewClassModal({ onUploadSuccess, onClose }: NewClassModa
     const err = validateFile(file, ['.ppt', '.pptx', '.pdf'])
     setPptError(err)
     setPptId(null)
+    setPptPages([])
     if (!err) {
+      const reqId = ++pptUploadReqIdRef.current
       setPptFile(file)
-      uploadPpt(file).then(res => { setPptId(res.ppt_id); setPptPages(res.pages) }).catch(() => {})
+      uploadPpt(file)
+        .then((res) => {
+          if (reqId !== pptUploadReqIdRef.current) return
+          setPptId(res.ppt_id)
+          setPptPages(res.pages)
+        })
+        .catch(() => {
+          if (reqId !== pptUploadReqIdRef.current) return
+          setPptId(null)
+          setPptPages([])
+        })
     }
   }, [])
 
@@ -153,8 +166,19 @@ export default function NewClassModal({ onUploadSuccess, onClose }: NewClassModa
       setUploading(true)
       setUploadError(null)
       try {
-        const result = await uploadFiles(pptFile ?? undefined, audioFile, 'en', undefined, pptId ?? undefined)
-        onUploadSuccess(result.session_id, pptPages)
+        // Correctness first: always lock this submit to the currently selected PPT.
+        // This avoids any stale ppt_id/pages from previous async pre-upload attempts.
+        let ensuredPptId = pptId
+        let ensuredPptPages = pptPages
+        if (pptFile) {
+          const res = await uploadPpt(pptFile)
+          ensuredPptId = res.ppt_id
+          ensuredPptPages = res.pages
+          setPptId(res.ppt_id)
+          setPptPages(res.pages)
+        }
+        const result = await uploadFiles(pptFile ?? undefined, audioFile, 'en', undefined, ensuredPptId ?? undefined)
+        onUploadSuccess(result.session_id, ensuredPptPages)
       } catch (err) {
         console.error('Upload failed:', err)
         setUploadError('上传失败，请检查网络后重试')

@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+from pathlib import Path
 from typing import Optional
 
 from openai import OpenAI
@@ -21,6 +22,7 @@ import settings as _settings
 
 CHUNK_DURATION_SEC = _settings.ASR_CHUNK_DURATION_SEC
 MAX_FILE_SIZE_MB = 25
+_ENV_LOADED = False
 
 # ── Sentence-ending punctuation ───────────────────────────────────────────────
 _SENTENCE_END = re.compile(r"[.?!。？！]$")
@@ -32,6 +34,38 @@ _EN_FILLERS = re.compile(
     re.IGNORECASE,
 )
 _ZH_FILLERS = re.compile(r"[嗯呃啊哦额那个就是其实吧呢]")
+
+
+def _ensure_backend_env_loaded() -> None:
+    """
+    Best-effort dotenv load for direct service/test entrypoints.
+    This keeps ASR usable even when caller forgot to load backend/.env.
+    """
+    global _ENV_LOADED
+    if _ENV_LOADED:
+        return
+    _ENV_LOADED = True
+    try:
+        from dotenv import load_dotenv
+    except Exception:
+        return
+
+    env_path = Path(__file__).resolve().parents[1] / ".env"
+    if env_path.exists():
+        load_dotenv(env_path, override=False)
+
+
+def _is_placeholder_openai_key(api_key: str) -> bool:
+    key = api_key.strip().lower()
+    if not key:
+        return True
+    if key.startswith("sk-xxx"):
+        return True
+    if key.startswith("your_openai_api_key"):
+        return True
+    if key in {"changeme", "replace_me", "your_key_here"}:
+        return True
+    return False
 
 
 def _merge_into_sentences(segments: list[dict]) -> list[dict]:
@@ -142,11 +176,13 @@ def transcribe_openai(
     Returns a list of segments:
       [{"text": str, "start": float, "end": float}, ...]
     """
+    _ensure_backend_env_loaded()
     api_key = os.environ.get("OPENAI_API_KEY", "")
-    if not api_key or api_key.startswith("sk-xxx"):
+    if _is_placeholder_openai_key(api_key):
+        env_hint = Path(__file__).resolve().parents[1] / ".env"
         raise RuntimeError(
             "OPENAI_API_KEY not set or is placeholder. "
-            "Add a real key to backend/.env"
+            f"Add a real key to backend/.env (resolved path: {env_hint})"
         )
     base_url = os.environ.get("OPENAI_BASE_URL", "").strip() or None
     client = OpenAI(
@@ -215,6 +251,7 @@ def transcribe_aliyun(
         import urllib.request as _urllib_req
         httpx = None
 
+    _ensure_backend_env_loaded()
     access_key_id = os.environ.get("ALIYUN_ACCESS_KEY_ID", "")
     access_key_secret = os.environ.get("ALIYUN_ACCESS_KEY_SECRET", "")
     app_key = os.environ.get("ALIYUN_ASR_APP_KEY", "")
@@ -477,6 +514,7 @@ def transcribe(
     Returns:
         (sentences, raw_segments)
     """
+    _ensure_backend_env_loaded()
     if _settings.ASR_ENGINE == "race":
         return _transcribe_race(wav_path, language, prompt=prompt)
     if _settings.ASR_ENGINE == "aliyun":
@@ -497,47 +535,44 @@ def _transcribe_race(
     import logging
     logger = logging.getLogger(__name__)
 
-    result_holder: list = []
-
     def _run_aliyun():
         return ("aliyun", transcribe_aliyun(wav_path, language))
 
     def _run_whisper():
         return ("whisper", transcribe_openai(wav_path, language, prompt=prompt))
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+    try:
         futures = {
             executor.submit(_run_aliyun): "aliyun",
             executor.submit(_run_whisper): "whisper",
         }
-        winner_name = None
-        winner_result = None
+        errors: dict[str, str] = {}
+
         for fut in concurrent.futures.as_completed(futures):
             try:
                 name, result = fut.result()
-                if winner_result is None:
-                    winner_name = name
-                    winner_result = result
-                    logger.info(f"ASR race: {name} won")
-                    # Cancel remaining (best-effort, won't interrupt blocking I/O
-                    # but prevents starting if not yet running)
-                    for other in futures:
-                        if other is not fut:
-                            other.cancel()
-                    break
+                logger.info(f"ASR race: {name} won")
+                # Stop waiting for slower engine; return winner immediately.
+                for other in futures:
+                    if other is not fut:
+                        other.cancel()
+                return result
             except Exception as e:
-                logger.warning(f"ASR race: {futures[fut]} failed: {e}")
+                engine = futures[fut]
+                logger.warning(f"ASR race: {engine} failed: {e}")
+                errors[engine] = str(e)
 
-        if winner_result is None:
-            # Both failed — wait for second one as last resort
-            for fut in concurrent.futures.as_completed(futures):
-                try:
-                    name, result = fut.result()
-                    winner_name = name
-                    winner_result = result
-                    break
-                except Exception as e:
-                    logger.error(f"ASR race: both engines failed. Last error: {e}")
-                    raise
-
-    return winner_result
+        # If we got here, both engines failed.
+        logger.error("ASR race: both engines failed")
+        if errors:
+            aliyun_err = errors.get("aliyun", "(no error captured)")
+            whisper_err = errors.get("whisper", "(no error captured)")
+            raise RuntimeError(
+                "ASR race failed. "
+                f"aliyun_error={aliyun_err}; whisper_error={whisper_err}"
+            )
+        raise RuntimeError("ASR race failed: no engine result")
+    finally:
+        # Do not block response on slower engine teardown.
+        executor.shutdown(wait=False, cancel_futures=True)
