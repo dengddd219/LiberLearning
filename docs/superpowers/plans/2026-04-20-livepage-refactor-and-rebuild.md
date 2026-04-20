@@ -980,7 +980,7 @@ git commit -m "refactor: extract AiBulletRow to components/notes/"
 
 NotesPanel 封装右侧面板 aside 全部内容（Tab bar + 三个 Tab 内容 + Bottom drawer）。
 
-- [ ] **Step 1：定义 NotesPanel 的 Props 接口**
+- [x] **Step 1：定义 NotesPanel 的 Props 接口**
 
 在 `frontend/src/components/notes/NotesPanel.tsx` 的顶部写出完整 props 接口（注意：所有 state 和 handler 由 NotesPage 传入，NotesPanel 是纯渲染组件）：
 
@@ -1068,7 +1068,7 @@ export interface NotesPanelProps {
 }
 ```
 
-- [ ] **Step 2：实现 NotesPanel 组件体**
+- [x] **Step 2：实现 NotesPanel 组件体**
 
 在 Props 接口之后，将 NotesPage.tsx lines 1781–2635 的右侧面板 JSX 复制进来，作为 NotesPanel 的 return 内容。
 
@@ -1085,7 +1085,7 @@ export interface NotesPanelProps {
 
 最终 NotesPanel 是一个完整的 `<aside>` 元素，不含外层布局。
 
-- [ ] **Step 3：在 NotesPage.tsx 中使用 NotesPanel**
+- [x] **Step 3：在 NotesPage.tsx 中使用 NotesPanel**
 
 在 NotesPage.tsx import 块末尾加入：
 ```ts
@@ -1157,7 +1157,7 @@ import NotesPanel from '../components/notes/NotesPanel'
 />
 ```
 
-- [ ] **Step 4：确认编译无报错**
+- [x] **Step 4：确认编译无报错**
 
 ```bash
 cd frontend && npx tsc --noEmit
@@ -1173,7 +1173,7 @@ cd frontend && npx tsc --noEmit
 - Transcript Tab 时间戳点击可以跳转音频
 - Bottom drawer 可以打开/关闭，Page Chat 可以发送
 
-- [ ] **Step 6：Commit**
+- [x] **Step 6：Commit**
 
 ```bash
 git add frontend/src/components/notes/NotesPanel.tsx frontend/src/pages/NotesPage.tsx
