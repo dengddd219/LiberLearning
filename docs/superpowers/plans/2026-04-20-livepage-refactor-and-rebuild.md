@@ -1866,7 +1866,7 @@ cd frontend && npx tsc --noEmit
 
 预期：0 errors
 
-- [ ] **Step 6：Commit**
+- [x] **Step 6：Commit**
 
 ```bash
 git add frontend/src/pages/LivePage.tsx
@@ -1878,6 +1878,8 @@ git commit -m "feat: LivePage - end class, submit to /api/process, poll until do
 ### Task 11：手动端到端验证
 
 **无代码修改，纯验证步骤。**
+
+> 当前 CLI 内已完成后端启动与 `/api/sessions/health` 烟雾检查；前端 `npm run dev` / `npx vite` 在本 worktree 环境中因缺少本地 `frontend/node_modules`（`vite`、`@vitejs/plugin-react`、`@tailwindcss/vite` 等）无法启动，因此下面需要真实浏览器交互的步骤暂未勾选。
 
 - [ ] **Step 1：启动前后端**
 
