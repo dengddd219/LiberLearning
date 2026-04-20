@@ -779,7 +779,7 @@ git commit -m "refactor: extract StreamingExpandText and InlineQA to components/
 - 新建：`frontend/src/components/notes/AiBulletRow.tsx`
 - 修改：`frontend/src/pages/NotesPage.tsx`
 
-- [ ] **Step 1：创建 `frontend/src/components/notes/AiBulletRow.tsx`**
+- [x] **Step 1：创建 `frontend/src/components/notes/AiBulletRow.tsx`**
 
 从 NotesPage.tsx lines 606–847 提取，完整代码：
 
@@ -946,7 +946,7 @@ export default function AiBulletRow({
 }
 ```
 
-- [ ] **Step 2：在 NotesPage.tsx 中替换导入**
+- [x] **Step 2：在 NotesPage.tsx 中替换导入**
 
 在 NotesPage.tsx import 块末尾加入：
 ```ts
@@ -955,7 +955,7 @@ import AiBulletRow from '../components/notes/AiBulletRow'
 
 删除 NotesPage.tsx 中 lines 606–847 的 `AiBulletRow` 组件定义。
 
-- [ ] **Step 3：确认编译无报错**
+- [x] **Step 3：确认编译无报错**
 
 ```bash
 cd frontend && npx tsc --noEmit
@@ -963,7 +963,7 @@ cd frontend && npx tsc --noEmit
 
 预期：0 errors
 
-- [ ] **Step 4：Commit**
+- [x] **Step 4：Commit**
 
 ```bash
 git add frontend/src/components/notes/AiBulletRow.tsx frontend/src/pages/NotesPage.tsx
