@@ -1,1227 +1,393 @@
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import CanvasToolbar from '../components/CanvasToolbar'
+import NotesPanel from '../components/notes/NotesPanel'
 import { useTabs } from '../context/TabsContext'
 import { useTranslation } from '../context/TranslationContext'
-import { useState, useEffect, useCallback, useRef } from 'react'
-import CanvasToolbar from '../components/CanvasToolbar'
-import { getSession, retryPage, generateMyNote, askBullet } from '../lib/api'
-import { openAskDB, STORE_NAME, MY_NOTES_STORE, PAGE_CHAT_STORE } from '../lib/askDb'
-import { Document, Page, pdfjs } from 'react-pdf'
-import 'react-pdf/dist/Page/AnnotationLayer.css'
-import 'react-pdf/dist/Page/TextLayer.css'
-import { useHighlights } from '../hooks/useHighlights'
-import HighlightLayer from '../components/HighlightLayer'
-import { useTextAnnotations } from '../hooks/useTextAnnotations'
-import TextAnnotationLayer from '../components/TextAnnotationLayer'
+import {
+  askBullet,
+  createLiveSession,
+  generateMyNote,
+  getSession,
+  retryPage,
+  uploadFiles,
+  uploadPpt,
+} from '../lib/api'
+import { loadMyNote, loadPageChat, saveMyNote, savePageChat } from '../lib/notesDb'
+import type { AlignedSegment, PageChatMessage, PageData, SessionData } from '../lib/notesTypes'
+import { C, FONT_SERIF, injectNoteStyles, withApiBase } from '../lib/notesUtils'
+import type { PptPage } from '../types/session'
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString()
-
-// ─── IndexedDB：持久化（ask_history / my_notes / page_chat） ───
-function askKey(sessionId: string, pageNum: number, bulletIndex: number) {
-  return `${sessionId}:${pageNum}:${bulletIndex}`
-}
-
-function myNoteKey(sessionId: string, pageNum: number) {
-  return `${sessionId}:${pageNum}`
-}
-
-async function loadMyNote(sessionId: string, pageNum: number): Promise<string> {
-  const db = await openAskDB()
-  return new Promise((resolve) => {
-    const tx = db.transaction(MY_NOTES_STORE, 'readonly')
-    const req = tx.objectStore(MY_NOTES_STORE).get(myNoteKey(sessionId, pageNum))
-    req.onsuccess = () => resolve(req.result?.text ?? '')
-    req.onerror = () => resolve('')
-  })
-}
-
-async function saveMyNote(sessionId: string, pageNum: number, text: string) {
-  const db = await openAskDB()
-  return new Promise<void>((resolve) => {
-    const tx = db.transaction(MY_NOTES_STORE, 'readwrite')
-    tx.objectStore(MY_NOTES_STORE).put({ text }, myNoteKey(sessionId, pageNum))
-    tx.oncomplete = () => resolve()
-    tx.onerror = () => resolve()
-  })
-}
-
-async function loadPageChat(sessionId: string, pageNum: number): Promise<PageChatMessage[]> {
-  const db = await openAskDB()
-  return new Promise((resolve) => {
-    const tx = db.transaction(PAGE_CHAT_STORE, 'readonly')
-    const req = tx.objectStore(PAGE_CHAT_STORE).get(myNoteKey(sessionId, pageNum))
-    req.onsuccess = () => resolve(req.result?.messages ?? [])
-    req.onerror = () => resolve([])
-  })
-}
-
-async function savePageChat(sessionId: string, pageNum: number, messages: PageChatMessage[]) {
-  const db = await openAskDB()
-  return new Promise<void>((resolve) => {
-    const tx = db.transaction(PAGE_CHAT_STORE, 'readwrite')
-    tx.objectStore(PAGE_CHAT_STORE).put({ messages }, myNoteKey(sessionId, pageNum))
-    tx.oncomplete = () => resolve()
-    tx.onerror = () => resolve()
-  })
-}
-
-async function loadAskHistory(sessionId: string, pageNum: number, bulletIndex: number): Promise<AskMessage[]> {
-  const db = await openAskDB()
-  return new Promise((resolve) => {
-    const tx = db.transaction(STORE_NAME, 'readonly')
-    const req = tx.objectStore(STORE_NAME).get(askKey(sessionId, pageNum, bulletIndex))
-    req.onsuccess = () => resolve(req.result?.messages ?? [])
-    req.onerror = () => resolve([])
-  })
-}
-
-async function saveAskHistory(sessionId: string, pageNum: number, bulletIndex: number, messages: AskMessage[]) {
-  const db = await openAskDB()
-  return new Promise<void>((resolve) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite')
-    tx.objectStore(STORE_NAME).put({ messages }, askKey(sessionId, pageNum, bulletIndex))
-    tx.oncomplete = () => resolve()
-    tx.onerror = () => resolve()
-  })
-}
-
-interface AskMessage {
-  role: 'user' | 'ai'
-  content: string
-  model: string
-  timestamp: number
-}
-
-interface PageChatMessage {
-  role: 'user' | 'ai'
-  content: string
-  timestamp: number
-}
-
-interface Bullet { ppt_text: string; level: number; ai_comment: string | null; timestamp_start: number; timestamp_end: number; }
-interface AlignedSegment { start: number; end: number; text: string; similarity?: number }
-interface PageData {
-  page_num: number
-  status?: string
-  pdf_url: string
-  pdf_page_num: number
-  thumbnail_url?: string
-  ppt_text: string
-  page_start_time: number
-  page_end_time: number
-  alignment_confidence: number
-  active_notes: { user_note: string; ai_expansion: string } | null
-  passive_notes: { bullets: Bullet[]; error?: string } | null
-  page_supplement: { content: string; timestamp_start: number; timestamp_end: number } | null
-  aligned_segments?: AlignedSegment[]
-}
-interface SessionData {
-  session_id: string
-  status: string
-  ppt_filename: string
-  audio_url: string
-  total_duration: number
-  pages: PageData[]
+type WsStatus = 'idle' | 'connecting' | 'live' | 'paused' | 'stopped' | 'processing' | 'done'
+type NoteMode = 'my' | 'ai' | 'transcript'
+type DrawerPhase = 'closed' | 'input' | 'full'
+type MyNoteExpandState = { userNote: string; aiText: string; status: 'idle' | 'expanding' | 'expanded' }
+type TranslatedPageTexts = {
+  bullets: string[]
+  aiComments: (string | null)[]
+  supplement: string | null
+  aiExpansion: string | null
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
+const WS_BASE = API_BASE.replace(/^http/, 'ws')
 
-const FONT_SERIF = "Inter, 'PingFang SC', 'Microsoft YaHei', sans-serif"
-const C = {
-  bg: '#F7F7F2',       // 次级背景（主内容区）
-  sidebar: '#F2F2EC',  // 辅助背景（侧边栏）
-  fg: '#292929',       // 主文本色
-  secondary: '#72726E',// 次要文本色
-  muted: '#D0CFC5',    // 禁用/占位符
-  dark: '#292929',     // 深色（与fg一致）
-  white: '#FFFFFF',    // 顶层卡片
-  divider: '#E3E3DA',  // 分割线
-}
-
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-  const s = Math.floor(seconds % 60)
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-}
-
-function stripBullet(text: string): string {
-  return text.replace(/^[\s•\-–—*]+/, '')
-}
-
-// ─── RevealText：CSS class 方式，对齐 ai-text-enhancement.html ───
-function RevealText({
-  children,
-  revealed,
-  muted,
-  highlight,
-}: {
-  children: React.ReactNode
-  revealed: boolean
-  muted: boolean
-  highlight: boolean
-}) {
-  const ref = useRef<HTMLSpanElement>(null)
-  const settledRef = useRef(false)
-
-  useEffect(() => {
-    if (!revealed || settledRef.current) return
-    const el = ref.current
-    if (!el) return
-
-    // 1. 揭开瞬间：下落 + 彩色流光
-    el.classList.add('drop-in', 'shimmer-text')
-
-    // 2. 500ms 后固化为最终颜色
-    const t = setTimeout(() => {
-      el.classList.remove('shimmer-text')
-      el.classList.add('color-settle')
-      el.style.color = highlight ? '#92400e' : muted ? '#D0CFC5' : '#292929'
-      settledRef.current = true
-    }, 500)
-
-    return () => clearTimeout(t)
-  }, [revealed])
-
-  return (
-    <span ref={ref} style={{ color: 'transparent', display: 'inline' }}>
-      {children}
-    </span>
-  )
-}
-
-// ─── LineByLineReveal：测量视觉行后逐行 shimmer 揭开 ───
-function LineByLineReveal({
-  text,
-  startReveal,
-  onDone,
-}: {
-  text: string
-  startReveal: boolean
-  onDone: () => void
-}) {
-  const measureRef = useRef<HTMLSpanElement>(null)
-  const [lines, setLines] = useState<string[]>([])
-  const [revealedLines, setRevealedLines] = useState<Set<number>>(new Set())
-
-  // 挂载后测量视觉行
-  useEffect(() => {
-    const el = measureRef.current
-    if (!el || !text) return
-
-    const range = document.createRange()
-    const textNode = el.firstChild
-    if (!textNode) return
-
-    const measured: string[] = []
-    let lineStart = 0
-    let prevTop: number | null = null
-
-    for (let i = 0; i <= text.length; i++) {
-      range.setStart(textNode, i === text.length ? i - 1 : i)
-      range.setEnd(textNode, i === text.length ? i : i + 1)
-      const rect = range.getBoundingClientRect()
-      const top = Math.round(rect.top)
-
-      if (prevTop !== null && top !== prevTop) {
-        measured.push(text.slice(lineStart, i))
-        lineStart = i
-      }
-      prevTop = top
-    }
-    // 最后一行
-    if (lineStart < text.length) {
-      measured.push(text.slice(lineStart))
-    }
-
-    setLines(measured.length > 0 ? measured : [text])
-  }, [text])
-
-  // startReveal 触发时逐行揭开
-  useEffect(() => {
-    if (!startReveal || lines.length === 0) return
-    setRevealedLines(new Set())
-
-    const INTERVAL = 120
-    const timers: number[] = []
-    lines.forEach((_, i) => {
-      const t = window.setTimeout(() => {
-        setRevealedLines(prev => new Set(prev).add(i))
-        if (i === lines.length - 1) {
-          window.setTimeout(onDone, 500)
-        }
-      }, i * INTERVAL)
-      timers.push(t)
+function buildDraftOutlineLines(pptText: string): string[] {
+  return pptText
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .flatMap((line) => {
+      const trimmed = line.trim()
+      if (!trimmed) return []
+      if (!trimmed.includes('•')) return [trimmed]
+      return trimmed
+        .split('•')
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .map((part) => `• ${part}`)
     })
-    return () => timers.forEach(clearTimeout)
-  }, [startReveal, lines, onDone])
-
-  const baseStyle: React.CSSProperties = {
-    fontSize: '14px', lineHeight: '1.625', fontWeight: '400',
-    margin: 0, userSelect: 'text',
-  }
-
-  return (
-    <>
-      {/* 不可见的测量层 */}
-      <p style={{ ...baseStyle, position: 'absolute', visibility: 'hidden', pointerEvents: 'none', width: '100%' }}>
-        <span ref={measureRef}>{text}</span>
-      </p>
-      {/* 逐行渲染层 */}
-      <p style={{ ...baseStyle }}>
-        {lines.length === 0
-          ? <span style={{ color: 'transparent' }}>{text}</span>
-          : lines.map((line, i) => (
-              <LineRevealSpan key={i} text={line} revealed={revealedLines.has(i)} />
-            ))
-        }
-      </p>
-    </>
-  )
-}
-
-function LineRevealSpan({ text, revealed }: { text: string; revealed: boolean }) {
-  const ref = useRef<HTMLSpanElement>(null)
-  const settledRef = useRef(false)
-
-  useEffect(() => {
-    if (!revealed || settledRef.current) return
-    const el = ref.current
-    if (!el) return
-    el.classList.add('drop-in', 'shimmer-text')
-    const t = setTimeout(() => {
-      el.classList.remove('shimmer-text')
-      el.classList.add('color-settle')
-      el.style.color = '#72726E'
-      settledRef.current = true
-    }, 300)
-    return () => clearTimeout(t)
-  }, [revealed])
-
-  return (
-    <span ref={ref} style={{ color: 'transparent', display: 'inline' }}>{text}</span>
-  )
-}
-
-// ─── StreamingExpandText：AI 扩写完成后全文 drop-in shimmer ───
-function StreamingExpandText({ text }: { text: string }) {
-  const ref = useRef<HTMLSpanElement>(null)
-  const settledRef = useRef(false)
-
-  useEffect(() => {
-    if (settledRef.current || !text) return
-    const el = ref.current
-    if (!el) return
-    settledRef.current = true
-    el.classList.add('drop-in', 'shimmer-text')
-    const t = setTimeout(() => {
-      el.classList.remove('shimmer-text')
-      el.classList.add('color-settle')
-    }, 600)
-    return () => clearTimeout(t)
-  }, [text]) // 依赖 text 变化：每次新内容触发新动画
-
-  return (
-    <span
-      ref={ref}
-      style={{ fontSize: '13px', color: 'transparent', lineHeight: '1.7', whiteSpace: 'pre-wrap', display: 'block' }}
-    >
-      {text}
-    </span>
-  )
-}
-
-// ─── InlineQA：bullet 内联问答区 ───
-function InlineQA({
-  sessionId,
-  pageNum,
-  bulletIndex,
-  bulletText,
-  bulletAiComment,
-}: {
-  sessionId: string
-  pageNum: number
-  bulletIndex: number
-  bulletText: string
-  bulletAiComment: string
-}) {
-  const [messages, setMessages] = useState<AskMessage[]>([])
-  const [input, setInput] = useState('')
-  const [model, setModel] = useState('中转站')
-  const [streaming, setStreaming] = useState(false)
-  const [streamingText, setStreamingText] = useState('')
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const { t } = useTranslation()
-
-  useEffect(() => {
-    loadAskHistory(sessionId, pageNum, bulletIndex).then(setMessages)
-  }, [sessionId, pageNum, bulletIndex])
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, streamingText])
-
-  async function handleSend() {
-    const q = input.trim()
-    if (!q || streaming) return
-
-    const userMsg: AskMessage = { role: 'user', content: q, model, timestamp: Date.now() }
-    const newMessages = [...messages, userMsg]
-    setMessages(newMessages)
-    setInput('')
-    setStreaming(true)
-    setStreamingText('')
-
-    try {
-      let full = ''
-      await askBullet(sessionId, pageNum, bulletIndex, bulletText, bulletAiComment, q, model, (chunk) => {
-        full += chunk
-        setStreamingText(full)
-      })
-      const aiMsg: AskMessage = { role: 'ai', content: full, model, timestamp: Date.now() }
-      const finalMessages = [...newMessages, aiMsg]
-      setMessages(finalMessages)
-      await saveAskHistory(sessionId, pageNum, bulletIndex, finalMessages)
-    } catch (err) {
-      const errMsg: AskMessage = { role: 'ai', content: `出错了：${err instanceof Error ? err.message : '未知错误'}`, model, timestamp: Date.now() }
-      const finalMessages = [...newMessages, errMsg]
-      setMessages(finalMessages)
-      await saveAskHistory(sessionId, pageNum, bulletIndex, finalMessages)
-    } finally {
-      setStreaming(false)
-      setStreamingText('')
-    }
-  }
-
-  return (
-    <div style={{
-      marginTop: '8px',
-      borderRadius: '8px',
-      border: `1px solid ${C.divider}`,
-      background: C.bg,
-      overflow: 'hidden',
-    }}>
-      {/* 模型选择 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px', borderBottom: `1px solid ${C.divider}` }}>
-        <span style={{ fontSize: '9px', color: C.muted, fontWeight: '600', letterSpacing: '0.06em' }}>{t('notes_model_label')}</span>
-        {(['中转站', '通义千问', 'DeepSeek', '豆包'] as const).map(m => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => setModel(m)}
-            style={{
-              padding: '1px 6px', borderRadius: '4px', fontSize: '10px',
-              border: `1px solid ${model === m ? C.secondary : C.divider}`,
-              background: model === m ? C.sidebar : 'transparent',
-              color: model === m ? C.fg : C.muted,
-              cursor: 'pointer',
-            }}
-          >{m}</button>
-        ))}
-      </div>
-
-      {/* 对话历史 */}
-      {(messages.length > 0 || streaming) && (
-        <div style={{ maxHeight: '240px', overflowY: 'auto', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {messages.map((msg, i) => (
-            <div
-              key={i}
-              style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}
-            >
-              <div style={{
-                maxWidth: '85%',
-                padding: '6px 10px',
-                borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-                background: msg.role === 'user' ? C.fg : C.white,
-                color: msg.role === 'user' ? C.white : C.fg,
-                fontSize: '13px',
-                lineHeight: '1.55',
-                whiteSpace: 'pre-wrap',
-              }}>
-                {msg.content}
-              </div>
-            </div>
-          ))}
-          {streaming && streamingText && (
-            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-              <div style={{
-                maxWidth: '85%',
-                padding: '6px 10px',
-                borderRadius: '12px 12px 12px 2px',
-                background: C.white,
-                color: C.fg,
-                fontSize: '13px',
-                lineHeight: '1.55',
-                whiteSpace: 'pre-wrap',
-              }}>
-                {streamingText}
-                <span style={{ opacity: 0.5 }}>▋</span>
-              </div>
-            </div>
-          )}
-          <div ref={bottomRef} />
-        </div>
-      )}
-
-      {/* 输入框 */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', padding: '6px 10px' }}>
-        <textarea
-          rows={1}
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              handleSend()
-            }
-          }}
-          placeholder={t('notes_bullet_placeholder')}
-          style={{
-            flex: 1, resize: 'none', border: 'none', outline: 'none',
-            background: 'transparent', fontSize: '13px', lineHeight: '1.5',
-            color: C.fg, fontFamily: 'inherit',
-          }}
-        />
-        <button
-          type="button"
-          onClick={handleSend}
-          disabled={streaming || !input.trim()}
-          style={{
-            flexShrink: 0, width: '24px', height: '24px',
-            borderRadius: '50%', border: 'none',
-            background: streaming || !input.trim() ? C.divider : C.fg,
-            color: C.white, cursor: streaming || !input.trim() ? 'default' : 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="19" x2="12" y2="5" />
-            <polyline points="5 12 12 5 19 12" />
-          </svg>
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ─── AiBulletRow：点击展开时 ppt_text 向上抹去，然后 ppt_text + AI 解释全部逐项彩虹揭开 ───
-function AiBulletRow({
-  bullet,
-  expanded,
-  animationDone,
-  onToggle,
-  onAnimationDone,
-  onTimestampClick,
-  translationEnabled,
-  translatedPptText,
-  translatedAiComment,
-  sessionId,
-  pageNum,
-  bulletIndex,
-}: {
-  bullet: Bullet
-  expanded: boolean
-  animationDone: boolean
-  onToggle: () => void
-  onAnimationDone: () => void
-  onTimestampClick: (t: number) => void
-  translationEnabled?: boolean
-  translatedPptText?: string
-  translatedAiComment?: string | null
-  sessionId: string
-  pageNum: number
-  bulletIndex: number
-}) {
-  const { t } = useTranslation()
-  const hasComment = !!bullet.ai_comment
-  const indent = bullet.level * 16
-  const [hovered, setHovered] = useState(false)
-
-  const [askOpen, setAskOpen] = useState(false)
-
-  const [revealedSet, setRevealedSet] = useState<Set<number>>(new Set())
-  // ppt_text 是否正在向上退场
-  const [pptExiting, setPptExiting] = useState(false)
-  // ppt_text swipe-up 完成，隐藏原始 ppt_text（由 reveal 版本接管）
-  // animationDone=true 说明已经播过，直接初始化为 true 跳过退场层
-  const [pptSwipedAway, setPptSwipedAway] = useState(animationDone)
-  // ai 正文逐行揭开是否已触发
-  const [startAiLineReveal, setStartAiLineReveal] = useState(false)
-
-
-  // 展开/收起时控制退场和揭开动画
-  useEffect(() => {
-    if (!expanded) {
-      // 收起：重置动画中间状态（animationDone=true 的不需要重置，下次展开直接走已完成分支）
-      if (!animationDone) {
-        setRevealedSet(new Set())
-        setPptExiting(false)
-        setPptSwipedAway(false)
-        setStartAiLineReveal(false)
-      }
-      return
-    }
-    if (animationDone) return
-
-    const timers: number[] = []
-    const after = (delay: number, fn: () => void) => {
-      const t = window.setTimeout(fn, delay)
-      timers.push(t)
-      return t
-    }
-
-    // Phase 1：ppt_text 向上退场（swipe-up）
-    setPptExiting(true)
-    after(320, () => {
-      // Phase 2：ppt_text 揭开，等 shimmer 固色
-      setPptSwipedAway(true)
-      setRevealedSet(new Set([0]))
-      after(300, () => {
-        // Phase 3：label 揭开
-        setRevealedSet(new Set([0, 1]))
-        after(250, () => {
-          // Phase 4：ai 正文逐行揭开
-          setStartAiLineReveal(true)
-        })
-      })
-    })
-
-    return () => timers.forEach(clearTimeout)
-  }, [expanded, animationDone])
-
-  const pptRevealed = revealedSet.has(0)
-  const labelRevealed = revealedSet.has(1)
-  const pptText = translationEnabled && translatedPptText ? translatedPptText : stripBullet(bullet.ppt_text)
-
-  // 始终渲染同一套 DOM，避免 expanded 切换时销毁/重建节点导致闪烁
-  return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: 'flex', flexDirection: 'column', gap: '6px',
-        paddingLeft: indent,
-        paddingRight: '6px',
-        paddingTop: '4px',
-        paddingBottom: '4px',
-        borderRadius: '6px',
-        background: hovered ? 'rgba(175,179,176,0.12)' : 'transparent',
-        transition: 'background 120ms',
-        marginLeft: -6,
-        marginRight: -6,
-      }}
-    >
-      {/* ppt_text 行：收起时是可点击 button，展开动画期间 swipe-up 退场，退场完成后由 reveal 版本接管 */}
-      <div style={{ position: 'relative' }}>
-        {/* 退场层：始终存在，expanded+pptExiting 时播 swipe-up，pptSwipedAway 后隐藏 */}
-        <button
-          type="button"
-          onClick={() => { if (hasComment) onToggle() }}
-          className="text-left w-full"
-          style={{
-            background: 'none', border: 'none', padding: '4px 0',
-            cursor: hasComment ? 'pointer' : 'default',
-            display: pptSwipedAway ? 'none' : 'flex',
-            alignItems: 'flex-start', gap: '8px', userSelect: 'text',
-            width: '100%',
-            ...(pptExiting ? { animation: 'swipe-up 0.32s ease-in forwards' } : {}),
-          }}
-        >
-          <span style={{ color: '#D0CFC5', flexShrink: 0, marginTop: '2px', fontSize: '14px' }}>
-            {bullet.level === 0 ? '' : '•'}
-          </span>
-          <span style={{
-            fontSize: bullet.level === 0 ? '15px' : '14px',
-            color: '#292929', lineHeight: '1.625',
-            fontWeight: bullet.level === 0 ? '600' : '400',
-            opacity: !expanded
-              ? (translationEnabled && !translatedPptText ? 0.4 : (hasComment ? 1 : 0.5))
-              : 1,
-            transition: 'opacity 0.2s',
-          }}>
-            {pptText}
-          </span>
-          {!expanded && hasComment && (
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"
-              style={{ flexShrink: 0, marginTop: '4px', color: '#D0CFC5' }}>
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          )}
-        </button>
-
-        {/* reveal 层：swipe-up 完成后接管显示 */}
-        {pptSwipedAway && (
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '4px 0' }}>
-            <span style={{ color: '#D0CFC5', flexShrink: 0, marginTop: '2px', fontSize: '14px' }}>
-              {bullet.level === 0 ? '' : '•'}
-            </span>
-            <p style={{ fontSize: bullet.level === 0 ? '15px' : '14px', lineHeight: '1.625', fontWeight: bullet.level === 0 ? '600' : '400', margin: 0, minHeight: '1.4em' }}>
-              {animationDone
-                ? <span style={{ color: '#292929' }}>{pptText}</span>
-                : <RevealText revealed={pptRevealed} muted={false} highlight={false}>{pptText}</RevealText>
-              }
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* AI 解释区域 — label 揭开后才挂载 */}
-      {hasComment && (animationDone || labelRevealed) && (
-        <div style={{ marginLeft: '18px', paddingLeft: '14px', borderLeft: '2px solid rgba(85,96,113,0.2)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minHeight: '1.4em' }}>
-            <RevealText revealed={labelRevealed} muted={false} highlight={false}>
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ display: 'inline', transform: 'translateY(1px)' }}>
-                <path d="M12 2L14.09 8.26L21 9.27L16 13.97L17.18 21L12 17.77L6.82 21L8 13.97L3 9.27L9.91 8.26L12 2Z" fill="#72726E" />
-              </svg>
-            </RevealText>
-            <RevealText revealed={labelRevealed} muted={false} highlight={false}>
-              <span style={{ fontSize: '9px', fontWeight: '700', letterSpacing: '0.08em', color: '#72726E', textTransform: 'uppercase' }}>
-                AI Clarification
-              </span>
-            </RevealText>
-            {bullet.timestamp_start >= 0 && (
-              <RevealText revealed={labelRevealed} muted={false} highlight={false}>
-                <button type="button"
-                  onClick={(e) => { e.stopPropagation(); onTimestampClick(bullet.timestamp_start) }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '9px', color: '#D0CFC5', fontWeight: '700', padding: 0, marginLeft: '4px' }}>
-                  {String(Math.floor(bullet.timestamp_start / 60)).padStart(2, '0')}:
-                  {String(Math.floor(bullet.timestamp_start % 60)).padStart(2, '0')}
-                </button>
-              </RevealText>
-            )}
-          </div>
-          <div style={{
-            opacity: translationEnabled && !translatedAiComment ? 0.4 : 1,
-            transition: 'opacity 0.2s',
-            position: 'relative',
-          }}>
-            {translationEnabled && translatedAiComment
-              ? <p style={{ fontSize: '14px', lineHeight: '1.625', fontWeight: '400', margin: 0, userSelect: 'text', color: '#72726E' }}>{translatedAiComment}</p>
-              : animationDone
-                ? <p style={{ fontSize: '14px', lineHeight: '1.625', fontWeight: '400', margin: 0, userSelect: 'text', color: '#72726E' }}>{bullet.ai_comment}</p>
-                : <LineByLineReveal
-                    text={bullet.ai_comment as string}
-                    startReveal={startAiLineReveal}
-                    onDone={onAnimationDone}
-                  />
-            }
-          </div>
-
-          {/* 针对此条提问 — 在 AI 解释区内部 */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
-            <button
-              type="button"
-              onClick={() => setAskOpen(v => !v)}
-              style={{
-                padding: '4px 10px', borderRadius: '6px', fontSize: '11px',
-                border: `1px solid ${askOpen ? C.secondary : C.secondary}`,
-                background: askOpen ? C.secondary : 'transparent',
-                color: askOpen ? '#fff' : C.secondary,
-                cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: '5px',
-                fontWeight: 500,
-                transition: 'all 0.15s',
-              }}
-            >
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
-              {askOpen ? t('notes_bullet_collapse') : t('notes_bullet_ask')}
-            </button>
-          </div>
-
-          {/* InlineQA 展开区 */}
-          {askOpen && (
-            <InlineQA
-              sessionId={sessionId}
-              pageNum={pageNum}
-              bulletIndex={bulletIndex}
-              bulletText={bullet.ppt_text}
-              bulletAiComment={bullet.ai_comment ?? ''}
-            />
-          )}
-        </div>
-      )}
-    </div>
-  )
 }
 
 export default function LivePage() {
-  const navigate = useNavigate()
-  const sessionIdRef = useRef('live')
-  const sessionId = sessionIdRef.current
+  injectNoteStyles()
+
+  const [searchParams] = useSearchParams()
   const { openTab } = useTabs()
+  const {
+    enabled: translationEnabled,
+    targetLang,
+    setEnabled: setTranslationEnabled,
+    setTargetLang,
+  } = useTranslation()
 
-  // 进入 LivePage 时注册 Tab
-  useEffect(() => {
-    openTab({ sessionId, label: 'New Living', path: '/live' })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-  const [session, setSession] = useState<SessionData>({
-    session_id: sessionId,
-    status: 'live',
-    ppt_filename: 'Live Class',
-    audio_url: '',
-    total_duration: 0,
-    pages: [],
-  })
-  // 本地 PPT/PDF 文件（Live 模式直接在浏览器渲染，无需上传）
-  const [localPdfUrl, setLocalPdfUrl] = useState<string | null>(null)
-  const [localPdfPageCount, setLocalPdfPageCount] = useState(0)
-  const localPdfInputRef = useRef<HTMLInputElement>(null)
+  const createNewSession = searchParams.get('new') === '1' || !searchParams.get('session')
 
-  function handleLocalPdfSelect(file: File) {
-    if (localPdfUrl) URL.revokeObjectURL(localPdfUrl)
-    const url = URL.createObjectURL(file)
-    setLocalPdfUrl(url)
-    setCurrentPage(1)
-  }
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [draftSessionId, setDraftSessionId] = useState<string | null>(null)
+  const [processedSessionId, setProcessedSessionId] = useState<string | null>(null)
+  const [session, setSession] = useState<SessionData | null>(null)
+  const [initError, setInitError] = useState<string | null>(null)
+
+  const notesSessionId = draftSessionId ?? processedSessionId ?? 'live-local'
+  const panelSessionId = processedSessionId ?? notesSessionId
+
+  const [wsStatus, setWsStatus] = useState<WsStatus>('idle')
+  const wsRef = useRef<WebSocket | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+
+  const [subtitleLines, setSubtitleLines] = useState<string[]>([])
+  const [transcriptByPage, setTranscriptByPage] = useState<Record<number, string[]>>({})
+  const subtitleBottomRef = useRef<HTMLDivElement>(null)
+
+  const [pptFile, setPptFile] = useState<File | null>(null)
+  const [pptId, setPptId] = useState<string | null>(null)
+  const [pptPages, setPptPages] = useState<PptPage[]>([])
+  const [pptUploading, setPptUploading] = useState(false)
+  const [processingProgress, setProcessingProgress] = useState(0)
+
   const [currentPage, setCurrentPage] = useState(1)
-  const [noteMode, setNoteMode] = useState<'my' | 'ai' | 'transcript'>('ai')
-  const [playingSegIdx, setPlayingSegIdx] = useState<number | null>(null)
-  const [playProgress, setPlayProgress] = useState(0) // 0–1，当前播放段进度
-  const segStartRef = useRef<number | null>(null)
-  const segEndRef = useRef<number | null>(null)
-  const segTimeUpdateRef = useRef<(() => void) | null>(null)
-  const [transcriptClickCount, setTranscriptClickCount] = useState<number>(() => {
-    return parseInt(localStorage.getItem('liberstudy_transcript_clicks') ?? '0', 10)
-  })
-  const [copyToast, setCopyToast] = useState(false)
-  const [retrying, setRetrying] = useState<number | null>(null)
-  const [navVisible, setNavVisible] = useState(false)
-
-  // Toolbar state
+  const currentPageRef = useRef(1)
+  const [noteMode, setNoteMode] = useState<NoteMode>('transcript')
+  const [navVisible, setNavVisible] = useState(true)
+  const [notesPanelWidth, setNotesPanelWidth] = useState(460)
   const [activeTool, setActiveTool] = useState<'none' | 'highlight' | 'eraser' | 'text'>('none')
-  const [highlightColor, setHighlightColor] = useState('#FAFF00')
+  const [highlightColor, setHighlightColor] = useState('#FFD700')
   const [zoomLevel, setZoomLevel] = useState(100)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [pageInputValue, setPageInputValue] = useState('1')
-
-  // 跨页持久化的展开状态：pageNum → Set<bulletIndex>
-  const [expandedBullets, setExpandedBullets] = useState<Map<number, Set<number>>>(new Map())
-  // 记录哪些 bullet 的 shimmer 动画已播完，跨页持久化，切回来直接显示文本
-  const [animatedBullets, setAnimatedBullets] = useState<Map<number, Set<number>>>(new Map())
-  const prevPageRef = useRef<number>(1)
-  const audioRef = useRef<HTMLAudioElement>(null)
-  const wheelTimeoutRef = useRef<number | null>(null)
-  const wheelAccumRef = useRef(0)
-  const currentPageRef = useRef(currentPage)
-  const totalPagesRef = useRef(session?.pages.length ?? 1)
-
-  // Highlight tool state
-  const pageContainerRef = useRef<HTMLDivElement | null>(null)
-  const { addHighlight, removeHighlight, highlightsForPage } = useHighlights(sessionId ?? '')
-  const { addAnnotation, updateAnnotation, removeAnnotation, annotationsForPage } = useTextAnnotations(sessionId ?? '')
-
-  // Translation state
-  const { enabled: translationEnabled, setEnabled: setTranslationEnabled, targetLang, setTargetLang, translate, t } = useTranslation()
   const [popoverOpen, setPopoverOpen] = useState(false)
-  const [translatedTexts, setTranslatedTexts] = useState<Map<number, {
-    bullets: string[]
-    aiComments: (string | null)[]
-    supplement: string | null
-    aiExpansion: string | null
-  }>>(new Map())
 
-  // Provider 切换（AI Notes 顶部）
-  const PROVIDERS = ['中转站', '通义千问', 'DeepSeek', '豆包'] as const
-  type Provider = typeof PROVIDERS[number]
-  const [provider, setProvider] = useState<Provider>('中转站')
-
-  // My Notes：key=pageNum，值为文本（从 IndexedDB 加载，onChange 时 debounce 保存）
   const [myNoteTexts, setMyNoteTexts] = useState<Map<number, string>>(new Map())
   const myNoteSaveTimerRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map())
-
-  const getMyNoteText = (page: number) => myNoteTexts.get(page) ?? ''
-
-  const handleMyNoteChange = useCallback((page: number, text: string) => {
-    setMyNoteTexts(prev => { const m = new Map(prev); m.set(page, text); return m })
-    // debounce 500ms 保存
-    const timers = myNoteSaveTimerRef.current
-    const old = timers.get(page)
-    if (old) clearTimeout(old)
-    const t = setTimeout(() => {
-      if (sessionId) saveMyNote(sessionId, page, text)
-      timers.delete(page)
-    }, 500)
-    timers.set(page, t)
-  }, [sessionId])
-
-  // 切换页面时从 IndexedDB 加载 my note
-  useEffect(() => {
-    if (!sessionId) return
-    loadMyNote(sessionId, currentPage).then(text => {
-      setMyNoteTexts(prev => {
-        if (prev.has(currentPage)) return prev
-        const m = new Map(prev); m.set(currentPage, text); return m
-      })
-    })
-  }, [sessionId, currentPage])
-
-  // AI 扩写状态：idle | expanding（扩写中）| expanded（扩写完成）
-  type MyNoteExpandState = { userNote: string; aiText: string; status: 'idle' | 'expanding' | 'expanded' }
   const [myNoteExpandStates, setMyNoteExpandStates] = useState<Map<number, MyNoteExpandState>>(new Map())
+  const [expandedBullets, setExpandedBullets] = useState<Map<number, Set<number>>>(new Map())
+  const [animatedBullets, setAnimatedBullets] = useState<Map<number, Set<number>>>(new Map())
+  const [translatedTexts] = useState<Map<number, TranslatedPageTexts>>(new Map())
 
-  const getMyNoteExpandState = (page: number): MyNoteExpandState =>
-    myNoteExpandStates.get(page) ?? { userNote: '', aiText: '', status: 'idle' }
-
-  const patchMyNoteExpandState = useCallback((page: number, patch: Partial<MyNoteExpandState>) =>
-    setMyNoteExpandStates(prev => {
-      const current = prev.get(page) ?? { userNote: '', aiText: '', status: 'idle' as const }
-      const next = new Map(prev)
-      next.set(page, { ...current, ...patch })
-      return next
-    }), [])
-
-  // Page-level chat（My Notes / AI Notes 底部共用，key=pageNum）
   const [pageChatMessages, setPageChatMessages] = useState<Map<number, PageChatMessage[]>>(new Map())
   const [pageChatInput, setPageChatInput] = useState('')
   const [pageChatStreaming, setPageChatStreaming] = useState(false)
   const [pageChatStreamingText, setPageChatStreamingText] = useState('')
-  const pageChatBottomRef = useRef<HTMLDivElement>(null)
-
-  // Drawer phase: 'closed' | 'input' | 'full'
-  const [drawerPhase, setDrawerPhase] = useState<'closed' | 'input' | 'full'>('closed')
-  const [drawerHeightPx, setDrawerHeightPx] = useState<number | null>(null) // null = use default %
+  const [drawerPhase, setDrawerPhase] = useState<DrawerPhase>('closed')
+  const [drawerHeightPx, setDrawerHeightPx] = useState<number | null>(null)
   const [drawerModel, setDrawerModel] = useState('Auto')
   const [drawerModelDDOpen, setDrawerModelDDOpen] = useState(false)
 
-  // 切换页面时收回抽屉
-  const drawerPrevPageRef = useRef(currentPage)
-  useEffect(() => {
-    if (drawerPrevPageRef.current !== currentPage) {
-      setDrawerPhase('closed')
-      setDrawerHeightPx(null)
-      setPageChatInput('')
-      drawerPrevPageRef.current = currentPage
-    }
-  }, [currentPage])
-
-  const getPageChat = (page: number): PageChatMessage[] => pageChatMessages.get(page) ?? []
-
-  // 切换页面时加载 page chat
-  useEffect(() => {
-    if (!sessionId) return
-    loadPageChat(sessionId, currentPage).then(msgs => {
-      setPageChatMessages(prev => {
-        if (prev.has(currentPage)) return prev
-        const m = new Map(prev); m.set(currentPage, msgs); return m
-      })
-    })
-  }, [sessionId, currentPage])
-
-  useEffect(() => {
-    pageChatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [pageChatMessages, pageChatStreamingText])
-
-  const handlePageChatSend = useCallback(async () => {
-    const q = pageChatInput.trim()
-    if (!q || pageChatStreaming || !sessionId) return
-    const userMsg: PageChatMessage = { role: 'user', content: q, timestamp: Date.now() }
-    const currentMsgs = pageChatMessages.get(currentPage) ?? []
-    const newMsgs = [...currentMsgs, userMsg]
-    setPageChatMessages(prev => { const m = new Map(prev); m.set(currentPage, newMsgs); return m })
-    setPageChatInput('')
-    setPageChatStreaming(true)
-    setPageChatStreamingText('')
-
-    try {
-      const pageData = session?.pages.find(p => p.page_num === currentPage)
-      const context = [
-        getMyNoteText(currentPage) ? `用户笔记：${getMyNoteText(currentPage)}` : '',
-        pageData?.passive_notes?.bullets?.map(b => b.ppt_text).join('\n') ?? '',
-      ].filter(Boolean).join('\n\n')
-
-      let full = ''
-      await askBullet(sessionId, currentPage, -1, context, '', q, '中转站', (chunk) => {
-        full += chunk
-        setPageChatStreamingText(full)
-      })
-      const aiMsg: PageChatMessage = { role: 'ai', content: full, timestamp: Date.now() }
-      const finalMsgs = [...newMsgs, aiMsg]
-      setPageChatMessages(prev => { const m = new Map(prev); m.set(currentPage, finalMsgs); return m })
-      await savePageChat(sessionId, currentPage, finalMsgs)
-    } catch (err) {
-      const errMsg: PageChatMessage = { role: 'ai', content: `出错了：${err instanceof Error ? err.message : '未知错误'}`, timestamp: Date.now() }
-      const finalMsgs = [...newMsgs, errMsg]
-      setPageChatMessages(prev => { const m = new Map(prev); m.set(currentPage, finalMsgs); return m })
-      await savePageChat(sessionId, currentPage, finalMsgs)
-    } finally {
-      setPageChatStreaming(false)
-      setPageChatStreamingText('')
-    }
-  }, [pageChatInput, pageChatStreaming, sessionId, currentPage, pageChatMessages, session, myNoteTexts])
-
-  // Resizable panel state
-  const [notesPanelWidth, setNotesPanelWidth] = useState(500)
-  const isResizingRef = useRef(false)
-  const resizeStartXRef = useRef(0)
-  const resizeStartWidthRef = useRef(320)
-
-    // Canvas width for react-pdf
-  const canvasAreaRef = useRef<HTMLDivElement>(null)
-  const [canvasWidth, setCanvasWidth] = useState(800)
-
-  useEffect(() => {
-    if (!canvasAreaRef.current) return
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setCanvasWidth(Math.max(400, entry.contentRect.width - 48))
-      }
-    })
-    ro.observe(canvasAreaRef.current)
-    return () => ro.disconnect()
-  }, [])
-
-  const handleResizerMouseDown = useCallback((e: React.MouseEvent) => {
-    isResizingRef.current = true
-    resizeStartXRef.current = e.clientX
-    resizeStartWidthRef.current = notesPanelWidth
-    document.body.style.cursor = 'col-resize'
-    document.body.style.userSelect = 'none'
-
-    const onMouseMove = (ev: MouseEvent) => {
-      if (!isResizingRef.current) return
-      const delta = resizeStartXRef.current - ev.clientX
-      setNotesPanelWidth(Math.max(100, resizeStartWidthRef.current + delta))
-    }
-
-    const onMouseUp = () => {
-      isResizingRef.current = false
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-      document.removeEventListener('mousemove', onMouseMove)
-      document.removeEventListener('mouseup', onMouseUp)
-    }
-
-    document.addEventListener('mousemove', onMouseMove)
-    document.addEventListener('mouseup', onMouseUp)
-  }, [notesPanelWidth])
-
-  // NotesPage 挂载时锁定 body 滚动，防止触摸板带动整页上下滚
-  useEffect(() => {
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = prev }
-  }, [])
-
-  // LivePage: skip API loading, start with no session data
-  // WebSocket / Recording state
-  const [wsStatus, setWsStatus] = useState<'idle' | 'connecting' | 'live' | 'stopped'>('idle')
-  const [subtitleLines, setSubtitleLines] = useState<string[]>([])
-  const [transcriptByPage, setTranscriptByPage] = useState<Record<number, string[]>>({})
-  const [explanationsByPage, setExplanationsByPage] = useState<Record<number, string>>({})
-  const [currentExplanation, setCurrentExplanation] = useState('')
-  const [explaining, setExplaining] = useState(false)
-  const wsRef = useRef<WebSocket | null>(null)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const subtitleBottomRef = useRef<HTMLDivElement>(null)
-
-  // Wheel翻页 handler（用 passive:false 原生监听才能 preventDefault）
-  const handleWheelRef = useRef<(e: WheelEvent) => void>((e) => {
-    // 横向滑动为主时不翻页
-    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
-    e.preventDefault()
-    e.stopPropagation()
-
-    // 累积 deltaY，超过阈值才翻页（兼容触摸板小增量和鼠标大增量）
-    // deltaMode=1 是行模式（鼠标），乘以 40 转换为像素
-    const delta = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY
-    wheelAccumRef.current += delta
-
-    const THRESHOLD = 50
-    if (Math.abs(wheelAccumRef.current) < THRESHOLD) return
-
-    const direction = wheelAccumRef.current > 0 ? 1 : -1
-    wheelAccumRef.current = 0
-
-    if (wheelTimeoutRef.current) return
-    if (direction === 1 && currentPageRef.current < totalPagesRef.current) {
-      setCurrentPage(p => p + 1)
-    } else if (direction === -1 && currentPageRef.current > 1) {
-      setCurrentPage(p => p - 1)
-    }
-    wheelTimeoutRef.current = window.setTimeout(() => {
-      wheelTimeoutRef.current = null
-      wheelAccumRef.current = 0
-    }, 400)
+  const [playingSegIdx, setPlayingSegIdx] = useState<number | null>(null)
+  const [playProgress, setPlayProgress] = useState(0)
+  const [transcriptClickCount, setTranscriptClickCount] = useState<number>(() => {
+    return parseInt(localStorage.getItem('liberstudy_transcript_clicks') ?? '0', 10)
   })
+  const [retrying, setRetrying] = useState<number | null>(null)
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const segStartRef = useRef<number | null>(null)
+  const segEndRef = useRef<number | null>(null)
+  const segTimeUpdateRef = useRef<(() => void) | null>(null)
 
-  // 在 window 捕获阶段监听 wheel，检查事件是否发生在 canvas 区域内
-  // 原因：useEffect([]) 运行时 loading 尚未结束，canvasAreaRef.current 为 null，
-  // 导致事件永远无法注册。改用 window 级监听 + 区域检测规避此问题。
-  useEffect(() => {
-    const handler = (e: WheelEvent) => {
-      const el = canvasAreaRef.current
-      if (!el) return
-      if (!el.contains(e.target as Node)) return
-      handleWheelRef.current(e)
-    }
-    window.addEventListener('wheel', handler, { passive: false, capture: true })
-    return () => window.removeEventListener('wheel', handler, { capture: true })
+  const getMyNoteText = useCallback((pageNum: number) => myNoteTexts.get(pageNum) ?? '', [myNoteTexts])
+
+  const getMyNoteExpandState = useCallback((pageNum: number): MyNoteExpandState => {
+    return myNoteExpandStates.get(pageNum) ?? { userNote: '', aiText: '', status: 'idle' }
+  }, [myNoteExpandStates])
+
+  const patchMyNoteExpandState = useCallback((pageNum: number, patch: Partial<MyNoteExpandState>) => {
+    setMyNoteExpandStates((prev) => {
+      const current = prev.get(pageNum) ?? { userNote: '', aiText: '', status: 'idle' as const }
+      const next = new Map(prev)
+      next.set(pageNum, { ...current, ...patch })
+      return next
+    })
   }, [])
 
-  // Keep wheel ref pages in sync
+  const activePageData = session?.pages.find((page) => page.page_num === currentPage) ?? null
+  const draftPage = pptPages.find((page) => page.page_num === currentPage) ?? null
+  const totalPages = session?.pages.length ?? pptPages.length
+  const pageSource = session?.pages ?? pptPages
+  const isLiveMode = wsStatus !== 'done'
+  const pagePhase = wsStatus === 'processing' ? 'processing' : 'ready'
+  const draftOutlineLines = buildDraftOutlineLines(activePageData?.ppt_text ?? draftPage?.ppt_text ?? '')
+
   useEffect(() => {
     currentPageRef.current = currentPage
-  }, [currentPage])
-
-  useEffect(() => {
-    totalPagesRef.current = session?.pages.length ?? 1
-  }, [session?.pages.length])
-
-  // 键盘翻页
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowDown' || e.key === 'PageDown') {
-        e.preventDefault()
-        setCurrentPage(p => Math.min(p + 1, session?.pages.length ?? 1))
-      } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
-        e.preventDefault()
-        setCurrentPage(p => Math.max(p - 1, 1))
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [session?.pages.length])
-
-  // 页码输入框同步 currentPage
-  useEffect(() => {
     setPageInputValue(String(currentPage))
   }, [currentPage])
 
-  // ── 字幕条自动滚动 ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [])
+
   useEffect(() => {
     subtitleBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [subtitleLines])
 
-  // ── 录音 + WebSocket 逻辑 ─────────────────────────────────────────────────────
-  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-  const WS_BASE = API_BASE.replace(/^http/, 'ws')
+  useEffect(() => {
+    if (!createNewSession) return
 
-  const startRecording = useCallback(async () => {
-    setWsStatus('connecting')
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const ws = new WebSocket(`${WS_BASE}/api/ws/live-asr`)
-      wsRef.current = ws
+    let cancelled = false
 
-      ws.onopen = () => {
-        setWsStatus('live')
-        const mr = new MediaRecorder(stream, { mimeType: 'audio/webm' })
-        mediaRecorderRef.current = mr
-        mr.ondataavailable = (e) => {
-          if (e.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-            ws.send(e.data)
-          }
-        }
-        mr.start(250)
-      }
+    createLiveSession()
+      .then(({ session_id }) => {
+        if (cancelled) return
+        setDraftSessionId(session_id)
+        openTab({ sessionId: session_id, label: 'Live 课堂', path: '/live?new=1' })
+      })
+      .catch((error) => {
+        if (cancelled) return
+        const fallbackId = `live-local-${Date.now()}`
+        setDraftSessionId(fallbackId)
+        setInitError(error instanceof Error ? error.message : '初始化 Live 会话失败')
+        openTab({ sessionId: fallbackId, label: 'Live 课堂', path: '/live?new=1' })
+      })
 
-      ws.onmessage = (e) => {
-        const msg: { text: string; is_final: boolean; timestamp: number } = JSON.parse(e.data)
-        if (msg.is_final) {
-          setSubtitleLines(prev => {
-            const next = [...prev, msg.text]
-            return next.length > 50 ? next.slice(next.length - 50) : next
-          })
-          setTranscriptByPage(prev => ({
-            ...prev,
-            [currentPage]: [...(prev[currentPage] ?? []), msg.text],
-          }))
-        } else {
-          setSubtitleLines(prev => {
-            if (prev.length === 0) return [msg.text]
-            return [...prev.slice(0, -1), msg.text]
-          })
-        }
-      }
-
-      ws.onerror = () => setWsStatus('stopped')
-      ws.onclose = () => setWsStatus(s => s === 'live' ? 'stopped' : s)
-    } catch {
-      setWsStatus('idle')
+    return () => {
+      cancelled = true
     }
-  }, [currentPage, WS_BASE])
+  }, [createNewSession, openTab])
 
-  const stopRecording = useCallback(async () => {
-    mediaRecorderRef.current?.stop()
-    wsRef.current?.close()
-    setWsStatus('stopped')
+  useEffect(() => {
+    if (!notesSessionId) return
 
-    // 将 explanationsByPage 写入 IndexedDB
-    const db = await openAskDB()
-    await new Promise<void>((resolve) => {
-      const tx = db.transaction(MY_NOTES_STORE, 'readwrite')
-      tx.objectStore(MY_NOTES_STORE).put(
-        { explanations: explanationsByPage },
-        `live-explanations-${sessionId}`
-      )
-      tx.oncomplete = () => resolve()
-      tx.onerror = () => resolve()
+    loadMyNote(notesSessionId, currentPage).then((text) => {
+      setMyNoteTexts((prev) => {
+        if (prev.has(currentPage)) return prev
+        const next = new Map(prev)
+        next.set(currentPage, text)
+        return next
+      })
+    })
+  }, [notesSessionId, currentPage])
+
+  useEffect(() => {
+    if (!notesSessionId) return
+
+    loadPageChat(notesSessionId, currentPage).then((messages) => {
+      setPageChatMessages((prev) => {
+        if (prev.has(currentPage)) return prev
+        const next = new Map(prev)
+        next.set(currentPage, messages)
+        return next
+      })
+    })
+  }, [notesSessionId, currentPage])
+
+  useEffect(() => {
+    if (totalPages <= 0) return
+    setCurrentPage((prev) => Math.min(Math.max(1, prev), totalPages))
+  }, [totalPages])
+
+  const handleMyNoteChange = useCallback((pageNum: number, text: string) => {
+    setMyNoteTexts((prev) => {
+      const next = new Map(prev)
+      next.set(pageNum, text)
+      return next
     })
 
-    // 跳转 ProcessingPage
-    navigate('/processing', { state: { sessionId, fromLive: true } })
-  }, [explanationsByPage, sessionId, navigate])
+    const existingTimer = myNoteSaveTimerRef.current.get(pageNum)
+    if (existingTimer) clearTimeout(existingTimer)
 
-  const handleExplainPage = useCallback(async () => {
-    if (wsStatus !== 'live' && wsStatus !== 'stopped') return
-    setExplaining(true)
-    setCurrentExplanation('')
+    const nextTimer = setTimeout(() => {
+      void saveMyNote(notesSessionId, pageNum, text)
+      myNoteSaveTimerRef.current.delete(pageNum)
+    }, 500)
 
-    const transcript = (transcriptByPage[currentPage] ?? []).join('')
-    const pptText = ''
+    myNoteSaveTimerRef.current.set(pageNum, nextTimer)
+  }, [notesSessionId])
+
+  const handlePageChatSend = useCallback(async () => {
+    const question = pageChatInput.trim()
+    if (!question || pageChatStreaming) return
+
+    const userMessage: PageChatMessage = {
+      role: 'user',
+      content: question,
+      timestamp: Date.now(),
+    }
+
+    const currentMessages = pageChatMessages.get(currentPage) ?? []
+    const nextMessages = [...currentMessages, userMessage]
+    setPageChatMessages((prev) => {
+      const next = new Map(prev)
+      next.set(currentPage, nextMessages)
+      return next
+    })
+    setPageChatInput('')
+
+    if (!processedSessionId) {
+      const aiMessage: PageChatMessage = {
+        role: 'ai',
+        content: '课堂处理中后，这里的页内问答会使用完整笔记上下文继续回答。',
+        timestamp: Date.now(),
+      }
+      const messagesWithReply = [...nextMessages, aiMessage]
+      setPageChatMessages((prev) => {
+        const next = new Map(prev)
+        next.set(currentPage, messagesWithReply)
+        return next
+      })
+      await savePageChat(notesSessionId, currentPage, messagesWithReply)
+      return
+    }
+
+    setPageChatStreaming(true)
+    setPageChatStreamingText('')
 
     try {
-      const res = await fetch(`${API_BASE}/api/live/explain`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ page_num: currentPage, ppt_text: pptText, transcript }),
-      })
-      if (!res.body) return
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
+      const pageData = session?.pages.find((page) => page.page_num === currentPage)
+      const context = [
+        getMyNoteText(currentPage) ? `用户笔记：${getMyNoteText(currentPage)}` : '',
+        pageData?.passive_notes?.bullets?.map((bullet) => bullet.ppt_text).join('\n') ?? '',
+      ].filter(Boolean).join('\n\n')
+
       let full = ''
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        const chunk = decoder.decode(value)
-        for (const line of chunk.split('\n')) {
-          if (line.startsWith('data: ')) {
-            const payload = line.slice(6).trim()
-            if (payload === '[DONE]') break
-            try {
-              const { text } = JSON.parse(payload)
-              full += text
-              setCurrentExplanation(full)
-            } catch { /* ignore parse errors */ }
-          }
-        }
+      await askBullet(
+        processedSessionId,
+        currentPage,
+        -1,
+        context,
+        '',
+        question,
+        drawerModel === 'Auto' ? '中转站' : drawerModel,
+        (chunk) => {
+          full += chunk
+          setPageChatStreamingText(full)
+        },
+      )
+
+      const aiMessage: PageChatMessage = {
+        role: 'ai',
+        content: full,
+        timestamp: Date.now(),
       }
-      setExplanationsByPage(prev => ({ ...prev, [currentPage]: full }))
+      const messagesWithReply = [...nextMessages, aiMessage]
+      setPageChatMessages((prev) => {
+        const next = new Map(prev)
+        next.set(currentPage, messagesWithReply)
+        return next
+      })
+      await savePageChat(notesSessionId, currentPage, messagesWithReply)
+    } catch (error) {
+      const aiMessage: PageChatMessage = {
+        role: 'ai',
+        content: `出错了：${error instanceof Error ? error.message : '未知错误'}`,
+        timestamp: Date.now(),
+      }
+      const messagesWithReply = [...nextMessages, aiMessage]
+      setPageChatMessages((prev) => {
+        const next = new Map(prev)
+        next.set(currentPage, messagesWithReply)
+        return next
+      })
+      await savePageChat(notesSessionId, currentPage, messagesWithReply)
     } finally {
-      setExplaining(false)
+      setPageChatStreaming(false)
+      setPageChatStreamingText('')
     }
-  }, [wsStatus, currentPage, transcriptByPage, API_BASE])
+  }, [
+    currentPage,
+    drawerModel,
+    getMyNoteText,
+    notesSessionId,
+    pageChatInput,
+    pageChatMessages,
+    pageChatStreaming,
+    processedSessionId,
+    session,
+  ])
+
+  const handleExpandMyNote = useCallback(async (pageNum: number) => {
+    if (!processedSessionId) return
+
+    const userNote = myNoteTexts.get(pageNum) ?? ''
+    if (!userNote.trim()) return
+
+    const pptText = session?.pages.find((page) => page.page_num === pageNum)?.ppt_text ?? ''
+    patchMyNoteExpandState(pageNum, { userNote, aiText: '', status: 'expanding' })
+
+    try {
+      await generateMyNote(processedSessionId, pageNum, userNote, pptText, '中转站', (chunk) => {
+        setMyNoteExpandStates((prev) => {
+          const current = prev.get(pageNum)
+          if (!current) return prev
+          const next = new Map(prev)
+          next.set(pageNum, { ...current, aiText: current.aiText + chunk })
+          return next
+        })
+      })
+      patchMyNoteExpandState(pageNum, { status: 'expanded' })
+    } catch {
+      patchMyNoteExpandState(pageNum, { status: 'idle' })
+    }
+  }, [myNoteTexts, patchMyNoteExpandState, processedSessionId, session])
+
+  const handleRetryPage = useCallback(async (pageNum: number) => {
+    if (!processedSessionId || retrying !== null) return
+
+    setRetrying(pageNum)
+    try {
+      await retryPage(processedSessionId, pageNum)
+      const data = await getSession(processedSessionId)
+      setSession(data as SessionData)
+    } finally {
+      setRetrying(null)
+    }
+  }, [processedSessionId, retrying])
 
   const handleTimestampClick = useCallback((seconds: number) => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = seconds
-      audioRef.current.play()
-    }
+    if (!audioRef.current) return
+    audioRef.current.currentTime = seconds
+    void audioRef.current.play()
   }, [])
 
-  const handleSegmentPlay = useCallback((seg: AlignedSegment, idx: number) => {
+  const handleSegmentPlay = useCallback((segment: AlignedSegment, index: number) => {
     const audio = audioRef.current
     if (!audio) return
 
-    // 点击正在播放的行 → 停止
-    if (playingSegIdx === idx) {
+    if (playingSegIdx === index) {
       audio.pause()
       segEndRef.current = null
       segStartRef.current = null
@@ -1234,29 +400,27 @@ export default function LivePage() {
       return
     }
 
-    // 切换到新行前清除旧监听
     if (segTimeUpdateRef.current) {
       audio.removeEventListener('timeupdate', segTimeUpdateRef.current)
       segTimeUpdateRef.current = null
     }
 
-    // 记录点击次数（最多记到 3，超过后不再更新）
     setTranscriptClickCount((prev) => {
       const next = Math.min(prev + 1, 3)
       localStorage.setItem('liberstudy_transcript_clicks', String(next))
       return next
     })
 
-    segEndRef.current = seg.end
-    segStartRef.current = seg.start
-    setPlayingSegIdx(idx)
+    segStartRef.current = segment.start
+    segEndRef.current = segment.end
+    setPlayingSegIdx(index)
     setPlayProgress(0)
-    audio.currentTime = seg.start
-    audio.play()
+    audio.currentTime = segment.start
+    void audio.play()
 
     const onTimeUpdate = () => {
-      const start = segStartRef.current!
-      const end = segEndRef.current!
+      const start = segStartRef.current ?? 0
+      const end = segEndRef.current ?? 0
       const duration = end - start
       if (duration > 0) {
         setPlayProgress(Math.min((audio.currentTime - start) / duration, 1))
@@ -1271,213 +435,97 @@ export default function LivePage() {
         audio.removeEventListener('timeupdate', onTimeUpdate)
       }
     }
+
     segTimeUpdateRef.current = onTimeUpdate
     audio.addEventListener('timeupdate', onTimeUpdate)
   }, [playingSegIdx])
 
-  const handleCopyPage = useCallback(() => {
-    if (!session) return
-    const page = session.pages.find((p) => p.page_num === currentPage)
-    if (!page) return
-    const bullets = page.passive_notes?.bullets.map((b) => `• ${b.ppt_text}`).join('\n') ?? ''
-    const text = `## 第 ${page.page_num} 页\n\n${bullets}`
-    navigator.clipboard.writeText(text)
-    setCopyToast(true)
-    setTimeout(() => setCopyToast(false), 1500)
-  }, [session, currentPage])
+  const startRecording = useCallback(async () => {
+    // Task 9
+  }, [])
 
-  const handleExportMarkdown = useCallback(() => {
-    if (!session) return
-    const lines: string[] = [`# ${session.ppt_filename}\n`]
-    session.pages.forEach((page) => {
-      lines.push(`## 第 ${page.page_num} 页`)
-      if (page.active_notes) {
-        lines.push(`\n> 我的笔记：${page.active_notes.user_note}`)
-        lines.push(`\n${page.active_notes.ai_expansion}`)
-      }
-      if (page.passive_notes) {
-        page.passive_notes.bullets.forEach((b) => lines.push(`- ${b.ppt_text}`))
-      }
-      if (page.page_supplement) {
-        lines.push(`\n**脱离课件内容：**\n${page.page_supplement.content}`)
-      }
-      lines.push('')
-    })
-    const blob = new Blob([lines.join('\n')], { type: 'text/markdown' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `LiberStudy_${session.ppt_filename}_${new Date().toISOString().slice(0, 10)}.md`
-    a.click()
-    URL.revokeObjectURL(url)
-  }, [session])
+  const pauseRecording = useCallback(() => {
+    // Task 9
+  }, [])
 
-  const handleExpandMyNote = useCallback(async (pageNum: number) => {
-    if (!sessionId) return
-    const userNote = myNoteTexts.get(pageNum) ?? ''
-    if (!userNote.trim()) return
-    const pptText = session?.pages.find(p => p.page_num === pageNum)?.ppt_text ?? ''
-    patchMyNoteExpandState(pageNum, { userNote, aiText: '', status: 'expanding' })
-    try {
-      await generateMyNote(sessionId, pageNum, userNote, pptText, provider, (chunk) => {
-        setMyNoteExpandStates(prev => {
-          const current = prev.get(pageNum)
-          if (!current) return prev
-          const next = new Map(prev)
-          next.set(pageNum, { ...current, aiText: current.aiText + chunk })
-          return next
-        })
-      })
-      patchMyNoteExpandState(pageNum, { status: 'expanded' })
-    } catch {
-      patchMyNoteExpandState(pageNum, { status: 'idle' })
-    }
-  }, [sessionId, session, provider, myNoteTexts, patchMyNoteExpandState])
+  const resumeRecording = useCallback(() => {
+    // Task 9
+  }, [])
 
-  const handleRetryPage = useCallback(async (pageNum: number) => {
-    if (!sessionId || retrying !== null) return
-    setRetrying(pageNum)
-    try {
-      await retryPage(sessionId, pageNum)
-      const data = await getSession(sessionId)
-      setSession(data as SessionData)
-    } catch {
-      // keep current state
-    } finally {
-      setRetrying(null)
-    }
-  }, [sessionId, retrying])
+  const stopRecording = useCallback(async () => {
+    // Task 10
+  }, [])
 
-  const translatePage = useCallback(async (pageNum: number) => {
-    if (!session) return
-    const page = session.pages.find((p) => p.page_num === pageNum)
-    if (!page) return
-
-    const bullets = page.passive_notes?.bullets ?? []
-    const supplement = page.page_supplement?.content ?? null
-    const aiExpansion = page.active_notes?.ai_expansion ?? null
-
-    const [translatedBullets, translatedAiComments, translatedSupplement, translatedAiExpansion] =
-      await Promise.all([
-        Promise.all(bullets.map((b) => translate(b.ppt_text))),
-        Promise.all(bullets.map((b) => (b.ai_comment ? translate(b.ai_comment) : Promise.resolve(null)))),
-        supplement ? translate(supplement) : Promise.resolve(null),
-        aiExpansion ? translate(aiExpansion) : Promise.resolve(null),
-      ])
-
-    setTranslatedTexts((prev) => {
-      const next = new Map(prev)
-      next.set(pageNum, {
-        bullets: translatedBullets,
-        aiComments: translatedAiComments,
-        supplement: translatedSupplement,
-        aiExpansion: translatedAiExpansion,
-      })
-      return next
-    })
-  }, [session, translate])
-
-  // 翻译已开启时，翻页自动翻译新页
-  useEffect(() => {
-    if (translationEnabled && session) {
-      translatePage(currentPage)
-    }
-  }, [currentPage, translationEnabled, session])
-
-  // 切页时把上一页所有展开中的 bullet 标记为动画完成，跳回来直接显示文本
-  useEffect(() => {
-    const prevPage = prevPageRef.current
-    if (prevPage === currentPage) return
-    const expanded = expandedBullets.get(prevPage)
-    if (expanded && expanded.size > 0) {
-      setAnimatedBullets(prev => {
-        const next = new Map(prev)
-        const pageSet = new Set(next.get(prevPage) ?? [])
-        expanded.forEach(i => pageSet.add(i))
-        next.set(prevPage, pageSet)
-        return next
-      })
-    }
-    prevPageRef.current = currentPage
-  }, [currentPage])
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: C.bg }}>
-        <div className="text-center">
-          <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3"
-            style={{ borderColor: C.secondary, borderTopColor: 'transparent' }} />
-          <p className="text-sm" style={{ color: C.muted }}>{t('notes_loading')}</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: C.bg }}>
-        <div className="text-center">
-          <p className="text-sm mb-4" style={{ color: C.secondary }}>{error ?? t('notes_unknown_error')}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="text-sm px-4 py-2 rounded-lg cursor-pointer transition-all duration-150"
-            style={{ background: C.sidebar, color: C.fg }}
-          >
-            {t('notes_retry')}
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  const currentPageData = session.pages.find((p) => p.page_num === currentPage)
-  const totalPages = localPdfUrl ? (localPdfPageCount || 1) : session.pages.length
+  const currentSlideUrl = activePageData
+    ? withApiBase(activePageData.thumbnail_url) ??
+      (processedSessionId ? `${API_BASE}/api/sessions/${processedSessionId}/slide/${activePageData.pdf_page_num}.png` : null)
+    : withApiBase(draftPage?.thumbnail_url)
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden" style={{ background: C.bg, fontFamily: FONT_SERIF }}>
-
-      {/* Main body (below TopAppBar) */}
-      <div className="flex flex-1 overflow-hidden" style={{ marginTop: '40px' }}>
-
-        {/* Left slide nav: click-toggle */}
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', marginTop: '40px', background: C.bg, fontFamily: FONT_SERIF }}>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {navVisible && (
-          <aside
-            className="flex-shrink-0 flex flex-col overflow-hidden"
-            style={{ width: '200px', background: C.sidebar, borderRight: '1px solid rgba(175,179,176,0.1)', zIndex: 15 }}
-          >
-            <div
-              className="flex items-center justify-between flex-shrink-0 px-4"
-              style={{ height: '48px', borderBottom: '1px solid rgba(175,179,176,0.1)' }}
-            >
-              <span style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.1em', color: C.secondary }}>{t('notes_toc')}</span>
-              <button type="button" onClick={() => setNavVisible(false)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '2px', borderRadius: '4px' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: C.secondary }}>
-                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+          <aside style={{ width: 200, flexShrink: 0, background: C.sidebar, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '12px 16px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', color: C.secondary }}>TOC</span>
+              <button
+                type="button"
+                onClick={() => setNavVisible(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, fontSize: '16px' }}
+              >
+                ×
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-3" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }} onWheel={(e) => e.stopPropagation()}>
-              {session.pages.map((page) => {
-                const isActive = page.page_num === currentPage
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px 8px' }} onWheel={(event) => event.stopPropagation()}>
+              {pageSource.map((page) => {
+                const thumbUrl = withApiBase(page.thumbnail_url)
+                const pageNum = page.page_num
                 return (
                   <button
+                    key={pageNum}
                     type="button"
-                    key={page.page_num}
-                    onClick={() => setCurrentPage(page.page_num)}
-                    aria-label={`跳转到第 ${page.page_num} 张幻灯片`}
-                    aria-current={isActive ? 'true' : undefined}
-                    className="relative cursor-pointer transition-all duration-150 rounded-md overflow-hidden flex-shrink-0 flex items-center justify-center w-full border-none p-0"
-                    style={{ height: '80px', borderRadius: '6px', background: C.divider, boxShadow: isActive ? '0px 0px 0px 2px rgba(95,94,94,1)' : '0 1px 3px rgba(0,0,0,0.08)', opacity: isActive ? 1 : 0.7 }}
+                    onClick={() => setCurrentPage(pageNum)}
+                    style={{
+                      width: '100%',
+                      padding: '4px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: currentPage === pageNum ? 'rgba(121,140,0,0.12)' : 'transparent',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '4px',
+                      marginBottom: '4px',
+                    }}
                   >
-                    <img
-                      src={page.thumbnail_url ? `${API_BASE}${page.thumbnail_url}` : `${API_BASE}/api/sessions/${sessionId}/slide/${page.pdf_page_num}.png`}
-                      alt={`第${page.page_num}页`}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                      loading="lazy"
-                    />
-                    <span className="absolute top-1 left-1.5 flex items-center justify-center" style={{ background: C.fg, color: C.white, fontSize: '8px', fontWeight: '700', borderRadius: '3px', padding: '1px 5px', minWidth: '16px' }}>
-                      {page.page_num}
-                    </span>
+                    {thumbUrl ? (
+                      <img
+                        src={thumbUrl}
+                        alt={`Slide ${pageNum}`}
+                        style={{
+                          width: '100%',
+                          borderRadius: '4px',
+                          border: currentPage === pageNum ? '2px solid #798C00' : '2px solid transparent',
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: '100%',
+                          aspectRatio: '16/9',
+                          background: C.muted,
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '11px',
+                          color: C.secondary,
+                        }}
+                      >
+                        {pageNum}
+                      </div>
+                    )}
                   </button>
                 )
               })}
@@ -1485,469 +533,370 @@ export default function LivePage() {
           </aside>
         )}
 
-        {/* Center: PPT Canvas */}
-        <main className="flex-1 flex flex-col overflow-hidden" style={{ background: C.bg }}>
-
-          {/* Toolbar */}
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
           <CanvasToolbar
             navVisible={navVisible}
-            onNavToggle={() => setNavVisible((v) => !v)}
+            onNavToggle={() => setNavVisible((prev) => !prev)}
             activeTool={activeTool}
             onToolChange={setActiveTool}
             highlightColor={highlightColor}
             onHighlightColorChange={setHighlightColor}
             translationEnabled={translationEnabled}
             popoverOpen={popoverOpen}
-            onPopoverToggle={() => setPopoverOpen((v) => !v)}
+            onPopoverToggle={() => setPopoverOpen((prev) => !prev)}
             targetLang={targetLang}
             onTargetLangChange={setTargetLang}
-            onTranslate={() => { setTranslationEnabled(true); setPopoverOpen(false); translatePage(currentPage) }}
-            onShowOriginal={() => { setTranslationEnabled(false); setPopoverOpen(false) }}
+            onTranslate={() => setTranslationEnabled(true)}
+            onShowOriginal={() => setTranslationEnabled(false)}
             onClosePopover={() => setPopoverOpen(false)}
             zoomLevel={zoomLevel}
             onZoomChange={setZoomLevel}
             currentPage={currentPage}
-            totalPages={totalPages}
+            totalPages={totalPages || 1}
             pageInputValue={pageInputValue}
             onPageInputChange={setPageInputValue}
             onPageInputCommit={() => {
-              const n = parseInt(pageInputValue, 10)
-              if (!isNaN(n) && n >= 1 && n <= totalPages) setCurrentPage(n)
-              else setPageInputValue(String(currentPage))
+              const nextPage = parseInt(pageInputValue, 10)
+              if (!Number.isNaN(nextPage) && nextPage >= 1 && nextPage <= (totalPages || 1)) {
+                setCurrentPage(nextPage)
+              }
             }}
-            onPrevPage={() => currentPage > 1 && setCurrentPage(currentPage - 1)}
-            onNextPage={() => currentPage < totalPages && setCurrentPage(currentPage + 1)}
+            onPrevPage={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+            onNextPage={() => setCurrentPage((prev) => Math.min(totalPages || 1, prev + 1))}
             searchOpen={searchOpen}
-            onSearchToggle={() => { setSearchOpen((v) => !v); if (searchOpen) setSearchQuery('') }}
+            onSearchToggle={() => setSearchOpen((prev) => !prev)}
             searchQuery={searchQuery}
             onSearchQueryChange={setSearchQuery}
           />
 
-          {/* LivePage 录音控制条 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '6px 16px', borderBottom: '1px solid rgba(175,179,176,0.15)', flexShrink: 0 }}>
-            <span style={{
-              fontSize: '11px',
-              fontWeight: 700,
-              letterSpacing: '0.12em',
-              color: wsStatus === 'live' ? '#798C00' : '#B0AFA7',
-              textTransform: 'uppercase',
-            }}>
-              {wsStatus === 'live' ? t('live_recording_label') :
-               wsStatus === 'stopped' ? t('live_stopped_label') :
-               t('live_idle_label')}
-            </span>
-            {wsStatus === 'idle' && (
-              <button
-                onClick={startRecording}
-                style={{ backgroundColor: '#798C00', color: '#fff', border: 'none', borderRadius: '9999px', padding: '6px 16px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
+            {pageSource.length === 0 ? (
+              <div style={{ textAlign: 'center', color: C.muted }}>
+                <p style={{ fontSize: '13px', marginBottom: '12px' }}>可选：上传 PPT 同步显示幻灯片</p>
+                <label
+                  style={{
+                    cursor: 'pointer',
+                    background: '#798C00',
+                    color: '#fff',
+                    borderRadius: '9999px',
+                    padding: '8px 20px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    display: 'inline-block',
+                  }}
+                >
+                  上传 PPT
+                  <input
+                    type="file"
+                    accept=".ppt,.pptx,.pdf"
+                    style={{ display: 'none' }}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0]
+                      if (!file) return
+                      setPptFile(file)
+                      setPptUploading(true)
+                      uploadPpt(file)
+                        .then((result) => {
+                          setPptId(result.ppt_id)
+                          setPptPages(result.pages)
+                          setCurrentPage(1)
+                        })
+                        .finally(() => setPptUploading(false))
+                    }}
+                  />
+                </label>
+                {pptUploading && <p style={{ marginTop: '8px', fontSize: '12px' }}>上传中…</p>}
+                {initError && <p style={{ marginTop: '8px', fontSize: '12px', color: '#B45309' }}>{initError}</p>}
+              </div>
+            ) : currentSlideUrl ? (
+              <img
+                src={currentSlideUrl}
+                alt={`Slide ${currentPage}`}
+                style={{
+                  maxWidth: `${zoomLevel}%`,
+                  maxHeight: '100%',
+                  objectFit: 'contain',
+                  borderRadius: '4px',
+                  boxShadow: '0 4px 24px rgba(0,0,0,0.10)',
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: '100%',
+                  aspectRatio: '16/9',
+                  maxWidth: '800px',
+                  background: C.white,
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: C.secondary,
+                  fontSize: '14px',
+                }}
               >
-                ● {t('live_recording_label')}
-              </button>
-            )}
-            {wsStatus === 'connecting' && (
-              <span style={{ fontSize: '12px', color: '#B0AFA7' }}>连接中…</span>
-            )}
-            {wsStatus === 'live' && (
-              <button
-                onClick={stopRecording}
-                style={{ backgroundColor: '#D0CFC5', color: '#2F3331', border: 'none', borderRadius: '9999px', padding: '6px 16px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
-              >
-                ■ {t('live_stopped_label')}
-              </button>
+                第 {currentPage} 页
+              </div>
             )}
           </div>
 
-          {/* Canvas area — single page with wheel navigation */}
+          {isLiveMode && (
+            <div
+              style={{
+                height: '100px',
+                flexShrink: 0,
+                overflowY: 'auto',
+                background: 'rgba(30,30,30,0.88)',
+                margin: '0 12px 8px',
+                borderRadius: '8px',
+                padding: '8px 14px',
+                fontSize: '13px',
+                lineHeight: '1.6',
+                color: '#E8E8E0',
+              }}
+            >
+              {subtitleLines.length === 0 ? (
+                <span style={{ opacity: 0.4 }}>开始录音后，字幕会实时显示在这里。</span>
+              ) : (
+                subtitleLines.map((line, index) => (
+                  <p key={`${index}-${line}`} style={{ margin: '2px 0' }}>
+                    {line}
+                  </p>
+                ))
+              )}
+              <div ref={subtitleBottomRef} />
+            </div>
+          )}
+
           <div
-            ref={canvasAreaRef}
-            className="flex-1 flex items-center justify-center"
             style={{
-              background: 'rgba(232,231,226,0.6)',
-              overflowX: zoomLevel > 100 ? 'auto' : 'hidden',
-              overflowY: 'hidden',
-              touchAction: 'none',
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '10px 20px',
+              borderTop: `1px solid ${C.divider}`,
+              background: C.white,
             }}
           >
-            {/* 本地 PDF 渲染（Live 模式直接加载本地文件） */}
-            {localPdfUrl ? (
-              <div className="relative" style={{ maxWidth: '100%', maxHeight: '100%' }}>
-                <div
-                  ref={pageContainerRef}
-                  className="relative rounded-lg overflow-hidden"
-                  style={{ background: C.white, boxShadow: '0 4px 24px rgba(0,0,0,0.10)' }}
-                >
-                  <Document
-                    file={localPdfUrl}
-                    onLoadSuccess={({ numPages }) => setLocalPdfPageCount(numPages)}
-                    loading={
-                      <div style={{ height: '500px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin"
-                          style={{ borderColor: C.secondary, borderTopColor: 'transparent' }} />
-                      </div>
-                    }
-                  >
-                    <Page
-                      pageNumber={currentPage}
-                      width={Math.round(canvasWidth * zoomLevel / 100)}
-                      renderTextLayer={true}
-                      renderAnnotationLayer={false}
-                    />
-                  </Document>
-                  {/* Highlight layer */}
-                  <HighlightLayer
-                    pageContainerRef={pageContainerRef}
-                    pageNum={currentPage}
-                    highlights={highlightsForPage(currentPage)}
-                    highlightToolActive={activeTool === 'highlight'}
-                    eraserToolActive={activeTool === 'eraser'}
-                    highlightColor={highlightColor}
-                    onAdd={(rec) => addHighlight({ ...rec, sessionId: sessionId ?? '' })}
-                    onRemove={removeHighlight}
-                  />
-                  {/* Text annotation layer */}
-                  <TextAnnotationLayer
-                    annotations={annotationsForPage(currentPage)}
-                    textToolActive={activeTool === 'text'}
-                    onPlaceAnnotation={(x, y) => addAnnotation(currentPage, x, y)}
-                    onUpdate={updateAnnotation}
-                    onRemove={removeAnnotation}
-                  />
-                  {/* Slide label */}
-                  <div
-                    className="absolute bottom-3 right-3 text-xs px-2 py-0.5 rounded"
-                    style={{ background: 'rgba(47,51,49,0.5)', color: C.white, letterSpacing: '0.05em' }}
-                  >
-                    SLIDE {String(currentPage).padStart(2, '0')} / {String(localPdfPageCount || 1).padStart(2, '0')}
-                  </div>
-                </div>
-              </div>
-            ) : currentPageData ? (() => {
-              const pdfUrl = currentPageData.pdf_url ? `${API_BASE}${currentPageData.pdf_url}` : null
-              return (
-                <div
-                  className="relative"
-                  style={{ maxWidth: '100%', maxHeight: '100%' }}
-                >
-                  <div
-                    ref={pageContainerRef}
-                    className="relative rounded-lg overflow-hidden"
-                    style={{
-                      background: C.white,
-                      boxShadow: '0 4px 24px rgba(0,0,0,0.10)',
-                    }}
-                  >
-                    {pdfUrl ? (
-                      <Document
-                        file={pdfUrl}
-                        loading={
-                          <div style={{ height: '500px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin"
-                              style={{ borderColor: C.secondary, borderTopColor: 'transparent' }} />
-                          </div>
-                        }
-                      >
-                        <Page
-                          pageNumber={currentPageData.pdf_page_num}
-                          width={Math.round(canvasWidth * zoomLevel / 100)}
-                          renderTextLayer={true}
-                          renderAnnotationLayer={false}
-                        />
-                      </Document>
-                    ) : (
-                      <img
-                        src={`${API_BASE}/api/sessions/${sessionId}/slide/${currentPageData.pdf_page_num}.png`}
-                        alt={`第${currentPageData.page_num}页`}
-                        style={{ maxWidth: '100%', maxHeight: '80vh', display: 'block' }}
-                        loading="lazy"
-                      />
-                    )}
-                    {/* Play button */}
-                    <button
-                      onClick={() => handleTimestampClick(currentPageData.page_start_time)}
-                      className="absolute top-3 left-3 text-xs px-2 py-0.5 rounded cursor-pointer transition-all duration-150"
-                      style={{ background: 'rgba(47,51,49,0.7)', color: C.white }}
-                    >
-                      ▶ {formatTime(currentPageData.page_start_time)}
-                    </button>
-                    {/* Highlight layer */}
-                    <HighlightLayer
-                      pageContainerRef={pageContainerRef}
-                      pageNum={currentPage}
-                      highlights={highlightsForPage(currentPage)}
-                      highlightToolActive={activeTool === 'highlight'}
-                      eraserToolActive={activeTool === 'eraser'}
-                      highlightColor={highlightColor}
-                      onAdd={(rec) => addHighlight({ ...rec, sessionId: sessionId ?? '' })}
-                      onRemove={removeHighlight}
-                    />
-                    {/* Text annotation layer */}
-                    <TextAnnotationLayer
-                      annotations={annotationsForPage(currentPage)}
-                      textToolActive={activeTool === 'text'}
-                      onPlaceAnnotation={(x, y) => addAnnotation(currentPage, x, y)}
-                      onUpdate={updateAnnotation}
-                      onRemove={removeAnnotation}
-                    />
-                    {/* Slide label bottom-right */}
-                    <div
-                      className="absolute bottom-3 right-3 text-xs px-2 py-0.5 rounded"
-                      style={{ background: 'rgba(47,51,49,0.5)', color: C.white, letterSpacing: '0.05em' }}
-                    >
-                      SLIDE {String(currentPageData.page_num).padStart(2, '0')} / {String(totalPages).padStart(2, '0')}
-                    </div>
-                  </div>
-                </div>
-              )
-            })() : (
-              /* 无 PPT：居中显示上传入口 */
-              <div
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                color:
+                  wsStatus === 'live'
+                    ? '#798C00'
+                    : wsStatus === 'processing'
+                      ? '#F59E0B'
+                      : C.muted,
+              }}
+            >
+              {wsStatus === 'idle'
+                ? '未开始'
+                : wsStatus === 'connecting'
+                  ? '连接中'
+                  : wsStatus === 'live'
+                    ? '● 录音中'
+                    : wsStatus === 'paused'
+                      ? '已暂停'
+                      : wsStatus === 'stopped'
+                        ? '录音已停止'
+                        : wsStatus === 'processing'
+                          ? '处理中'
+                          : '已完成'}
+            </span>
+
+            {wsStatus === 'idle' && (
+              <button
+                type="button"
+                onClick={() => {
+                  void startRecording()
+                }}
                 style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '16px',
-                  padding: '48px',
-                  textAlign: 'center',
+                  background: '#798C00',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '9999px',
+                  padding: '6px 18px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
                 }}
               >
-                {/* 上传图标 */}
-                <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                  <rect x="4" y="4" width="28" height="36" rx="4" stroke="#AFB3B0" strokeWidth="2" />
-                  <path d="M10 14h16M10 20h16M10 26h10" stroke="#AFB3B0" strokeWidth="2" strokeLinecap="round" />
-                  <circle cx="36" cy="36" r="10" fill="#F3F4F1" stroke="#AFB3B0" strokeWidth="1.5" />
-                  <path d="M36 31v10M31 36h10" stroke="#AFB3B0" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-                <div>
-                  <div style={{ fontSize: '16px', fontWeight: '600', color: '#2F3331', marginBottom: '6px' }}>
-                    Upload Course Materials
-                  </div>
-                  <div style={{ fontSize: '13px', color: '#72726E', marginBottom: '20px' }}>
-                    Add a PDF or PPT to follow along while recording
-                  </div>
-                  <input
-                    ref={localPdfInputRef}
-                    type="file"
-                    accept=".pdf,.ppt,.pptx"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0]
-                      if (f) {
-                        if (f.name.toLowerCase().endsWith('.pdf')) {
-                          handleLocalPdfSelect(f)
-                        } else {
-                          alert('Live 模式暂仅支持 PDF，请先将 PPT 另存为 PDF。')
-                        }
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => localPdfInputRef.current?.click()}
-                    style={{
-                      backgroundColor: '#798C00',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '9999px',
-                      padding: '10px 24px',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Choose File
-                  </button>
-                </div>
+                开始录音
+              </button>
+            )}
+
+            {wsStatus === 'live' && (
+              <button
+                type="button"
+                onClick={pauseRecording}
+                style={{
+                  background: C.bg,
+                  color: C.fg,
+                  border: `1px solid ${C.divider}`,
+                  borderRadius: '9999px',
+                  padding: '6px 18px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                暂停
+              </button>
+            )}
+
+            {wsStatus === 'paused' && (
+              <button
+                type="button"
+                onClick={resumeRecording}
+                style={{
+                  background: '#798C00',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '9999px',
+                  padding: '6px 18px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                继续录音
+              </button>
+            )}
+
+            {(wsStatus === 'live' || wsStatus === 'paused') && (
+              <button
+                type="button"
+                onClick={() => {
+                  void stopRecording()
+                }}
+                style={{
+                  background: '#EF4444',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '9999px',
+                  padding: '6px 18px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  marginLeft: 'auto',
+                }}
+              >
+                结束课堂
+              </button>
+            )}
+
+            {wsStatus === 'processing' && (
+              <div style={{ flex: 1, height: '4px', background: C.muted, borderRadius: '2px', overflow: 'hidden' }}>
                 <div
-                  style={{ fontSize: '11px', color: '#B0AFA7', letterSpacing: '0.05em', textTransform: 'uppercase' }}
-                >
-                  PDF · PPT → PDF
-                </div>
+                  style={{
+                    height: '100%',
+                    background: '#798C00',
+                    width: `${processingProgress}%`,
+                    transition: 'width 0.5s',
+                  }}
+                />
               </div>
             )}
           </div>
         </main>
 
-        {/* 字幕条 */}
         <div
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: `${notesPanelWidth + 8}px`,
-            bottom: '40px',
-            height: '120px',
-            overflowY: 'auto',
-            backgroundColor: 'rgba(30,30,30,0.85)',
-            borderRadius: '8px',
-            padding: '10px 16px',
-            margin: '0 16px',
-            fontSize: '13px',
-            lineHeight: '1.6',
-            color: '#E8E8E0',
-            zIndex: 5,
+          style={{ width: '8px', flexShrink: 0, cursor: 'col-resize', background: C.divider, opacity: 0 }}
+          onMouseDown={(event) => {
+            const startX = event.clientX
+            const startWidth = notesPanelWidth
+
+            const onMove = (moveEvent: MouseEvent) => {
+              setNotesPanelWidth(Math.max(300, startWidth - (moveEvent.clientX - startX)))
+            }
+
+            const onUp = () => {
+              document.removeEventListener('mousemove', onMove)
+              document.removeEventListener('mouseup', onUp)
+            }
+
+            document.addEventListener('mousemove', onMove)
+            document.addEventListener('mouseup', onUp)
           }}
-        >
-          {subtitleLines.length === 0 ? (
-            <span style={{ opacity: 0.45 }}>{t('live_subtitle_placeholder')}</span>
-          ) : (
-            subtitleLines.map((line, i) => (
-              <p key={i} style={{ margin: '2px 0' }}>{line}</p>
-            ))
-          )}
-          <div ref={subtitleBottomRef} />
-        </div>
+        />
 
-        {/* Resizer */}
-        <div
-          onMouseDown={handleResizerMouseDown}
-          className="flex-shrink-0 flex items-center justify-center"
-          style={{
-            width: '8px',
-            cursor: 'col-resize',
-            background: 'transparent',
-            position: 'relative',
-            zIndex: 10,
+        <NotesPanel
+          sessionId={panelSessionId}
+          currentPage={currentPage}
+          pageData={activePageData}
+          notesPanelWidth={notesPanelWidth}
+          noteMode={noteMode}
+          onNoteModeChange={setNoteMode}
+          isLive={isLiveMode}
+          subtitleLines={subtitleLines}
+          wsStatus={wsStatus === 'paused' ? 'stopped' : wsStatus === 'done' || wsStatus === 'processing' ? 'stopped' : wsStatus}
+          getMyNoteText={getMyNoteText}
+          onMyNoteChange={handleMyNoteChange}
+          myNoteExpandState={getMyNoteExpandState(currentPage)}
+          onExpandMyNote={handleExpandMyNote}
+          annotations={[]}
+          expandedBullets={expandedBullets.get(currentPage) ?? new Set()}
+          animatedBullets={animatedBullets.get(currentPage) ?? new Set()}
+          onBulletToggle={(bulletIndex) => {
+            setExpandedBullets((prev) => {
+              const next = new Map(prev)
+              const pageBullets = new Set(next.get(currentPage) ?? [])
+              if (pageBullets.has(bulletIndex)) pageBullets.delete(bulletIndex)
+              else pageBullets.add(bulletIndex)
+              next.set(currentPage, pageBullets)
+              return next
+            })
           }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(0,0,0,0.06)' }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
-        >
-          <div style={{ width: '1px', height: '100%', background: 'rgba(175,179,176,0.2)' }} />
-        </div>
-
-        {/* Right panel: Notes */}
-        <aside
-          className="flex-shrink-0 flex flex-col overflow-hidden"
-          style={{ width: `${notesPanelWidth}px`, background: C.white, position: 'relative' }}
-        >
-          {/* Tab bar — My Notes / AI Notes / Transcript */}
-          <div
-            className="flex-shrink-0 flex items-end"
-            style={{ padding: '14px 18px 0', borderBottom: '1px solid rgba(175,179,176,0.15)', gap: 0 }}
-          >
-            {(['my', 'ai', 'transcript'] as const).map((mode) => {
-              const label = mode === 'my' ? t('notes_my_tab') : mode === 'ai' ? t('notes_ai_tab') : t('notes_transcript_tab')
-              const active = noteMode === mode
-              return (
-                <button
-                  key={mode}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setNoteMode(mode)}
-                  style={{
-                    padding: '6px 16px 10px',
-                    fontSize: '13px',
-                    fontWeight: active ? '700' : '500',
-                    color: active ? '#2F3331' : '#556071',
-                    background: 'none',
-                    border: 'none',
-                    borderBottom: `2px solid ${active ? '#798C00' : 'transparent'}`,
-                    marginBottom: '-1px',
-                    cursor: 'pointer',
-                    transition: 'color 0.15s',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Notes content */}
-          <div className="flex-1 overflow-y-auto px-6 pb-4" onWheel={(e) => e.stopPropagation()}>
-
-            {noteMode === 'my' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                <textarea
-                  value={getMyNoteText(currentPage)}
-                  onChange={e => handleMyNoteChange(currentPage, e.target.value)}
-                  placeholder={t('notes_my_placeholder')}
-                  style={{
-                    flex: 1, width: '100%', resize: 'none', border: 'none', outline: 'none',
-                    background: 'transparent', color: '#2F3331', fontSize: '13px',
-                    lineHeight: '1.7', fontFamily: 'inherit', minHeight: '200px',
-                    boxSizing: 'border-box', padding: '0', paddingTop: '12px',
-                  }}
-                />
-              </div>
-            ) : noteMode === 'ai' ? (
-              /* AI Explain */
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '16px' }}>
-                <div style={{ flex: 1, fontSize: '14px', lineHeight: '1.7', color: '#2F3331' }}>
-                  {explaining ? (
-                    <span style={{ whiteSpace: 'pre-wrap' }}>{currentExplanation}<span style={{ opacity: 0.5 }}>▋</span></span>
-                  ) : explanationsByPage[currentPage] ? (
-                    <span style={{ whiteSpace: 'pre-wrap' }}>{explanationsByPage[currentPage]}</span>
-                  ) : (
-                    <span style={{ color: '#B0AFA7' }}>{t('live_explain_empty')}</span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  disabled={wsStatus === 'idle' || wsStatus === 'connecting' || explaining}
-                  onClick={handleExplainPage}
-                  title={wsStatus === 'idle' ? t('live_recording_required') : undefined}
-                  style={{
-                    backgroundColor: wsStatus === 'idle' || explaining ? '#D0CFC5' : '#798C00',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '9999px',
-                    padding: '10px 0',
-                    fontWeight: 600,
-                    fontSize: '13px',
-                    cursor: wsStatus === 'idle' || explaining ? 'not-allowed' : 'pointer',
-                    width: '100%',
-                  }}
-                >
-                  {explaining ? '…' : explanationsByPage[currentPage] ? t('live_explain_refresh') : t('live_explain_btn')}
-                </button>
-              </div>
-            ) : (
-              /* Transcript */
-              <div style={{ paddingTop: '12px', fontSize: '13px', lineHeight: '1.7', color: '#2F3331' }}>
-                {(transcriptByPage[currentPage] ?? []).length === 0 ? (
-                  <span style={{ color: '#B0AFA7' }}>{t('live_subtitle_placeholder')}</span>
-                ) : (
-                  (transcriptByPage[currentPage] ?? []).map((line, i) => (
-                    <p key={i} style={{ margin: '4px 0' }}>{line}</p>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-        </aside>
+          onBulletAnimationDone={(bulletIndex) => {
+            setAnimatedBullets((prev) => {
+              const next = new Map(prev)
+              const pageBullets = new Set(next.get(currentPage) ?? [])
+              pageBullets.add(bulletIndex)
+              next.set(currentPage, pageBullets)
+              return next
+            })
+          }}
+          pageRevealed={!isLiveMode}
+          onTimestampClick={handleTimestampClick}
+          onSegmentPlay={handleSegmentPlay}
+          playingSegIdx={playingSegIdx}
+          playProgress={playProgress}
+          transcriptClickCount={transcriptClickCount}
+          translationEnabled={translationEnabled}
+          translatedPage={translatedTexts.get(currentPage)}
+          retrying={retrying}
+          onRetryPage={handleRetryPage}
+          pageChat={pageChatMessages.get(currentPage) ?? []}
+          pageChatInput={pageChatInput}
+          onPageChatInputChange={setPageChatInput}
+          pageChatStreaming={pageChatStreaming}
+          pageChatStreamingText={pageChatStreamingText}
+          onPageChatSend={() => {
+            void handlePageChatSend()
+          }}
+          drawerPhase={drawerPhase}
+          onDrawerPhaseChange={setDrawerPhase}
+          drawerHeightPx={drawerHeightPx}
+          onDrawerHeightChange={setDrawerHeightPx}
+          drawerModel={drawerModel}
+          onDrawerModelChange={setDrawerModel}
+          drawerModelDDOpen={drawerModelDDOpen}
+          onDrawerModelDDOpenChange={setDrawerModelDDOpen}
+          pagePhase={pagePhase}
+          transcriptJustDone={false}
+          aiNotesJustDone={false}
+          hasAnyAlignedSegments={session?.pages?.some((page) => (page.aligned_segments?.length ?? 0) > 0) ?? false}
+          hasPendingAiNotes={session?.pages?.some((page) => !page.passive_notes?.bullets?.length) ?? false}
+          draftOutlineLines={draftOutlineLines}
+        />
       </div>
 
-      {/* Global Footer */}
-      <footer
-        className="flex-shrink-0 flex items-center justify-center"
-        style={{
-          height: '40px',
-          background: C.bg,
-          borderTop: '1px solid rgba(175,179,176,0.1)',
-          color: '#D0CFC5',
-          fontSize: '11px',
-        }}
-      >
-        LiberStudy · {new Date().getFullYear()}
-      </footer>
-
-      {/* Copy toast */}
-      {copyToast && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed bottom-12 left-1/2 -translate-x-1/2 text-sm px-4 py-2 rounded-full shadow-lg z-50"
-          style={{ background: C.fg, color: C.white }}
-        >
-          已复制到剪贴板
-        </div>
-      )}
-
-      {/* Audio player (hidden, driven by timestamp clicks) */}
-      {session.audio_url && (
-        <audio ref={audioRef} src={`${API_BASE}${session.audio_url}`} preload="metadata" style={{ display: 'none' }} />
+      {session?.audio_url && (
+        <audio ref={audioRef} src={withApiBase(session.audio_url) ?? undefined} preload="metadata" style={{ display: 'none' }} />
       )}
     </div>
   )

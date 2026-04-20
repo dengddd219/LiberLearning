@@ -1193,7 +1193,7 @@ git commit -m "refactor: extract NotesPanel component, NotesPage now composition
 
 LivePage 整体结构与 NotesPage 一致（三栏布局），但中间列加了字幕条，录音控制条替代 PillToggle，右侧面板使用 `<NotesPanel isLive>` 并在课后切换为完整模式。
 
-- [ ] **Step 1：建立 LivePage 骨架（状态机 + 布局）**
+- [x] **Step 1：建立 LivePage 骨架（状态机 + 布局）**
 
 用以下完整代码替换现有 LivePage.tsx 占位内容（注意：此步骤先不包含 WebSocket 逻辑，专注于状态机和布局骨架）：
 
@@ -1676,7 +1676,7 @@ export default function LivePage() {
 }
 ```
 
-- [ ] **Step 2：确认编译无报错**
+- [x] **Step 2：确认编译无报错**
 
 ```bash
 cd frontend && npx tsc --noEmit
