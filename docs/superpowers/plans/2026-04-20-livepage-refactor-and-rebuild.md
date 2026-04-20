@@ -578,7 +578,7 @@ git commit -m "refactor: extract RevealText and LineByLineReveal to components/n
 - 新建：`frontend/src/components/notes/InlineQA.tsx`
 - 修改：`frontend/src/pages/NotesPage.tsx`
 
-- [ ] **Step 1：创建 `frontend/src/components/notes/StreamingExpandText.tsx`**
+- [x] **Step 1：创建 `frontend/src/components/notes/StreamingExpandText.tsx`**
 
 从 NotesPage.tsx lines 401–426 提取：
 
@@ -609,7 +609,7 @@ export default function StreamingExpandText({ text }: StreamingExpandTextProps) 
 }
 ```
 
-- [ ] **Step 2：创建 `frontend/src/components/notes/InlineQA.tsx`**
+- [x] **Step 2：创建 `frontend/src/components/notes/InlineQA.tsx`**
 
 从 NotesPage.tsx lines 429–603 提取，完整代码（注意依赖 notesTypes、notesDb、askBullet API）：
 
@@ -746,7 +746,7 @@ export default function InlineQA({ sessionId, pageNum, bulletIndex, bulletText, 
 }
 ```
 
-- [ ] **Step 3：在 NotesPage.tsx 中替换导入**
+- [x] **Step 3：在 NotesPage.tsx 中替换导入**
 
 在 NotesPage.tsx import 块末尾加入：
 ```ts
@@ -756,7 +756,7 @@ import InlineQA from '../components/notes/InlineQA'
 
 删除 NotesPage.tsx 中 lines 401–603 的 `StreamingExpandText` 和 `InlineQA` 组件定义。
 
-- [ ] **Step 4：确认编译无报错**
+- [x] **Step 4：确认编译无报错**
 
 ```bash
 cd frontend && npx tsc --noEmit
@@ -764,7 +764,7 @@ cd frontend && npx tsc --noEmit
 
 预期：0 errors
 
-- [ ] **Step 5：Commit**
+- [x] **Step 5：Commit**
 
 ```bash
 git add frontend/src/components/notes/StreamingExpandText.tsx frontend/src/components/notes/InlineQA.tsx frontend/src/pages/NotesPage.tsx
