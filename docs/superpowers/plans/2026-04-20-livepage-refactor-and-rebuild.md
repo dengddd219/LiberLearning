@@ -1684,7 +1684,7 @@ cd frontend && npx tsc --noEmit
 
 预期：0 errors
 
-- [ ] **Step 3：Commit**
+- [x] **Step 3：Commit**
 
 ```bash
 git add frontend/src/pages/LivePage.tsx
@@ -1698,7 +1698,7 @@ git commit -m "feat: LivePage skeleton - state machine, layout, NotesPanel integ
 **Files:**
 - 修改：`frontend/src/pages/LivePage.tsx`
 
-- [ ] **Step 1：实现 `startRecording` 函数**
+- [x] **Step 1：实现 `startRecording` 函数**
 
 在 LivePage.tsx 的工具函数区域（`handleMyNoteChange` 之后、`return` 之前）加入：
 
@@ -1758,7 +1758,7 @@ const startRecording = useCallback(async () => {
 }, [currentPage, wsStatus])
 ```
 
-- [ ] **Step 2：实现 `pauseRecording` 和 `resumeRecording` 函数**
+- [x] **Step 2：实现 `pauseRecording` 和 `resumeRecording` 函数**
 
 ```tsx
 const pauseRecording = useCallback(() => {
@@ -1772,7 +1772,7 @@ const resumeRecording = useCallback(() => {
 }, [])
 ```
 
-- [ ] **Step 3：在录音控制条按钮上绑定真实 handler**
+- [x] **Step 3：在录音控制条按钮上绑定真实 handler**
 
 找到 Task 8 中录音控制条里的 `onClick={() => { /* Task 9 实现 */ }}` 占位，替换为：
 
@@ -1780,7 +1780,7 @@ const resumeRecording = useCallback(() => {
 - 「暂停」按钮：`onClick={pauseRecording}`
 - 「继续录音」按钮：`onClick={resumeRecording}`
 
-- [ ] **Step 4：确认编译无报错**
+- [x] **Step 4：确认编译无报错**
 
 ```bash
 cd frontend && npx tsc --noEmit

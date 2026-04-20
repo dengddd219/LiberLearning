@@ -441,15 +441,78 @@ export default function LivePage() {
   }, [playingSegIdx])
 
   const startRecording = useCallback(async () => {
-    // Task 9
+    setWsStatus('connecting')
+    audioChunksRef.current = []
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const ws = new WebSocket(`${WS_BASE}/api/ws/live-asr`)
+      wsRef.current = ws
+
+      ws.onopen = () => {
+        setWsStatus('live')
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : 'audio/webm'
+        const recorder = new MediaRecorder(stream, { mimeType })
+        mediaRecorderRef.current = recorder
+
+        recorder.ondataavailable = (event) => {
+          if (event.data.size <= 0) return
+          audioChunksRef.current.push(event.data)
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(event.data)
+          }
+        }
+
+        recorder.start(250)
+      }
+
+      ws.onmessage = (event) => {
+        const message = JSON.parse(event.data) as
+          | { error: string }
+          | { text: string; is_final: boolean; timestamp: number }
+
+        if ('error' in message) {
+          setWsStatus('stopped')
+          return
+        }
+
+        if (message.is_final) {
+          setSubtitleLines((prev) => {
+            const next = [...prev.filter((line) => line !== '…'), message.text]
+            return next.length > 50 ? next.slice(next.length - 50) : next
+          })
+          setTranscriptByPage((prev) => ({
+            ...prev,
+            [currentPageRef.current]: [...(prev[currentPageRef.current] ?? []), message.text],
+          }))
+          return
+        }
+
+        setSubtitleLines((prev) => {
+          const base = prev[prev.length - 1] === '…' ? prev.slice(0, -1) : prev
+          return [...base, message.text || '…']
+        })
+      }
+
+      ws.onerror = () => setWsStatus('stopped')
+      ws.onclose = () => {
+        setWsStatus((prev) => (prev === 'processing' || prev === 'done' ? prev : 'stopped'))
+      }
+    } catch {
+      setWsStatus('idle')
+    }
   }, [])
 
   const pauseRecording = useCallback(() => {
-    // Task 9
+    mediaRecorderRef.current?.pause()
+    setWsStatus('paused')
   }, [])
 
   const resumeRecording = useCallback(() => {
-    // Task 9
+    mediaRecorderRef.current?.resume()
+    setWsStatus('live')
   }, [])
 
   const stopRecording = useCallback(async () => {
@@ -833,7 +896,7 @@ export default function LivePage() {
           onNoteModeChange={setNoteMode}
           isLive={isLiveMode}
           subtitleLines={subtitleLines}
-          wsStatus={wsStatus === 'paused' ? 'stopped' : wsStatus === 'done' || wsStatus === 'processing' ? 'stopped' : wsStatus}
+          wsStatus={wsStatus === 'done' || wsStatus === 'processing' ? 'stopped' : wsStatus === 'paused' ? 'live' : wsStatus}
           getMyNoteText={getMyNoteText}
           onMyNoteChange={handleMyNoteChange}
           myNoteExpandState={getMyNoteExpandState(currentPage)}
