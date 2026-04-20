@@ -1,23 +1,10 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import SlideCanvas from '../components/SlideCanvas'
-import RecordingControl from '../components/RecordingControl'
-import FileUpload from '../components/FileUpload'
-
-interface Annotation {
-  id: string
-  pageNum: number
-  text: string
-  yPosition: number
-  timestamp: number
-}
 
 interface SlideInfo {
   pageNum: number
   slideImageUrl: string
 }
-
-const SESSION_ID = `session-${Date.now()}`
 
 // Mock slides - replace with real PPT slides when uploaded
 const MOCK_SLIDES: SlideInfo[] = [
@@ -47,37 +34,15 @@ function useRecordingTimer(isRecording: boolean) {
 export default function LiveSessionPage() {
   const navigate = useNavigate()
   const [slides] = useState<SlideInfo[]>(MOCK_SLIDES)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [annotations, setAnnotations] = useState<Annotation[]>([])
   const [scrollToPage, setScrollToPage] = useState<number | null>(null)
-  const [pptFile, setPptFile] = useState<File | null>(null)
-  const [hasPpt, setHasPpt] = useState(true) // Toggle this based on PPT upload state
   const [isRecording, setIsRecording] = useState(false)
   const [noteMode, setNoteMode] = useState<'my' | 'ai'>('ai')
   const [noteInput, setNoteInput] = useState('')
   const recTimer = useRecordingTimer(isRecording)
-  const totalPages = slides.length
-
-  const handleAnnotationAdd = useCallback((ann: Annotation) => {
-    setAnnotations((prev) => [...prev, ann])
-  }, [])
-
-  const handleAnnotationDelete = useCallback((id: string) => {
-    setAnnotations((prev) => prev.filter((a) => a.id !== id))
-  }, [])
 
   const handleNavClick = useCallback((pageNum: number) => {
     setScrollToPage(pageNum)
     setTimeout(() => setScrollToPage(null), 100)
-  }, [])
-
-  const handlePptUpload = useCallback((file: File) => {
-    setPptFile(file)
-    setHasPpt(true)
-  }, [])
-
-  const handleStartRecording = useCallback(() => {
-    setIsRecording(true)
   }, [])
 
   const handleEndSession = useCallback(() => {
@@ -87,22 +52,8 @@ export default function LiveSessionPage() {
   }, [navigate])
 
   // Mock notes for display
-  const mockNotes = [
-    {
-      id: '1',
-      timestamp: '00:45',
-      title: 'Contextual Anchors',
-      content: 'Discussing how neural networks bridge the gap between abstract symbolic reasoning and raw data input.',
-      isActive: false,
-    },
-    {
-      id: '2',
-      timestamp: '03:52',
-      title: 'Latency vs Throughput',
-      content: 'Critical bottleneck identified in the pre-processing layer.\nReal-time capture requires 4ms response time.\nPossible solution: Distributed nodes.',
-      isActive: true,
-    },
-  ]
+  void slides
+  void scrollToPage
 
   return (
     <div

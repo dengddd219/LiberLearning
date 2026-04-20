@@ -14,7 +14,7 @@ import {
   uploadPpt,
 } from '../lib/api'
 import { loadMyNote, loadPageChat, saveMyNote, savePageChat } from '../lib/notesDb'
-import type { AlignedSegment, PageChatMessage, PageData, SessionData } from '../lib/notesTypes'
+import type { AlignedSegment, PageChatMessage, SessionData } from '../lib/notesTypes'
 import { C, FONT_SERIF, injectNoteStyles, withApiBase } from '../lib/notesUtils'
 import type { PptPage } from '../types/session'
 
@@ -30,7 +30,13 @@ type TranslatedPageTexts = {
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
-const WS_BASE = API_BASE.replace(/^http/, 'ws')
+const WS_BASE =
+  API_BASE.replace(/^http/, 'ws') ||
+  (typeof window !== 'undefined'
+    ? import.meta.env.DEV
+      ? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.hostname}:8000`
+      : `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`
+    : '')
 
 function buildDraftOutlineLines(pptText: string): string[] {
   return pptText
@@ -76,7 +82,7 @@ export default function LivePage() {
   const audioChunksRef = useRef<Blob[]>([])
 
   const [subtitleLines, setSubtitleLines] = useState<string[]>([])
-  const [transcriptByPage, setTranscriptByPage] = useState<Record<number, string[]>>({})
+  const [, setTranscriptByPage] = useState<Record<number, string[]>>({})
   const subtitleBottomRef = useRef<HTMLDivElement>(null)
 
   const [pptFile, setPptFile] = useState<File | null>(null)

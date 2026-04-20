@@ -54,6 +54,7 @@ export default function PassiveNotes({
   onTimestampClick,
   granularity,
 }: PassiveNotesProps) {
+  void granularity
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null)
 
   const handleBulletClick = (i: number, bullet: Bullet) => {

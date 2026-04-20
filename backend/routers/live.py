@@ -8,6 +8,8 @@ import json
 import asyncio
 import time
 import uuid
+import shutil
+import subprocess
 import hmac
 import hashlib
 import base64
@@ -139,20 +141,27 @@ async def live_asr(websocket: WebSocket):
         return
 
     # 启动 ffmpeg 子进程：stdin=webm, stdout=PCM s16le 16kHz mono
+    ffmpeg_bin = os.environ.get("FFMPEG_PATH") or shutil.which("ffmpeg")
+    if not ffmpeg_bin:
+        await websocket.send_text(json.dumps({"error": "ffmpeg not found in PATH"}))
+        await websocket.close()
+        return
+
     ffmpeg_cmd = [
-        "ffmpeg", "-loglevel", "quiet",
+        ffmpeg_bin, "-loglevel", "quiet",
         "-f", "webm", "-i", "pipe:0",
         "-ar", "16000", "-ac", "1", "-f", "s16le", "pipe:1",
     ]
     try:
-        ffmpeg = await asyncio.create_subprocess_exec(
-            *ffmpeg_cmd,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.DEVNULL,
+        ffmpeg = subprocess.Popen(
+            ffmpeg_cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
         )
     except Exception as e:
-        await websocket.send_text(json.dumps({"error": f"ffmpeg start failed: {e}"}))
+        detail = repr(e) if repr(e) else type(e).__name__
+        await websocket.send_text(json.dumps({"error": f"ffmpeg start failed: {detail}"}))
         await websocket.close()
         return
 
@@ -199,13 +208,16 @@ async def live_asr(websocket: WebSocket):
             try:
                 while True:
                     data = await asyncio.wait_for(websocket.receive_bytes(), timeout=30.0)
-                    ffmpeg.stdin.write(data)
-                    await ffmpeg.stdin.drain()
+                    if not ffmpeg.stdin:
+                        break
+                    await asyncio.to_thread(ffmpeg.stdin.write, data)
+                    await asyncio.to_thread(ffmpeg.stdin.flush)
             except (WebSocketDisconnect, asyncio.TimeoutError):
                 pass
             finally:
                 try:
-                    ffmpeg.stdin.close()
+                    if ffmpeg.stdin:
+                        await asyncio.to_thread(ffmpeg.stdin.close)
                 except Exception:
                     pass
 
@@ -214,8 +226,10 @@ async def live_asr(websocket: WebSocket):
             nonlocal elapsed
             try:
                 while True:
+                    if not ffmpeg.stdout:
+                        break
                     frame = await asyncio.wait_for(
-                        ffmpeg.stdout.read(PCM_FRAME_SIZE), timeout=5.0
+                        asyncio.to_thread(ffmpeg.stdout.read, PCM_FRAME_SIZE), timeout=5.0
                     )
                     if not frame:
                         break
@@ -286,7 +300,7 @@ async def live_asr(websocket: WebSocket):
     finally:
         try:
             ffmpeg.terminate()
-            await ffmpeg.wait()
+            await asyncio.to_thread(ffmpeg.wait)
         except Exception:
             pass
         if nls_ws:

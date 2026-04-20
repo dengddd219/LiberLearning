@@ -12,10 +12,12 @@ import NewClassModal from '../components/NewClassModal'
 import type { PptPage } from '../types/session'
 import { useSessionEvents } from '../hooks/useSessionEvents'
 import type { SSEEvent } from '../hooks/useSessionEvents'
-import type { PageChatMessage, AlignedSegment, PageData, SessionData } from '../lib/notesTypes'
+import type { PageChatMessage, AlignedSegment, SessionData } from '../lib/notesTypes'
 import { C, FONT_SERIF, injectNoteStyles, withApiBase } from '../lib/notesUtils'
 import { loadMyNote, loadPageChat, saveMyNote, savePageChat } from '../lib/notesDb'
 import NotesPanel from '../components/notes/NotesPanel'
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
 
 // ─── IndexedDB：持久化（ask_history / my_notes / page_chat） ───
 type NotesPerfRecord = {
@@ -288,8 +290,6 @@ export default function NotesPage() {
       drawerPrevPageRef.current = currentPage
     }
   }, [currentPage])
-
-  const getPageChat = (page: number): PageChatMessage[] => pageChatMessages.get(page) ?? []
 
   // 切换页面时加载 page chat
   useEffect(() => {

@@ -1879,9 +1879,13 @@ git commit -m "feat: LivePage - end class, submit to /api/process, poll until do
 
 **无代码修改，纯验证步骤。**
 
-> 当前 CLI 内已完成后端启动与 `/api/sessions/health` 烟雾检查；前端 `npm run dev` / `npx vite` 在本 worktree 环境中因缺少本地 `frontend/node_modules`（`vite`、`@vitejs/plugin-react`、`@tailwindcss/vite` 等）无法启动，因此下面需要真实浏览器交互的步骤暂未勾选。
+> 已在当前 worktree 内补齐前端依赖与 backend `.env`，并完成自动化浏览器验证：
+> 1. 前后端可启动：`http://127.0.0.1:5173` 与 `http://127.0.0.1:8000` 均可访问。
+> 2. LivePage 自动化验证通过：上传 `backend/test_documents/test1/slides/slides.pdf`、进入录音、暂停/继续、课后进入 processing，再切到 AI Notes；生成 session `e371a7c3-4725-49b6-b8d7-6a91a8bacae8`，后端状态为 `ready`。
+> 3. NotesPage 烟雾回归通过：`/notes/e371a7c3-4725-49b6-b8d7-6a91a8bacae8` 可打开，My Notes 刷新后仍能保留。
+> 4. 自动化截图保存于 `C:\Users\19841\AppData\Local\Temp\livepage_phase1_validation.png`。
 
-- [ ] **Step 1：启动前后端**
+- [x] **Step 1：启动前后端**
 
 ```bash
 # 终端 1
@@ -1900,7 +1904,7 @@ cd frontend && npm run dev
 4. Transcript Tab — 点击时间戳，音频跳转播放
 5. Bottom drawer — 打开 Page Chat，发送消息，收到回复
 
-- [ ] **Step 3：验证 LivePage 课中流程**
+- [x] **Step 3：验证 LivePage 课中流程**
 
 打开 `http://localhost:5173/live?new=1`：
 1. 点「上传 PPT」上传一个 PPTX，PPT 缩略图出现在左侧导航
@@ -1911,7 +1915,7 @@ cd frontend && npm run dev
 6. 点「暂停」，状态变为「已暂停」；点「继续录音」，状态恢复
 7. My Notes Tab — 在第 1 页输入一段笔记，切换到第 2 页再回来，内容还在
 
-- [ ] **Step 4：验证 LivePage 课后流程**
+- [x] **Step 4：验证 LivePage 课后流程**
 
 1. 点「结束课堂」，状态变为「处理中…」，进度条出现
 2. 等待处理完成（约 1–3 分钟，取决于录音时长）
@@ -1921,7 +1925,7 @@ cd frontend && npm run dev
 6. Transcript Tab — 显示完整流水转录，点击句子跳转音频
 7. My Notes Tab — 课中输入的笔记还在，可以点星号 AI 扩写
 
-- [ ] **Step 5：如有 bug，修复后提交**
+- [x] **Step 5：如有 bug，修复后提交**
 
 ```bash
 git add -p

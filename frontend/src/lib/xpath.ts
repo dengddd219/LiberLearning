@@ -5,9 +5,9 @@ export function getXPath(node: Node, root: Node): string {
   while (current && current !== root) {
     if (current.nodeType === Node.TEXT_NODE) {
       // 找出是父元素的第几个文本节点（1-based）
-      const parent = current.parentNode!
+      const parent: Node = current.parentNode!
       let idx = 0
-      for (const child of Array.from(parent.childNodes)) {
+      for (const child of Array.from(parent.childNodes) as Node[]) {
         if (child.nodeType === Node.TEXT_NODE) idx++
         if (child === current) break
       }
@@ -44,7 +44,7 @@ export function resolveXPath(xpath: string, root: Node): Node | null {
       const idx = parseInt(textMatch[1])
       let count = 0
       let found: Node | null = null
-      for (const child of Array.from(current.childNodes)) {
+      for (const child of Array.from(current.childNodes) as Node[]) {
         if (child.nodeType === Node.TEXT_NODE) {
           count++
           if (count === idx) { found = child; break }
@@ -56,7 +56,7 @@ export function resolveXPath(xpath: string, root: Node): Node | null {
       const idx = parseInt(idxStr)
       let count = 0
       let found: Node | null = null
-      for (const child of Array.from(current.childNodes)) {
+      for (const child of Array.from(current.childNodes) as Node[]) {
         if (child.nodeType === Node.ELEMENT_NODE && (child as Element).tagName.toLowerCase() === tag) {
           count++
           if (count === idx) { found = child; break }
