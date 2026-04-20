@@ -1788,7 +1788,7 @@ cd frontend && npx tsc --noEmit
 
 预期：0 errors
 
-- [ ] **Step 5：Commit**
+- [x] **Step 5：Commit**
 
 ```bash
 git add frontend/src/pages/LivePage.tsx
@@ -1802,7 +1802,7 @@ git commit -m "feat: LivePage - WebSocket recording with real-time ASR subtitles
 **Files:**
 - 修改：`frontend/src/pages/LivePage.tsx`
 
-- [ ] **Step 1：实现 `stopRecording`（结束课堂）函数**
+- [x] **Step 1：实现 `stopRecording`（结束课堂）函数**
 
 ```tsx
 const stopRecording = useCallback(async () => {
@@ -1846,19 +1846,19 @@ const stopRecording = useCallback(async () => {
 }, [pptFile, pptId])
 ```
 
-- [ ] **Step 2：在「结束课堂」按钮上绑定 handler**
+- [x] **Step 2：在「结束课堂」按钮上绑定 handler**
 
 找到 Task 8 中「结束课堂」按钮的 `onClick={() => { /* Task 10 实现 */ }}`，替换为：`onClick={stopRecording}`
 
-- [ ] **Step 3：课后模式隐藏字幕条（wsStatus === 'done' 时）**
+- [x] **Step 3：课后模式隐藏字幕条（wsStatus === 'done' 时）**
 
 字幕条的渲染条件已经是 `{isLiveMode && ...}`，`isLiveMode = wsStatus !== 'done'`，因此 done 后字幕条自动隐藏。无需额外修改。
 
-- [ ] **Step 4：课后音频播放 — 确认 audio 元素条件渲染**
+- [x] **Step 4：课后音频播放 — 确认 audio 元素条件渲染**
 
 Task 8 骨架中音频元素是 `{session?.audio_url && <audio ref={audioRef} ... />}`，session 在 done 后填充，自动生效。
 
-- [ ] **Step 5：确认编译无报错**
+- [x] **Step 5：确认编译无报错**
 
 ```bash
 cd frontend && npx tsc --noEmit

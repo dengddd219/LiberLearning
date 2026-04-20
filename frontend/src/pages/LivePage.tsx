@@ -516,8 +516,61 @@ export default function LivePage() {
   }, [])
 
   const stopRecording = useCallback(async () => {
-    // Task 10
-  }, [])
+    const recorder = mediaRecorderRef.current
+    const stream = recorder?.stream
+
+    if (recorder && recorder.state !== 'inactive') {
+      await new Promise<void>((resolve) => {
+        recorder.addEventListener('stop', () => resolve(), { once: true })
+        recorder.stop()
+      })
+    }
+
+    stream?.getTracks().forEach((track) => track.stop())
+    wsRef.current?.close()
+    setWsStatus('processing')
+
+    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+    const audioFile = new File([audioBlob], 'recording.webm', { type: 'audio/webm' })
+
+    try {
+      const result = await uploadFiles(pptFile ?? undefined, audioFile, 'zh', undefined, pptId ?? undefined)
+      const nextSessionId = result.session_id
+      setProcessedSessionId(nextSessionId)
+
+      const poll = async () => {
+        const data = await getSession(nextSessionId) as SessionData & {
+          progress?: { step: string; percent: number } | null
+        }
+
+        if (data.status === 'ready' || data.status === 'partial_ready') {
+          setSession(data)
+          setWsStatus('done')
+          setNoteMode('ai')
+          if (data.pages.length > 0) {
+            setCurrentPage(data.pages[0].page_num)
+          }
+          return
+        }
+
+        if (data.status === 'error') {
+          setWsStatus('stopped')
+          return
+        }
+
+        if (data.progress) {
+          setProcessingProgress(data.progress.percent)
+        }
+        window.setTimeout(() => {
+          void poll()
+        }, 3000)
+      }
+
+      await poll()
+    } catch {
+      setWsStatus('stopped')
+    }
+  }, [pptFile, pptId])
 
   const currentSlideUrl = activePageData
     ? withApiBase(activePageData.thumbnail_url) ??
