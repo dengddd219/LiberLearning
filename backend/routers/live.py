@@ -2,6 +2,14 @@
 Live router.
   WebSocket /ws/live-asr  — 接收音频 chunk，转发阿里云 NLS 流式 ASR，推回识别结果
   POST /api/live/explain  — 接收页码+转录文本，SSE 流式返回 Claude 解释
+  POST /api/live/session/start  — 创建 live session
+  POST /api/live/page-snapshot  — 翻页时记录 current_page
+  POST /api/live/annotations    — 保存课中批注
+  GET  /api/live/state/{id}     — 获取 session 状态 + transcript
+  POST /api/live/stop           — 结束录音（后台触发 alignment）
+  POST /api/live/finalize-stream — SSE 流式生成 AI Notes
+  GET  /api/live/finalize/status/{id} — 查询 finalize 状态
+  POST /api/live/detailed-note  — SSE 逐行详细解释
 """
 import os
 import json
@@ -15,13 +23,21 @@ import hashlib
 import base64
 import urllib.request
 import urllib.parse
+import threading
 from datetime import datetime, timezone
 
 import websockets
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import anthropic
+
+from services.live_store import (
+    create_session, get_session, update_session_status,
+    update_session_page, save_segment, get_segments,
+    save_annotation, update_segment_assigned_pages,
+)
+from services.live_note_builder import stream_notes, generate_detailed_note
 
 router = APIRouter(tags=["live"])
 
@@ -72,13 +88,229 @@ def _get_nls_token() -> str:
     return _nls_token
 
 
-# ── POST /api/live/explain ─────────────────────────────────────────────────────
+# ── Pydantic 模型 ──────────────────────────────────────────────────────────────
+
+class SessionStartRequest(BaseModel):
+    ppt_id: str | None = None
+    language: str = "zh"
+
+
+class PageSnapshotRequest(BaseModel):
+    session_id: str
+    current_page: int
+    timestamp_ms: int = 0
+
+
+class AnnotationRequest(BaseModel):
+    session_id: str
+    page_num: int
+    text: str
+    x: float = 0.0
+    y: float = 0.0
+
+
+class SessionStopRequest(BaseModel):
+    session_id: str
+    ppt_pages: list[dict] | None = None  # [{page_num, ppt_text}]，有 PPT 时传入触发后台 alignment
+
+
+class FinalizeRequest(BaseModel):
+    session_id: str
+    ppt_pages: list[dict] | None = None   # [{page_num, ppt_text}]
+    my_notes: list[dict] | None = None    # [{page, text}]
+
+
+class DetailedNoteRequest(BaseModel):
+    session_id: str
+    line_text: str
+    page_num: int | None = None
+    start_sec: float | None = None  # bullet 时间戳起点（秒），从 AI Notes markdown 解析
+    end_sec: float | None = None    # bullet 时间戳终点（秒）
+
 
 class ExplainRequest(BaseModel):
     page_num: int
     ppt_text: str
     transcript: str
 
+
+# ── POST /api/live/session/start ───────────────────────────────────────────────
+
+@router.post("/live/session/start")
+def live_session_start(req: SessionStartRequest):
+    session = create_session(ppt_id=req.ppt_id, language=req.language)
+    return {"session_id": session["session_id"], "status": session["status"]}
+
+
+# ── POST /api/live/page-snapshot ───────────────────────────────────────────────
+
+@router.post("/live/page-snapshot")
+def live_page_snapshot(req: PageSnapshotRequest):
+    session = get_session(req.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="session not found")
+    update_session_page(req.session_id, req.current_page)
+    return {"ok": True, "current_page": req.current_page}
+
+
+# ── POST /api/live/annotations ─────────────────────────────────────────────────
+
+@router.post("/live/annotations")
+def live_save_annotation(req: AnnotationRequest):
+    session = get_session(req.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="session not found")
+    ann = save_annotation(req.session_id, req.page_num, req.text, req.x, req.y)
+    return ann
+
+
+# ── GET /api/live/state/{session_id} ──────────────────────────────────────────
+
+@router.get("/live/state/{session_id}")
+def live_get_state(session_id: str, page_num: int | None = None):
+    session = get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="session not found")
+    segments = get_segments(session_id)
+    if page_num is not None:
+        filtered = [
+            s for s in segments
+            if s.get("current_page_hint") == page_num
+            or s.get("assigned_page") == page_num
+        ]
+    else:
+        filtered = segments
+    transcript_with_page = [
+        {
+            "text": s["text"],
+            "page": s.get("assigned_page") or s.get("current_page_hint"),
+            "seq": s["seq"],
+        }
+        for s in filtered
+    ]
+    return {
+        "session_id": session_id,
+        "status": session["status"],
+        "current_page": session["current_page"],
+        "transcript": transcript_with_page,
+        "segment_count": len(segments),
+    }
+
+
+# ── alignment 后台线程 ──────────────────────────────────────────────────────────
+
+def _run_alignment_background(session_id: str, ppt_pages: list[dict]):
+    """独立线程：跑 embedding alignment 并回写 assigned_page。
+    用 threading.Thread 而非 BackgroundTasks，因为 build_page_timeline 是同步 IO，
+    必须在线程里跑，不能阻塞 async event loop。
+    """
+    try:
+        from services.alignment import build_page_timeline
+        raw_segments = get_segments(session_id)
+        if not raw_segments:
+            return
+        align_input = [
+            {"text": s["text"], "start": s["start_ms"] / 1000.0, "end": s["end_ms"] / 1000.0}
+            for s in raw_segments
+        ]
+        aligned = build_page_timeline(
+            ppt_pages=ppt_pages,
+            segments=align_input,
+            user_anchors=None,
+            total_audio_duration=raw_segments[-1]["end_ms"] / 1000.0,
+        )
+        assignments: list[tuple[str, int]] = []
+        for page in aligned:
+            page_num = page["page_num"]
+            for seg in page.get("aligned_segments", []):
+                start_ms = int(seg["start"] * 1000)
+                for rs in raw_segments:
+                    if rs["start_ms"] == start_ms and rs["text"] == seg["text"]:
+                        assignments.append((rs["id"], page_num))
+                        break
+        if assignments:
+            update_segment_assigned_pages(session_id, assignments)
+    except Exception:
+        pass  # alignment 失败不影响后续 Generate Notes，降级用 current_page_hint
+
+
+# ── POST /api/live/stop ────────────────────────────────────────────────────────
+
+@router.post("/live/stop")
+def live_stop(req: SessionStopRequest):
+    session = get_session(req.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="session not found")
+    update_session_status(req.session_id, "stopped", ended_at=int(time.time() * 1000))
+    if req.ppt_pages:
+        t = threading.Thread(
+            target=_run_alignment_background,
+            args=(req.session_id, req.ppt_pages),
+            daemon=True,
+        )
+        t.start()
+    return {"session_id": req.session_id, "status": "stopped"}
+
+
+# ── POST /api/live/finalize-stream ────────────────────────────────────────────
+
+@router.post("/live/finalize-stream")
+def live_finalize_stream(req: FinalizeRequest):
+    session = get_session(req.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="session not found")
+    if session["status"] != "stopped":
+        raise HTTPException(
+            status_code=400, detail=f"cannot finalize in status {session['status']}; call /live/stop first"
+        )
+    update_session_status(req.session_id, "finalizing")
+
+    raw_segments = get_segments(req.session_id)
+
+    def generate():
+        try:
+            yield from stream_notes(raw_segments, req.ppt_pages, req.my_notes, max_retries=1)
+            update_session_status(req.session_id, "done")
+        except Exception as e:
+            update_session_status(req.session_id, "stopped")  # stopped 允许用户重试
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            yield "data: [DONE]\n\n"  # 确保客户端 SSE 循环能正常退出
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+# ── GET /api/live/finalize/status/{session_id} ────────────────────────────────
+
+@router.get("/live/finalize/status/{session_id}")
+def live_finalize_status(session_id: str):
+    session = get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="session not found")
+    return {"session_id": session_id, "status": session["status"]}
+
+
+# ── POST /api/live/detailed-note ──────────────────────────────────────────────
+
+@router.post("/live/detailed-note")
+def live_detailed_note(req: DetailedNoteRequest):
+    session = get_session(req.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="session not found")
+    from services.live_note_builder import _detailed_note_semaphore
+    if not _detailed_note_semaphore.acquire(blocking=False):
+        raise HTTPException(status_code=429, detail="too many concurrent detailed-note requests, try again")
+    segments = get_segments(req.session_id)
+
+    def gen_and_release():
+        try:
+            yield from generate_detailed_note(req.line_text, req.page_num, segments, req.start_sec, req.end_sec)
+        finally:
+            _detailed_note_semaphore.release()
+
+    return StreamingResponse(gen_and_release(), media_type="text/event-stream")
+
+
+# ── POST /api/live/explain ─────────────────────────────────────────────────────
 
 @router.post("/live/explain")
 async def live_explain(req: ExplainRequest):
@@ -121,7 +353,7 @@ PCM_FRAME_SIZE = 3200  # 100ms @ 16kHz mono s16le
 
 
 @router.websocket("/ws/live-asr")
-async def live_asr(websocket: WebSocket):
+async def live_asr(websocket: WebSocket, session_id: str | None = None):
     """
     接收前端音频 chunk（audio/webm），经 ffmpeg 转码为 PCM 16kHz，
     转发给阿里云 NLS 流式 ASR，将识别结果推回前端。
@@ -279,6 +511,20 @@ async def live_asr(websocket: WebSocket):
                                 "is_final": True,
                                 "timestamp": round(elapsed, 2),
                             }))
+                            # 持久化 final segment
+                            if session_id:
+                                try:
+                                    sess = get_session(session_id)
+                                    page_hint = sess["current_page"] if sess else None
+                                    save_segment(
+                                        session_id=session_id,
+                                        text=text,
+                                        current_page_hint=page_hint,
+                                        start_ms=int(payload.get("begin_time", 0)),
+                                        end_ms=int(payload.get("time", 0)),
+                                    )
+                                except Exception:
+                                    pass  # 持久化失败不中断 ASR
                     elif name == "TranscriptionCompleted":
                         break
             except Exception:
