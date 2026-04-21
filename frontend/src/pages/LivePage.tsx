@@ -61,12 +61,14 @@ export default function LivePage() {
   const { openTab } = useTabs()
   const {
     enabled: translationEnabled,
+    translate,
     targetLang,
     setEnabled: setTranslationEnabled,
     setTargetLang,
   } = useTranslation()
 
-  const createNewSession = searchParams.get('new') === '1' || !searchParams.get('session')
+  const requestedSessionId = searchParams.get('session')
+  const createNewSession = searchParams.get('new') === '1' || !requestedSessionId
 
   const [draftSessionId, setDraftSessionId] = useState<string | null>(null)
   const [processedSessionId, setProcessedSessionId] = useState<string | null>(null)
@@ -79,11 +81,14 @@ export default function LivePage() {
   const [wsStatus, setWsStatus] = useState<WsStatus>('idle')
   const wsRef = useRef<WebSocket | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
+  const processingPollTimeoutRef = useRef<number | null>(null)
+  const unmountedRef = useRef(false)
 
   const [subtitleLines, setSubtitleLines] = useState<string[]>([])
-  const [, setTranscriptByPage] = useState<Record<number, string[]>>({})
-  const subtitleBottomRef = useRef<HTMLDivElement>(null)
+  const [subtitleVisible, setSubtitleVisible] = useState(false)
+  const subtitleHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [pptFile, setPptFile] = useState<File | null>(null)
   const [pptId, setPptId] = useState<string | null>(null)
@@ -92,8 +97,7 @@ export default function LivePage() {
   const [processingProgress, setProcessingProgress] = useState(0)
 
   const [currentPage, setCurrentPage] = useState(1)
-  const currentPageRef = useRef(1)
-  const [noteMode, setNoteMode] = useState<NoteMode>('transcript')
+  const [noteMode, setNoteMode] = useState<NoteMode>('my')
   const [navVisible, setNavVisible] = useState(true)
   const [notesPanelWidth, setNotesPanelWidth] = useState(460)
   const [activeTool, setActiveTool] = useState<'none' | 'highlight' | 'eraser' | 'text'>('none')
@@ -106,10 +110,12 @@ export default function LivePage() {
 
   const [myNoteTexts, setMyNoteTexts] = useState<Map<number, string>>(new Map())
   const myNoteSaveTimerRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map())
+  const myNoteTextsRef = useRef(myNoteTexts)
+  const notesSessionIdRef = useRef(notesSessionId)
   const [myNoteExpandStates, setMyNoteExpandStates] = useState<Map<number, MyNoteExpandState>>(new Map())
   const [expandedBullets, setExpandedBullets] = useState<Map<number, Set<number>>>(new Map())
   const [animatedBullets, setAnimatedBullets] = useState<Map<number, Set<number>>>(new Map())
-  const [translatedTexts] = useState<Map<number, TranslatedPageTexts>>(new Map())
+  const [translatedTexts, setTranslatedTexts] = useState<Map<number, TranslatedPageTexts>>(new Map())
 
   const [pageChatMessages, setPageChatMessages] = useState<Map<number, PageChatMessage[]>>(new Map())
   const [pageChatInput, setPageChatInput] = useState('')
@@ -154,46 +160,271 @@ export default function LivePage() {
   const pagePhase = wsStatus === 'processing' ? 'processing' : 'ready'
   const draftOutlineLines = buildDraftOutlineLines(activePageData?.ppt_text ?? draftPage?.ppt_text ?? '')
 
+  const clearProcessingPoll = useCallback(() => {
+    if (processingPollTimeoutRef.current !== null) {
+      window.clearTimeout(processingPollTimeoutRef.current)
+      processingPollTimeoutRef.current = null
+    }
+  }, [])
+
+  const stopSegmentPlayback = useCallback(() => {
+    const audio = audioRef.current
+    if (audio && segTimeUpdateRef.current) {
+      audio.removeEventListener('timeupdate', segTimeUpdateRef.current)
+    }
+    audio?.pause()
+    segTimeUpdateRef.current = null
+    segStartRef.current = null
+    segEndRef.current = null
+    setPlayingSegIdx(null)
+    setPlayProgress(0)
+  }, [])
+
+  const cleanupRecordingResources = useCallback(() => {
+    const ws = wsRef.current
+    wsRef.current = null
+    if (ws) {
+      ws.onopen = null
+      ws.onmessage = null
+      ws.onerror = null
+      ws.onclose = null
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        ws.close()
+      }
+    }
+
+    const recorder = mediaRecorderRef.current
+    mediaRecorderRef.current = null
+    if (recorder && recorder.state !== 'inactive') {
+      try {
+        recorder.stop()
+      } catch {
+        // ignore recorder shutdown errors
+      }
+    }
+
+    const stream = mediaStreamRef.current ?? recorder?.stream ?? null
+    mediaStreamRef.current = null
+    stream?.getTracks().forEach((track) => track.stop())
+  }, [])
+
+  const flushPendingMyNotes = useCallback(async () => {
+    const timers = myNoteSaveTimerRef.current
+    timers.forEach((timer) => clearTimeout(timer))
+    timers.clear()
+
+    if (!notesSessionId || myNoteTexts.size === 0) return
+
+    await Promise.all(
+      Array.from(myNoteTexts.entries()).map(([pageNum, text]) => saveMyNote(notesSessionId, pageNum, text)),
+    )
+  }, [myNoteTexts, notesSessionId])
+
+  const applySessionData = useCallback(
+    (
+      sessionId: string,
+      data: SessionData,
+      options?: { liveDraft?: boolean; keepCurrentPage?: boolean },
+    ) => {
+      if (options?.liveDraft || data.status === 'live') {
+        setDraftSessionId(sessionId)
+      } else {
+        setProcessedSessionId(sessionId)
+      }
+
+      setSession(data)
+
+      if (data.pages.length > 0) {
+        setCurrentPage((prev) => {
+          if (options?.keepCurrentPage && data.pages.some((page) => page.page_num === prev)) {
+            return prev
+          }
+          return data.pages[0].page_num
+        })
+      }
+
+      if (data.progress) {
+        setProcessingProgress(data.progress.percent)
+      }
+
+      if (data.status === 'processing') {
+        setWsStatus('processing')
+        setNoteMode('transcript')
+      } else if (data.status === 'ready' || data.status === 'partial_ready') {
+        setWsStatus('done')
+        setNoteMode('ai')
+      } else if (data.status === 'live') {
+        setWsStatus('idle')
+      }
+    },
+    [],
+  )
+
+  const pollProcessedSession = useCallback(
+    async (sessionId: string) => {
+      clearProcessingPoll()
+
+      try {
+        const data = await getSession(sessionId) as SessionData
+        if (unmountedRef.current) return
+
+        if (data.status === 'error') {
+          setWsStatus('stopped')
+          return
+        }
+
+        applySessionData(sessionId, data, { keepCurrentPage: true })
+
+        if (data.status === 'ready' || data.status === 'partial_ready') {
+          return
+        }
+
+        processingPollTimeoutRef.current = window.setTimeout(() => {
+          void pollProcessedSession(sessionId)
+        }, 3000)
+      } catch {
+        if (!unmountedRef.current) {
+          setWsStatus('stopped')
+        }
+      }
+    },
+    [applySessionData, clearProcessingPoll],
+  )
+
+  const translatePage = useCallback(async (pageNum: number) => {
+    if (!session || translatedTexts.has(pageNum)) return
+
+    const page = session.pages.find((item) => item.page_num === pageNum)
+    if (!page) return
+
+    const bullets = page.passive_notes?.bullets ?? []
+    const supplement = page.page_supplement?.content ?? null
+    const aiExpansion = page.active_notes?.ai_expansion ?? null
+
+    const [translatedBullets, translatedAiComments, translatedSupplement, translatedAiExpansion] =
+      await Promise.all([
+        Promise.all(bullets.map((bullet) => translate(bullet.ppt_text))),
+        Promise.all(bullets.map((bullet) => (bullet.ai_comment ? translate(bullet.ai_comment) : Promise.resolve(null)))),
+        supplement ? translate(supplement) : Promise.resolve(null),
+        aiExpansion ? translate(aiExpansion) : Promise.resolve(null),
+      ])
+
+    if (unmountedRef.current) return
+
+    setTranslatedTexts((prev) => {
+      const next = new Map(prev)
+      next.set(pageNum, {
+        bullets: translatedBullets,
+        aiComments: translatedAiComments,
+        supplement: translatedSupplement,
+        aiExpansion: translatedAiExpansion,
+      })
+      return next
+    })
+  }, [session, translate, translatedTexts])
+
   useEffect(() => {
-    currentPageRef.current = currentPage
     setPageInputValue(String(currentPage))
   }, [currentPage])
+
+  useEffect(() => {
+    myNoteTextsRef.current = myNoteTexts
+  }, [myNoteTexts])
+
+  useEffect(() => {
+    notesSessionIdRef.current = notesSessionId
+  }, [notesSessionId])
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const timers = myNoteSaveTimerRef.current
+      timers.forEach((timerId) => clearTimeout(timerId))
+      timers.clear()
+      const sid = notesSessionIdRef.current
+      if (sid) {
+        Array.from(myNoteTextsRef.current.entries()).forEach(([pageNum, text]) => {
+          void saveMyNote(sid, pageNum, text)
+        })
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [])
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
+      unmountedRef.current = true
+      clearProcessingPoll()
+      myNoteSaveTimerRef.current.forEach((timer) => clearTimeout(timer))
+      myNoteSaveTimerRef.current.clear()
+      const pendingSessionId = notesSessionIdRef.current
+      const pendingNotes = Array.from(myNoteTextsRef.current.entries())
+      if (pendingSessionId && pendingNotes.length > 0) {
+        void Promise.all(
+          pendingNotes.map(([pageNum, text]) => saveMyNote(pendingSessionId, pageNum, text)),
+        )
+      }
+      stopSegmentPlayback()
+      cleanupRecordingResources()
       document.body.style.overflow = previousOverflow
     }
-  }, [])
+  }, [clearProcessingPoll, cleanupRecordingResources, stopSegmentPlayback])
 
   useEffect(() => {
-    subtitleBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [subtitleLines])
-
-  useEffect(() => {
-    if (!createNewSession) return
-
     let cancelled = false
+    setInitError(null)
 
-    createLiveSession()
+    if (createNewSession) {
+      createLiveSession()
       .then(({ session_id }) => {
-        if (cancelled) return
+        if (cancelled || unmountedRef.current) return
         setDraftSessionId(session_id)
-        openTab({ sessionId: session_id, label: 'Live 课堂', path: '/live?new=1' })
+        openTab({ sessionId: session_id, label: 'Live Session', path: `/live?session=${session_id}` })
       })
       .catch((error) => {
-        if (cancelled) return
+        if (cancelled || unmountedRef.current) return
         const fallbackId = `live-local-${Date.now()}`
         setDraftSessionId(fallbackId)
         setInitError(error instanceof Error ? error.message : '初始化 Live 会话失败')
-        openTab({ sessionId: fallbackId, label: 'Live 课堂', path: '/live?new=1' })
+        openTab({ sessionId: fallbackId, label: 'Live Session', path: `/live?session=${fallbackId}` })
       })
+    } else if (requestedSessionId) {
+      getSession(requestedSessionId)
+        .then((data) => {
+          if (cancelled || unmountedRef.current) return
+
+          const typedData = data as SessionData
+          openTab({
+            sessionId: requestedSessionId,
+            label: typedData.ppt_filename || 'Live Session',
+            path: `/live?session=${requestedSessionId}`,
+          })
+
+          if (typedData.status === 'live') {
+            setDraftSessionId(requestedSessionId)
+            if (Array.isArray(typedData.pages) && typedData.pages.length > 0) {
+              applySessionData(requestedSessionId, typedData, { liveDraft: true })
+            }
+            return
+          }
+
+          applySessionData(requestedSessionId, typedData)
+          if (typedData.status === 'processing') {
+            void pollProcessedSession(requestedSessionId)
+          }
+        })
+        .catch((error) => {
+          if (cancelled || unmountedRef.current) return
+          setInitError(error instanceof Error ? error.message : 'Failed to load live session')
+        })
+    }
 
     return () => {
       cancelled = true
     }
-  }, [createNewSession, openTab])
+  }, [applySessionData, createNewSession, openTab, pollProcessedSession, requestedSessionId])
 
   useEffect(() => {
     if (!notesSessionId) return
@@ -225,6 +456,12 @@ export default function LivePage() {
     if (totalPages <= 0) return
     setCurrentPage((prev) => Math.min(Math.max(1, prev), totalPages))
   }, [totalPages])
+
+  useEffect(() => {
+    if (translationEnabled && session) {
+      void translatePage(currentPage)
+    }
+  }, [currentPage, session, translatePage, translationEnabled])
 
   const handleMyNoteChange = useCallback((pageNum: number, text: string) => {
     setMyNoteTexts((prev) => {
@@ -394,15 +631,7 @@ export default function LivePage() {
     if (!audio) return
 
     if (playingSegIdx === index) {
-      audio.pause()
-      segEndRef.current = null
-      segStartRef.current = null
-      if (segTimeUpdateRef.current) {
-        audio.removeEventListener('timeupdate', segTimeUpdateRef.current)
-        segTimeUpdateRef.current = null
-      }
-      setPlayingSegIdx(null)
-      setPlayProgress(0)
+      stopSegmentPlayback()
       return
     }
 
@@ -444,7 +673,7 @@ export default function LivePage() {
 
     segTimeUpdateRef.current = onTimeUpdate
     audio.addEventListener('timeupdate', onTimeUpdate)
-  }, [playingSegIdx])
+  }, [playingSegIdx, stopSegmentPlayback])
 
   const startRecording = useCallback(async () => {
     setWsStatus('connecting')
@@ -452,11 +681,13 @@ export default function LivePage() {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      mediaStreamRef.current = stream
       const ws = new WebSocket(`${WS_BASE}/api/ws/live-asr`)
       wsRef.current = ws
 
       ws.onopen = () => {
         setWsStatus('live')
+        openTab({ sessionId: notesSessionIdRef.current, label: '⏺ 录音中', path: `/live?session=${notesSessionIdRef.current}` })
         const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
           ? 'audio/webm;codecs=opus'
           : 'audio/webm'
@@ -489,10 +720,9 @@ export default function LivePage() {
             const next = [...prev.filter((line) => line !== '…'), message.text]
             return next.length > 50 ? next.slice(next.length - 50) : next
           })
-          setTranscriptByPage((prev) => ({
-            ...prev,
-            [currentPageRef.current]: [...(prev[currentPageRef.current] ?? []), message.text],
-          }))
+          setSubtitleVisible(true)
+          if (subtitleHideTimerRef.current) clearTimeout(subtitleHideTimerRef.current)
+          subtitleHideTimerRef.current = setTimeout(() => setSubtitleVisible(false), 2500)
           return
         }
 
@@ -500,6 +730,9 @@ export default function LivePage() {
           const base = prev[prev.length - 1] === '…' ? prev.slice(0, -1) : prev
           return [...base, message.text || '…']
         })
+        setSubtitleVisible(true)
+        if (subtitleHideTimerRef.current) clearTimeout(subtitleHideTimerRef.current)
+        subtitleHideTimerRef.current = setTimeout(() => setSubtitleVisible(false), 2500)
       }
 
       ws.onerror = () => setWsStatus('stopped')
@@ -507,9 +740,10 @@ export default function LivePage() {
         setWsStatus((prev) => (prev === 'processing' || prev === 'done' ? prev : 'stopped'))
       }
     } catch {
+      cleanupRecordingResources()
       setWsStatus('idle')
     }
-  }, [])
+  }, [cleanupRecordingResources, openTab])
 
   const pauseRecording = useCallback(() => {
     mediaRecorderRef.current?.pause()
@@ -522,6 +756,9 @@ export default function LivePage() {
   }, [])
 
   const stopRecording = useCallback(async () => {
+    await flushPendingMyNotes()
+    clearProcessingPoll()
+
     const recorder = mediaRecorderRef.current
     const stream = recorder?.stream
 
@@ -533,6 +770,7 @@ export default function LivePage() {
     }
 
     stream?.getTracks().forEach((track) => track.stop())
+    mediaStreamRef.current = null
     wsRef.current?.close()
     setWsStatus('processing')
 
@@ -544,39 +782,11 @@ export default function LivePage() {
       const nextSessionId = result.session_id
       setProcessedSessionId(nextSessionId)
 
-      const poll = async () => {
-        const data = await getSession(nextSessionId) as SessionData & {
-          progress?: { step: string; percent: number } | null
-        }
-
-        if (data.status === 'ready' || data.status === 'partial_ready') {
-          setSession(data)
-          setWsStatus('done')
-          setNoteMode('ai')
-          if (data.pages.length > 0) {
-            setCurrentPage(data.pages[0].page_num)
-          }
-          return
-        }
-
-        if (data.status === 'error') {
-          setWsStatus('stopped')
-          return
-        }
-
-        if (data.progress) {
-          setProcessingProgress(data.progress.percent)
-        }
-        window.setTimeout(() => {
-          void poll()
-        }, 3000)
-      }
-
-      await poll()
+      await pollProcessedSession(nextSessionId)
     } catch {
       setWsStatus('stopped')
     }
-  }, [pptFile, pptId])
+  }, [clearProcessingPoll, flushPendingMyNotes, pollProcessedSession, pptFile, pptId])
 
   const currentSlideUrl = activePageData
     ? withApiBase(activePageData.thumbnail_url) ??
@@ -655,7 +865,8 @@ export default function LivePage() {
           </aside>
         )}
 
-        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+        {pageSource.length > 0 && (
+          <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
           <CanvasToolbar
             navVisible={navVisible}
             onNavToggle={() => setNavVisible((prev) => !prev)}
@@ -760,34 +971,40 @@ export default function LivePage() {
                 第 {currentPage} 页
               </div>
             )}
+            {/* 字幕浮层：说话时出现，静默 2.5s 后淡出 */}
+            {isLiveMode && subtitleLines.length > 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '24px',
+                  right: '24px',
+                  bottom: '24px',
+                  pointerEvents: 'none',
+                  opacity: subtitleVisible ? 1 : 0,
+                  transition: 'opacity 0.4s ease',
+                  zIndex: 10,
+                }}
+              >
+                <div
+                  style={{
+                    display: 'inline-block',
+                    maxWidth: '100%',
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    background: 'rgba(0,0,0,0.62)',
+                    backdropFilter: 'blur(4px)',
+                    fontSize: '15px',
+                    lineHeight: '1.6',
+                    color: '#FFFFFF',
+                    fontWeight: 500,
+                  }}
+                >
+                  {subtitleLines.slice(-2).join(' ')}
+                </div>
+              </div>
+            )}
           </div>
 
-          {isLiveMode && (
-            <div
-              style={{
-                height: '100px',
-                flexShrink: 0,
-                overflowY: 'auto',
-                background: 'rgba(30,30,30,0.88)',
-                margin: '0 12px 8px',
-                borderRadius: '8px',
-                padding: '8px 14px',
-                fontSize: '13px',
-                lineHeight: '1.6',
-                color: '#E8E8E0',
-              }}
-            >
-              {subtitleLines.length === 0 ? (
-                <span style={{ opacity: 0.4 }}>开始录音后，字幕会实时显示在这里。</span>
-              ) : (
-                subtitleLines.map((line, index) => (
-                  <p key={`${index}-${line}`} style={{ margin: '2px 0' }}>
-                    {line}
-                  </p>
-                ))
-              )}
-              <div ref={subtitleBottomRef} />
-            </div>
           )}
 
           <div
@@ -807,20 +1024,36 @@ export default function LivePage() {
                 fontWeight: 700,
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
                 color:
                   wsStatus === 'live'
-                    ? '#798C00'
+                    ? '#E05C40'
                     : wsStatus === 'processing'
                       ? '#F59E0B'
                       : C.muted,
               }}
             >
+              {wsStatus === 'live' && (
+                <span
+                  style={{
+                    width: '7px',
+                    height: '7px',
+                    borderRadius: '50%',
+                    backgroundColor: '#E05C40',
+                    animation: 'pulse 1.5s ease-in-out infinite',
+                    display: 'inline-block',
+                    flexShrink: 0,
+                  }}
+                />
+              )}
               {wsStatus === 'idle'
                 ? '未开始'
                 : wsStatus === 'connecting'
                   ? '连接中'
                   : wsStatus === 'live'
-                    ? '● 录音中'
+                    ? '录音中'
                     : wsStatus === 'paused'
                       ? '已暂停'
                       : wsStatus === 'stopped'
@@ -925,9 +1158,11 @@ export default function LivePage() {
             )}
           </div>
         </main>
+        )}
 
-        <div
-          style={{ width: '8px', flexShrink: 0, cursor: 'col-resize', background: C.divider, opacity: 0 }}
+        {pageSource.length > 0 && (
+          <div
+            style={{ width: '8px', flexShrink: 0, cursor: 'col-resize', background: C.divider, opacity: 0 }}
           onMouseDown={(event) => {
             const startX = event.clientX
             const startWidth = notesPanelWidth
@@ -945,12 +1180,13 @@ export default function LivePage() {
             document.addEventListener('mouseup', onUp)
           }}
         />
+        )}
 
         <NotesPanel
           sessionId={panelSessionId}
           currentPage={currentPage}
           pageData={activePageData}
-          notesPanelWidth={notesPanelWidth}
+          notesPanelWidth={pageSource.length > 0 ? notesPanelWidth : undefined}
           noteMode={noteMode}
           onNoteModeChange={setNoteMode}
           isLive={isLiveMode}

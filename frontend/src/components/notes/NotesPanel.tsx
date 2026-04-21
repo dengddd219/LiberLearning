@@ -26,7 +26,7 @@ export interface NotesPanelProps {
   sessionId: string
   currentPage: number
   pageData: PageData | null
-  notesPanelWidth: number
+  notesPanelWidth?: number
   noteMode: NoteMode
   onNoteModeChange: (mode: NoteMode) => void
   isLive?: boolean
@@ -168,7 +168,7 @@ export default function NotesPanel({
   return (
     <aside
       className="flex-shrink-0 flex flex-col overflow-hidden"
-      style={{ width: `${notesPanelWidth}px`, background: C.white, position: 'relative' }}
+      style={{ width: notesPanelWidth != null ? `${notesPanelWidth}px` : '100%', background: C.white, position: 'relative' }}
     >
       <div
         className="flex-shrink-0 flex items-end"
