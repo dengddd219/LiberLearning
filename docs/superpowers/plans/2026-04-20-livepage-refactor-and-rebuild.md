@@ -50,7 +50,7 @@
 - 新建：`frontend/src/lib/notesTypes.ts`
 - 修改：`frontend/src/pages/NotesPage.tsx`（删除重复类型定义，改为从 notesTypes 导入）
 
-- [ ] **Step 1：创建 `frontend/src/lib/notesTypes.ts`**
+- [x] **Step 1：创建 `frontend/src/lib/notesTypes.ts`**
 
 ```ts
 // frontend/src/lib/notesTypes.ts
@@ -110,7 +110,7 @@ export interface SessionData {
 }
 ```
 
-- [ ] **Step 2：在 NotesPage.tsx 顶部导入替换**
+- [x] **Step 2：在 NotesPage.tsx 顶部导入替换**
 
 在 `frontend/src/pages/NotesPage.tsx` 的 import 块末尾加入：
 ```ts
@@ -119,7 +119,7 @@ import type { AskMessage, PageChatMessage, Bullet, AlignedSegment, PageData, Ses
 
 删除 NotesPage.tsx 中 lines 117–155 的重复类型定义（`interface AskMessage`、`interface PageChatMessage`、`interface Bullet`、`interface AlignedSegment`、`interface PageData`、`interface SessionData`）。
 
-- [ ] **Step 3：确认编译无报错**
+- [x] **Step 3：确认编译无报错**
 
 ```bash
 cd frontend && npx tsc --noEmit
@@ -127,7 +127,7 @@ cd frontend && npx tsc --noEmit
 
 预期：0 errors
 
-- [ ] **Step 4：Commit**
+- [x] **Step 4：Commit**
 
 ```bash
 git add frontend/src/lib/notesTypes.ts frontend/src/pages/NotesPage.tsx
@@ -142,7 +142,7 @@ git commit -m "refactor: extract shared note types to notesTypes.ts"
 - 新建：`frontend/src/lib/notesUtils.ts`
 - 修改：`frontend/src/pages/NotesPage.tsx`
 
-- [ ] **Step 1：创建 `frontend/src/lib/notesUtils.ts`**
+- [x] **Step 1：创建 `frontend/src/lib/notesUtils.ts`**
 
 ```ts
 // frontend/src/lib/notesUtils.ts
@@ -254,7 +254,7 @@ function applyBold(text: string): React.ReactNode {
 }
 ```
 
-- [ ] **Step 2：更新 NotesPage.tsx 导入**
+- [x] **Step 2：更新 NotesPage.tsx 导入**
 
 在 NotesPage.tsx import 块末尾加入：
 ```ts
@@ -270,7 +270,7 @@ injectNoteStyles()
 
 删除 NotesPage.tsx 中的 `renderMd` 函数定义（lines 360–398）。
 
-- [ ] **Step 3：确认编译无报错**
+- [x] **Step 3：确认编译无报错**
 
 ```bash
 cd frontend && npx tsc --noEmit
@@ -278,7 +278,7 @@ cd frontend && npx tsc --noEmit
 
 预期：0 errors
 
-- [ ] **Step 4：Commit**
+- [x] **Step 4：Commit**
 
 ```bash
 git add frontend/src/lib/notesUtils.ts frontend/src/pages/NotesPage.tsx
@@ -293,7 +293,7 @@ git commit -m "refactor: extract shared utils/styles to notesUtils.ts"
 - 新建：`frontend/src/lib/notesDb.ts`
 - 修改：`frontend/src/pages/NotesPage.tsx`
 
-- [ ] **Step 1：创建 `frontend/src/lib/notesDb.ts`**
+- [x] **Step 1：创建 `frontend/src/lib/notesDb.ts`**
 
 ```ts
 // frontend/src/lib/notesDb.ts
@@ -369,7 +369,7 @@ export async function saveAskHistory(sessionId: string, pageNum: number, bulletI
 }
 ```
 
-- [ ] **Step 2：更新 NotesPage.tsx 导入**
+- [x] **Step 2：更新 NotesPage.tsx 导入**
 
 在 NotesPage.tsx import 块末尾加入：
 ```ts
@@ -383,7 +383,7 @@ import {
 
 删除 NotesPage.tsx 中 lines 48–115 的 8 个 IDB helper 函数定义（`askKey`、`myNoteKey`、`loadMyNote`、`saveMyNote`、`loadPageChat`、`savePageChat`、`loadAskHistory`、`saveAskHistory`）。
 
-- [ ] **Step 3：确认编译无报错**
+- [x] **Step 3：确认编译无报错**
 
 ```bash
 cd frontend && npx tsc --noEmit
@@ -391,7 +391,7 @@ cd frontend && npx tsc --noEmit
 
 预期：0 errors
 
-- [ ] **Step 4：Commit**
+- [x] **Step 4：Commit**
 
 ```bash
 git add frontend/src/lib/notesDb.ts frontend/src/pages/NotesPage.tsx
@@ -407,7 +407,7 @@ git commit -m "refactor: extract IDB helpers to notesDb.ts"
 - 新建：`frontend/src/components/notes/LineByLineReveal.tsx`
 - 修改：`frontend/src/pages/NotesPage.tsx`
 
-- [ ] **Step 1：创建 `frontend/src/components/notes/RevealText.tsx`**
+- [x] **Step 1：创建 `frontend/src/components/notes/RevealText.tsx`**
 
 从 NotesPage.tsx lines 202–241 提取，完整内容：
 
@@ -450,7 +450,7 @@ export default function RevealText({ children, revealed, muted, highlight }: Rev
 }
 ```
 
-- [ ] **Step 2：创建 `frontend/src/components/notes/LineByLineReveal.tsx`**
+- [x] **Step 2：创建 `frontend/src/components/notes/LineByLineReveal.tsx`**
 
 从 NotesPage.tsx lines 244–357 提取（含 LineRevealSpan），完整内容：
 
@@ -544,7 +544,7 @@ export default function LineByLineReveal({ text, startReveal, onDone }: LineByLi
 }
 ```
 
-- [ ] **Step 3：在 NotesPage.tsx 中替换导入**
+- [x] **Step 3：在 NotesPage.tsx 中替换导入**
 
 在 NotesPage.tsx import 块末尾加入：
 ```ts
@@ -554,7 +554,7 @@ import LineByLineReveal from '../components/notes/LineByLineReveal'
 
 删除 NotesPage.tsx 中 lines 202–357 的 `RevealText`、`LineRevealSpan`、`LineByLineReveal` 三个组件定义。
 
-- [ ] **Step 4：确认编译无报错**
+- [x] **Step 4：确认编译无报错**
 
 ```bash
 cd frontend && npx tsc --noEmit
@@ -562,7 +562,7 @@ cd frontend && npx tsc --noEmit
 
 预期：0 errors
 
-- [ ] **Step 5：Commit**
+- [x] **Step 5：Commit**
 
 ```bash
 git add frontend/src/components/notes/RevealText.tsx frontend/src/components/notes/LineByLineReveal.tsx frontend/src/pages/NotesPage.tsx
@@ -578,7 +578,7 @@ git commit -m "refactor: extract RevealText and LineByLineReveal to components/n
 - 新建：`frontend/src/components/notes/InlineQA.tsx`
 - 修改：`frontend/src/pages/NotesPage.tsx`
 
-- [ ] **Step 1：创建 `frontend/src/components/notes/StreamingExpandText.tsx`**
+- [x] **Step 1：创建 `frontend/src/components/notes/StreamingExpandText.tsx`**
 
 从 NotesPage.tsx lines 401–426 提取：
 
@@ -609,7 +609,7 @@ export default function StreamingExpandText({ text }: StreamingExpandTextProps) 
 }
 ```
 
-- [ ] **Step 2：创建 `frontend/src/components/notes/InlineQA.tsx`**
+- [x] **Step 2：创建 `frontend/src/components/notes/InlineQA.tsx`**
 
 从 NotesPage.tsx lines 429–603 提取，完整代码（注意依赖 notesTypes、notesDb、askBullet API）：
 
@@ -746,7 +746,7 @@ export default function InlineQA({ sessionId, pageNum, bulletIndex, bulletText, 
 }
 ```
 
-- [ ] **Step 3：在 NotesPage.tsx 中替换导入**
+- [x] **Step 3：在 NotesPage.tsx 中替换导入**
 
 在 NotesPage.tsx import 块末尾加入：
 ```ts
@@ -756,7 +756,7 @@ import InlineQA from '../components/notes/InlineQA'
 
 删除 NotesPage.tsx 中 lines 401–603 的 `StreamingExpandText` 和 `InlineQA` 组件定义。
 
-- [ ] **Step 4：确认编译无报错**
+- [x] **Step 4：确认编译无报错**
 
 ```bash
 cd frontend && npx tsc --noEmit
@@ -764,7 +764,7 @@ cd frontend && npx tsc --noEmit
 
 预期：0 errors
 
-- [ ] **Step 5：Commit**
+- [x] **Step 5：Commit**
 
 ```bash
 git add frontend/src/components/notes/StreamingExpandText.tsx frontend/src/components/notes/InlineQA.tsx frontend/src/pages/NotesPage.tsx
@@ -779,7 +779,7 @@ git commit -m "refactor: extract StreamingExpandText and InlineQA to components/
 - 新建：`frontend/src/components/notes/AiBulletRow.tsx`
 - 修改：`frontend/src/pages/NotesPage.tsx`
 
-- [ ] **Step 1：创建 `frontend/src/components/notes/AiBulletRow.tsx`**
+- [x] **Step 1：创建 `frontend/src/components/notes/AiBulletRow.tsx`**
 
 从 NotesPage.tsx lines 606–847 提取，完整代码：
 
@@ -946,7 +946,7 @@ export default function AiBulletRow({
 }
 ```
 
-- [ ] **Step 2：在 NotesPage.tsx 中替换导入**
+- [x] **Step 2：在 NotesPage.tsx 中替换导入**
 
 在 NotesPage.tsx import 块末尾加入：
 ```ts
@@ -955,7 +955,7 @@ import AiBulletRow from '../components/notes/AiBulletRow'
 
 删除 NotesPage.tsx 中 lines 606–847 的 `AiBulletRow` 组件定义。
 
-- [ ] **Step 3：确认编译无报错**
+- [x] **Step 3：确认编译无报错**
 
 ```bash
 cd frontend && npx tsc --noEmit
@@ -963,7 +963,7 @@ cd frontend && npx tsc --noEmit
 
 预期：0 errors
 
-- [ ] **Step 4：Commit**
+- [x] **Step 4：Commit**
 
 ```bash
 git add frontend/src/components/notes/AiBulletRow.tsx frontend/src/pages/NotesPage.tsx
@@ -980,7 +980,7 @@ git commit -m "refactor: extract AiBulletRow to components/notes/"
 
 NotesPanel 封装右侧面板 aside 全部内容（Tab bar + 三个 Tab 内容 + Bottom drawer）。
 
-- [ ] **Step 1：定义 NotesPanel 的 Props 接口**
+- [x] **Step 1：定义 NotesPanel 的 Props 接口**
 
 在 `frontend/src/components/notes/NotesPanel.tsx` 的顶部写出完整 props 接口（注意：所有 state 和 handler 由 NotesPage 传入，NotesPanel 是纯渲染组件）：
 
@@ -1068,7 +1068,7 @@ export interface NotesPanelProps {
 }
 ```
 
-- [ ] **Step 2：实现 NotesPanel 组件体**
+- [x] **Step 2：实现 NotesPanel 组件体**
 
 在 Props 接口之后，将 NotesPage.tsx lines 1781–2635 的右侧面板 JSX 复制进来，作为 NotesPanel 的 return 内容。
 
@@ -1085,7 +1085,7 @@ export interface NotesPanelProps {
 
 最终 NotesPanel 是一个完整的 `<aside>` 元素，不含外层布局。
 
-- [ ] **Step 3：在 NotesPage.tsx 中使用 NotesPanel**
+- [x] **Step 3：在 NotesPage.tsx 中使用 NotesPanel**
 
 在 NotesPage.tsx import 块末尾加入：
 ```ts
@@ -1157,7 +1157,7 @@ import NotesPanel from '../components/notes/NotesPanel'
 />
 ```
 
-- [ ] **Step 4：确认编译无报错**
+- [x] **Step 4：确认编译无报错**
 
 ```bash
 cd frontend && npx tsc --noEmit
@@ -1173,7 +1173,7 @@ cd frontend && npx tsc --noEmit
 - Transcript Tab 时间戳点击可以跳转音频
 - Bottom drawer 可以打开/关闭，Page Chat 可以发送
 
-- [ ] **Step 6：Commit**
+- [x] **Step 6：Commit**
 
 ```bash
 git add frontend/src/components/notes/NotesPanel.tsx frontend/src/pages/NotesPage.tsx
@@ -1193,7 +1193,7 @@ git commit -m "refactor: extract NotesPanel component, NotesPage now composition
 
 LivePage 整体结构与 NotesPage 一致（三栏布局），但中间列加了字幕条，录音控制条替代 PillToggle，右侧面板使用 `<NotesPanel isLive>` 并在课后切换为完整模式。
 
-- [ ] **Step 1：建立 LivePage 骨架（状态机 + 布局）**
+- [x] **Step 1：建立 LivePage 骨架（状态机 + 布局）**
 
 用以下完整代码替换现有 LivePage.tsx 占位内容（注意：此步骤先不包含 WebSocket 逻辑，专注于状态机和布局骨架）：
 
@@ -1676,7 +1676,7 @@ export default function LivePage() {
 }
 ```
 
-- [ ] **Step 2：确认编译无报错**
+- [x] **Step 2：确认编译无报错**
 
 ```bash
 cd frontend && npx tsc --noEmit
@@ -1684,7 +1684,7 @@ cd frontend && npx tsc --noEmit
 
 预期：0 errors
 
-- [ ] **Step 3：Commit**
+- [x] **Step 3：Commit**
 
 ```bash
 git add frontend/src/pages/LivePage.tsx
@@ -1698,7 +1698,7 @@ git commit -m "feat: LivePage skeleton - state machine, layout, NotesPanel integ
 **Files:**
 - 修改：`frontend/src/pages/LivePage.tsx`
 
-- [ ] **Step 1：实现 `startRecording` 函数**
+- [x] **Step 1：实现 `startRecording` 函数**
 
 在 LivePage.tsx 的工具函数区域（`handleMyNoteChange` 之后、`return` 之前）加入：
 
@@ -1758,7 +1758,7 @@ const startRecording = useCallback(async () => {
 }, [currentPage, wsStatus])
 ```
 
-- [ ] **Step 2：实现 `pauseRecording` 和 `resumeRecording` 函数**
+- [x] **Step 2：实现 `pauseRecording` 和 `resumeRecording` 函数**
 
 ```tsx
 const pauseRecording = useCallback(() => {
@@ -1772,7 +1772,7 @@ const resumeRecording = useCallback(() => {
 }, [])
 ```
 
-- [ ] **Step 3：在录音控制条按钮上绑定真实 handler**
+- [x] **Step 3：在录音控制条按钮上绑定真实 handler**
 
 找到 Task 8 中录音控制条里的 `onClick={() => { /* Task 9 实现 */ }}` 占位，替换为：
 
@@ -1780,7 +1780,7 @@ const resumeRecording = useCallback(() => {
 - 「暂停」按钮：`onClick={pauseRecording}`
 - 「继续录音」按钮：`onClick={resumeRecording}`
 
-- [ ] **Step 4：确认编译无报错**
+- [x] **Step 4：确认编译无报错**
 
 ```bash
 cd frontend && npx tsc --noEmit
@@ -1788,7 +1788,7 @@ cd frontend && npx tsc --noEmit
 
 预期：0 errors
 
-- [ ] **Step 5：Commit**
+- [x] **Step 5：Commit**
 
 ```bash
 git add frontend/src/pages/LivePage.tsx
@@ -1802,7 +1802,7 @@ git commit -m "feat: LivePage - WebSocket recording with real-time ASR subtitles
 **Files:**
 - 修改：`frontend/src/pages/LivePage.tsx`
 
-- [ ] **Step 1：实现 `stopRecording`（结束课堂）函数**
+- [x] **Step 1：实现 `stopRecording`（结束课堂）函数**
 
 ```tsx
 const stopRecording = useCallback(async () => {
@@ -1846,19 +1846,19 @@ const stopRecording = useCallback(async () => {
 }, [pptFile, pptId])
 ```
 
-- [ ] **Step 2：在「结束课堂」按钮上绑定 handler**
+- [x] **Step 2：在「结束课堂」按钮上绑定 handler**
 
 找到 Task 8 中「结束课堂」按钮的 `onClick={() => { /* Task 10 实现 */ }}`，替换为：`onClick={stopRecording}`
 
-- [ ] **Step 3：课后模式隐藏字幕条（wsStatus === 'done' 时）**
+- [x] **Step 3：课后模式隐藏字幕条（wsStatus === 'done' 时）**
 
 字幕条的渲染条件已经是 `{isLiveMode && ...}`，`isLiveMode = wsStatus !== 'done'`，因此 done 后字幕条自动隐藏。无需额外修改。
 
-- [ ] **Step 4：课后音频播放 — 确认 audio 元素条件渲染**
+- [x] **Step 4：课后音频播放 — 确认 audio 元素条件渲染**
 
 Task 8 骨架中音频元素是 `{session?.audio_url && <audio ref={audioRef} ... />}`，session 在 done 后填充，自动生效。
 
-- [ ] **Step 5：确认编译无报错**
+- [x] **Step 5：确认编译无报错**
 
 ```bash
 cd frontend && npx tsc --noEmit
@@ -1866,7 +1866,7 @@ cd frontend && npx tsc --noEmit
 
 预期：0 errors
 
-- [ ] **Step 6：Commit**
+- [x] **Step 6：Commit**
 
 ```bash
 git add frontend/src/pages/LivePage.tsx
@@ -1879,7 +1879,13 @@ git commit -m "feat: LivePage - end class, submit to /api/process, poll until do
 
 **无代码修改，纯验证步骤。**
 
-- [ ] **Step 1：启动前后端**
+> 已在当前 worktree 内补齐前端依赖与 backend `.env`，并完成自动化浏览器验证：
+> 1. 前后端可启动：`http://127.0.0.1:5173` 与 `http://127.0.0.1:8000` 均可访问。
+> 2. LivePage 自动化验证通过：上传 `backend/test_documents/test1/slides/slides.pdf`、进入录音、暂停/继续、课后进入 processing，再切到 AI Notes；生成 session `e371a7c3-4725-49b6-b8d7-6a91a8bacae8`，后端状态为 `ready`。
+> 3. NotesPage 烟雾回归通过：`/notes/e371a7c3-4725-49b6-b8d7-6a91a8bacae8` 可打开，My Notes 刷新后仍能保留。
+> 4. 自动化截图保存于 `C:\Users\19841\AppData\Local\Temp\livepage_phase1_validation.png`。
+
+- [x] **Step 1：启动前后端**
 
 ```bash
 # 终端 1
@@ -1898,7 +1904,7 @@ cd frontend && npm run dev
 4. Transcript Tab — 点击时间戳，音频跳转播放
 5. Bottom drawer — 打开 Page Chat，发送消息，收到回复
 
-- [ ] **Step 3：验证 LivePage 课中流程**
+- [x] **Step 3：验证 LivePage 课中流程**
 
 打开 `http://localhost:5173/live?new=1`：
 1. 点「上传 PPT」上传一个 PPTX，PPT 缩略图出现在左侧导航
@@ -1909,7 +1915,7 @@ cd frontend && npm run dev
 6. 点「暂停」，状态变为「已暂停」；点「继续录音」，状态恢复
 7. My Notes Tab — 在第 1 页输入一段笔记，切换到第 2 页再回来，内容还在
 
-- [ ] **Step 4：验证 LivePage 课后流程**
+- [x] **Step 4：验证 LivePage 课后流程**
 
 1. 点「结束课堂」，状态变为「处理中…」，进度条出现
 2. 等待处理完成（约 1–3 分钟，取决于录音时长）
@@ -1919,7 +1925,7 @@ cd frontend && npm run dev
 6. Transcript Tab — 显示完整流水转录，点击句子跳转音频
 7. My Notes Tab — 课中输入的笔记还在，可以点星号 AI 扩写
 
-- [ ] **Step 5：如有 bug，修复后提交**
+- [x] **Step 5：如有 bug，修复后提交**
 
 ```bash
 git add -p

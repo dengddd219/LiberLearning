@@ -8,9 +8,12 @@ import os
 
 from routers import process, sessions, diagnostics, live
 from db import init_db
+from services.live_store import init_db as _live_init_db
 
 load_dotenv(Path(__file__).parent / ".env")
 logger = logging.getLogger("liberstudy.startup")
+
+_live_init_db()
 
 app = FastAPI(title="LiberStudy API", version="0.1.0")
 

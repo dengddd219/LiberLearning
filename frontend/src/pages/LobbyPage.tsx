@@ -45,15 +45,6 @@ function IconMic() {
   )
 }
 
-function IconCourse() {
-  return (
-    <svg width="13" height="16" viewBox="0 0 13 16" fill="none">
-      <rect x="1" y="1" width="11" height="14" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
-      <path d="M3.5 5h6M3.5 8h6M3.5 11h3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
-  )
-}
-
 function IconSettings() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -810,8 +801,6 @@ function ListTable({ sessions, folders, onRowClick, onRename, onDelete, onShare 
 
 // ─── Settings Panel ─────────────────────────────────────────────────────────
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
-
 function SettingsPanel({
   sessions,
   onOpenRunLog,
@@ -1353,7 +1342,7 @@ export default function LobbyPage() {
                 folders={folders}
                 onCardClick={(id) => {
                   const card = sessions.find(s => s.id === id)
-                  if (card?.status === 'live') {
+                  if (card?.status === 'live' || id.startsWith('live_') || id.startsWith('live-')) {
                     navigate(`/live?sessionId=${id}`)
                   } else {
                     openTab({ sessionId: id, label: card?.course ?? id })
@@ -1370,7 +1359,7 @@ export default function LobbyPage() {
                 folders={folders}
                 onRowClick={(id) => {
                   const card = sessions.find(s => s.id === id)
-                  if (card?.status === 'live') {
+                  if (card?.status === 'live' || id.startsWith('live_') || id.startsWith('live-')) {
                     navigate(`/live?sessionId=${id}`)
                   } else {
                     openTab({ sessionId: id, label: card?.course ?? id })

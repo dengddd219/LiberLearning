@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 
 export interface HighlightRect {
   x: number
@@ -34,6 +34,10 @@ export function useHighlights(sessionId: string) {
   const [highlights, setHighlights] = useState<HighlightRecord[]>(() =>
     load().filter((r) => r.sessionId === sessionId)
   )
+
+  useEffect(() => {
+    setHighlights(load().filter((r) => r.sessionId === sessionId))
+  }, [sessionId])
 
   const addHighlight = useCallback((record: Omit<HighlightRecord, 'id'>) => {
     const id = crypto.randomUUID()
