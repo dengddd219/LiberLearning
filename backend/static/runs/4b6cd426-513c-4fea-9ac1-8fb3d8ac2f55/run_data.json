@@ -1,0 +1,115 @@
+{
+  "session_id": "4b6cd426-513c-4fea-9ac1-8fb3d8ac2f55",
+  "started_at": "2026-04-21 13:56:19",
+  "config": {
+    "alignment_version": "v5",
+    "asr_engine": "race",
+    "note_provider": "中转站",
+    "note_model": "claude-sonnet-4-6",
+    "note_passive_template": "passive_ppt_notes",
+    "note_granularity": "detailed"
+  },
+  "steps": {
+    "step2_ppt": {
+      "status": "ok",
+      "ppt_path": null,
+      "num_pages": 0,
+      "pages_summary": [],
+      "elapsed_s": 0.01
+    },
+    "step1_audio": {
+      "status": "ok",
+      "wav_path": "C:\\Users\\19841\\AppData\\Local\\Temp\\liberstudy\\4b6cd426-513c-4fea-9ac1-8fb3d8ac2f55\\audio.wav",
+      "duration_seconds": 1.0,
+      "elapsed_s": 1.01
+    },
+    "step3_asr": {
+      "status": "ok",
+      "engine": "race",
+      "language": "zh",
+      "num_sentences": 0,
+      "num_raw_segments": 0,
+      "sentences": [],
+      "raw_segments": [],
+      "elapsed_s": 10.74
+    },
+    "step4_alignment": {
+      "status": "ok",
+      "version": "v5",
+      "num_pages": 1,
+      "pages_summary": [
+        {
+          "page_num": 1,
+          "num_segments": 0
+        }
+      ],
+      "aligned_pages": [
+        {
+          "page_num": 1,
+          "ppt_text": "",
+          "pdf_url": null,
+          "pdf_page_num": 1,
+          "page_start_time": 0,
+          "page_end_time": 1,
+          "alignment_confidence": 1.0,
+          "aligned_segments": [],
+          "page_supplement": null,
+          "active_notes": null
+        }
+      ],
+      "elapsed_s": 0.02
+    },
+    "step5_notes": {
+      "status": "ok",
+      "provider": "中转站",
+      "model": "claude-sonnet-4-6",
+      "template": "passive_ppt_notes",
+      "granularity": "detailed",
+      "num_pages": 1,
+      "pages_summary": [
+        {
+          "page_num": 1,
+          "status": "ready",
+          "num_bullets": 1,
+          "cost": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "generated_pages": [
+        {
+          "page_num": 1,
+          "ppt_text": "",
+          "pdf_url": null,
+          "pdf_page_num": 1,
+          "page_start_time": 0,
+          "page_end_time": 1,
+          "alignment_confidence": 1.0,
+          "aligned_segments": [],
+          "page_supplement": null,
+          "active_notes": null,
+          "status": "ready",
+          "passive_notes": {
+            "bullets": [
+              {
+                "ppt_text": "(no slide text)",
+                "level": 0,
+                "ai_comment": "本页无对应课堂讲解录音，以下内容仅基于 PPT 文本整理。",
+                "timestamp_start": -1,
+                "timestamp_end": -1
+              }
+            ]
+          },
+          "_cost": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "elapsed_s": 0.02
+    }
+  },
+  "finished_at": "2026-04-21 13:56:30",
+  "overall_status": "ready"
+}

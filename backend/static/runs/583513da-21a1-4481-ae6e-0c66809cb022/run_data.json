@@ -1,0 +1,367 @@
+{
+  "session_id": "583513da-21a1-4481-ae6e-0c66809cb022",
+  "started_at": "2026-04-21 20:38:52",
+  "config": {
+    "alignment_version": "v5",
+    "asr_engine": "race",
+    "note_provider": "中转站",
+    "note_model": "claude-sonnet-4-6",
+    "note_passive_template": "passive_ppt_notes",
+    "note_granularity": "detailed"
+  },
+  "steps": {
+    "step2_ppt": {
+      "status": "ok",
+      "ppt_path": "C:\\Users\\19841\\AppData\\Local\\Temp\\liberstudy\\583513da-21a1-4481-ae6e-0c66809cb022\\lec3_38-56_1-4.pdf",
+      "num_pages": 4,
+      "pages_summary": [
+        {
+          "page_num": 1,
+          "ppt_text_len": 42
+        },
+        {
+          "page_num": 2,
+          "ppt_text_len": 182
+        },
+        {
+          "page_num": 3,
+          "ppt_text_len": 133
+        },
+        {
+          "page_num": 4,
+          "ppt_text_len": 434
+        }
+      ],
+      "elapsed_s": 0.01
+    },
+    "step1_audio": {
+      "status": "ok",
+      "wav_path": "C:\\Users\\19841\\AppData\\Local\\Temp\\liberstudy\\583513da-21a1-4481-ae6e-0c66809cb022\\audio.wav",
+      "duration_seconds": 60.009313,
+      "elapsed_s": 2.62
+    },
+    "step3_asr": {
+      "status": "ok",
+      "engine": "race",
+      "language": "en",
+      "num_sentences": 0,
+      "num_raw_segments": 0,
+      "sentences": [],
+      "raw_segments": [],
+      "elapsed_s": 17.57
+    },
+    "step4_alignment": {
+      "status": "ok",
+      "version": "v5",
+      "num_pages": 4,
+      "pages_summary": [
+        {
+          "page_num": 1,
+          "num_segments": 0
+        },
+        {
+          "page_num": 2,
+          "num_segments": 0
+        },
+        {
+          "page_num": 3,
+          "num_segments": 0
+        },
+        {
+          "page_num": 4,
+          "num_segments": 0
+        }
+      ],
+      "aligned_pages": [
+        {
+          "page_num": 1,
+          "ppt_text": "Practical aspects of training / validation",
+          "ppt_bullets": null,
+          "pdf_url": "/slides/583513da-21a1-4481-ae6e-0c66809cb022/slides_65f9ba2d-259c-4b0c-a323-bf6cb3268bcb.pdf",
+          "pdf_page_num": 1,
+          "thumbnail_url": "/slides/583513da-21a1-4481-ae6e-0c66809cb022/slide_001.png",
+          "aligned_segments": [],
+          "off_slide_segments": [],
+          "page_start_time": 0.0,
+          "page_end_time": 15.00232825,
+          "alignment_confidence": 0.0,
+          "page_supplement": null
+        },
+        {
+          "page_num": 2,
+          "ppt_text": "Predict Who Will Repay TheirLoans •A lender hires you to investigate who will repay their  loans •You are given complete files on 100 •5 defaulted within 3 years Image creditdebt.org",
+          "ppt_bullets": null,
+          "pdf_url": "/slides/583513da-21a1-4481-ae6e-0c66809cb022/slides_65f9ba2d-259c-4b0c-a323-bf6cb3268bcb.pdf",
+          "pdf_page_num": 2,
+          "thumbnail_url": "/slides/583513da-21a1-4481-ae6e-0c66809cb022/slide_002.png",
+          "aligned_segments": [],
+          "off_slide_segments": [],
+          "page_start_time": 15.00232825,
+          "page_end_time": 30.0046565,
+          "alignment_confidence": 0.0,
+          "page_supplement": null
+        },
+        {
+          "page_num": 3,
+          "ppt_text": "A Surprising Finding\n• All 5 people who defaulted wore blue shirts during interviews\n• Your model may find this strong signal as well",
+          "ppt_bullets": null,
+          "pdf_url": "/slides/583513da-21a1-4481-ae6e-0c66809cb022/slides_65f9ba2d-259c-4b0c-a323-bf6cb3268bcb.pdf",
+          "pdf_page_num": 3,
+          "thumbnail_url": "/slides/583513da-21a1-4481-ae6e-0c66809cb022/slide_003.png",
+          "aligned_segments": [],
+          "off_slide_segments": [],
+          "page_start_time": 30.0046565,
+          "page_end_time": 45.00698475,
+          "alignment_confidence": 0.0,
+          "page_supplement": null
+        },
+        {
+          "page_num": 4,
+          "ppt_text": "Training Error and Generalization Error\n• Training error (bias): model error on the training data\n• Generalization error (variance): model error on new data\n• Example: practice a future exam with past exams\n• Doing well on past exams (training error) doesn’t guarantee a  good score on the future exam (generalization error)\n• Student A gets 0 error on past exams by rote learning\n• Student B  understands the reasons for givenanswers",
+          "ppt_bullets": null,
+          "pdf_url": "/slides/583513da-21a1-4481-ae6e-0c66809cb022/slides_65f9ba2d-259c-4b0c-a323-bf6cb3268bcb.pdf",
+          "pdf_page_num": 4,
+          "thumbnail_url": "/slides/583513da-21a1-4481-ae6e-0c66809cb022/slide_004.png",
+          "aligned_segments": [],
+          "off_slide_segments": [],
+          "page_start_time": 45.00698475,
+          "page_end_time": 60.009313,
+          "alignment_confidence": 0.0,
+          "page_supplement": null
+        }
+      ],
+      "elapsed_s": 1.13
+    },
+    "step5_notes": {
+      "status": "ok",
+      "provider": "中转站",
+      "model": "claude-sonnet-4-6",
+      "template": "passive_ppt_notes",
+      "granularity": "detailed",
+      "num_pages": 4,
+      "pages_summary": [
+        {
+          "page_num": 1,
+          "status": "ready",
+          "num_bullets": 1,
+          "cost": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        },
+        {
+          "page_num": 2,
+          "status": "ready",
+          "num_bullets": 1,
+          "cost": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        },
+        {
+          "page_num": 3,
+          "status": "ready",
+          "num_bullets": 3,
+          "cost": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        },
+        {
+          "page_num": 4,
+          "status": "ready",
+          "num_bullets": 7,
+          "cost": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "generated_pages": [
+        {
+          "page_num": 1,
+          "ppt_text": "Practical aspects of training / validation",
+          "ppt_bullets": null,
+          "pdf_url": "/slides/583513da-21a1-4481-ae6e-0c66809cb022/slides_65f9ba2d-259c-4b0c-a323-bf6cb3268bcb.pdf",
+          "pdf_page_num": 1,
+          "thumbnail_url": "/slides/583513da-21a1-4481-ae6e-0c66809cb022/slide_001.png",
+          "aligned_segments": [],
+          "off_slide_segments": [],
+          "page_start_time": 0.0,
+          "page_end_time": 15.00232825,
+          "alignment_confidence": 0.0,
+          "page_supplement": null,
+          "status": "ready",
+          "passive_notes": {
+            "bullets": [
+              {
+                "ppt_text": "Practical aspects of training / validation",
+                "level": 0,
+                "ai_comment": "本页无对应课堂讲解录音，以下内容仅基于 PPT 文本整理。",
+                "timestamp_start": -1,
+                "timestamp_end": -1
+              }
+            ]
+          },
+          "active_notes": null,
+          "_cost": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        },
+        {
+          "page_num": 2,
+          "ppt_text": "Predict Who Will Repay TheirLoans •A lender hires you to investigate who will repay their  loans •You are given complete files on 100 •5 defaulted within 3 years Image creditdebt.org",
+          "ppt_bullets": null,
+          "pdf_url": "/slides/583513da-21a1-4481-ae6e-0c66809cb022/slides_65f9ba2d-259c-4b0c-a323-bf6cb3268bcb.pdf",
+          "pdf_page_num": 2,
+          "thumbnail_url": "/slides/583513da-21a1-4481-ae6e-0c66809cb022/slide_002.png",
+          "aligned_segments": [],
+          "off_slide_segments": [],
+          "page_start_time": 15.00232825,
+          "page_end_time": 30.0046565,
+          "alignment_confidence": 0.0,
+          "page_supplement": null,
+          "status": "ready",
+          "passive_notes": {
+            "bullets": [
+              {
+                "ppt_text": "Predict Who Will Repay TheirLoans •A lender hires you to investigate who will repay their  loans •You are given complete files on 100 •5 defaulted within 3 years Image creditdebt.org",
+                "level": 0,
+                "ai_comment": "本页无对应课堂讲解录音，以下内容仅基于 PPT 文本整理。",
+                "timestamp_start": -1,
+                "timestamp_end": -1
+              }
+            ]
+          },
+          "active_notes": null,
+          "_cost": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        },
+        {
+          "page_num": 3,
+          "ppt_text": "A Surprising Finding\n• All 5 people who defaulted wore blue shirts during interviews\n• Your model may find this strong signal as well",
+          "ppt_bullets": null,
+          "pdf_url": "/slides/583513da-21a1-4481-ae6e-0c66809cb022/slides_65f9ba2d-259c-4b0c-a323-bf6cb3268bcb.pdf",
+          "pdf_page_num": 3,
+          "thumbnail_url": "/slides/583513da-21a1-4481-ae6e-0c66809cb022/slide_003.png",
+          "aligned_segments": [],
+          "off_slide_segments": [],
+          "page_start_time": 30.0046565,
+          "page_end_time": 45.00698475,
+          "alignment_confidence": 0.0,
+          "page_supplement": null,
+          "status": "ready",
+          "passive_notes": {
+            "bullets": [
+              {
+                "ppt_text": "A Surprising Finding",
+                "level": 0,
+                "ai_comment": "本页无对应课堂讲解录音，以下内容仅基于 PPT 文本整理。",
+                "timestamp_start": -1,
+                "timestamp_end": -1
+              },
+              {
+                "ppt_text": "• All 5 people who defaulted wore blue shirts during interviews",
+                "level": 0,
+                "ai_comment": "本页无对应课堂讲解录音，以下内容仅基于 PPT 文本整理。",
+                "timestamp_start": -1,
+                "timestamp_end": -1
+              },
+              {
+                "ppt_text": "• Your model may find this strong signal as well",
+                "level": 0,
+                "ai_comment": "本页无对应课堂讲解录音，以下内容仅基于 PPT 文本整理。",
+                "timestamp_start": -1,
+                "timestamp_end": -1
+              }
+            ]
+          },
+          "active_notes": null,
+          "_cost": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        },
+        {
+          "page_num": 4,
+          "ppt_text": "Training Error and Generalization Error\n• Training error (bias): model error on the training data\n• Generalization error (variance): model error on new data\n• Example: practice a future exam with past exams\n• Doing well on past exams (training error) doesn’t guarantee a  good score on the future exam (generalization error)\n• Student A gets 0 error on past exams by rote learning\n• Student B  understands the reasons for givenanswers",
+          "ppt_bullets": null,
+          "pdf_url": "/slides/583513da-21a1-4481-ae6e-0c66809cb022/slides_65f9ba2d-259c-4b0c-a323-bf6cb3268bcb.pdf",
+          "pdf_page_num": 4,
+          "thumbnail_url": "/slides/583513da-21a1-4481-ae6e-0c66809cb022/slide_004.png",
+          "aligned_segments": [],
+          "off_slide_segments": [],
+          "page_start_time": 45.00698475,
+          "page_end_time": 60.009313,
+          "alignment_confidence": 0.0,
+          "page_supplement": null,
+          "status": "ready",
+          "passive_notes": {
+            "bullets": [
+              {
+                "ppt_text": "Training Error and Generalization Error",
+                "level": 0,
+                "ai_comment": "本页无对应课堂讲解录音，以下内容仅基于 PPT 文本整理。",
+                "timestamp_start": -1,
+                "timestamp_end": -1
+              },
+              {
+                "ppt_text": "• Training error (bias): model error on the training data",
+                "level": 0,
+                "ai_comment": "本页无对应课堂讲解录音，以下内容仅基于 PPT 文本整理。",
+                "timestamp_start": -1,
+                "timestamp_end": -1
+              },
+              {
+                "ppt_text": "• Generalization error (variance): model error on new data",
+                "level": 0,
+                "ai_comment": "本页无对应课堂讲解录音，以下内容仅基于 PPT 文本整理。",
+                "timestamp_start": -1,
+                "timestamp_end": -1
+              },
+              {
+                "ppt_text": "• Example: practice a future exam with past exams",
+                "level": 0,
+                "ai_comment": "本页无对应课堂讲解录音，以下内容仅基于 PPT 文本整理。",
+                "timestamp_start": -1,
+                "timestamp_end": -1
+              },
+              {
+                "ppt_text": "• Doing well on past exams (training error) doesn’t guarantee a  good score on the future exam (generalization error)",
+                "level": 0,
+                "ai_comment": "本页无对应课堂讲解录音，以下内容仅基于 PPT 文本整理。",
+                "timestamp_start": -1,
+                "timestamp_end": -1
+              },
+              {
+                "ppt_text": "• Student A gets 0 error on past exams by rote learning",
+                "level": 0,
+                "ai_comment": "本页无对应课堂讲解录音，以下内容仅基于 PPT 文本整理。",
+                "timestamp_start": -1,
+                "timestamp_end": -1
+              },
+              {
+                "ppt_text": "• Student B  understands the reasons for givenanswers",
+                "level": 0,
+                "ai_comment": "本页无对应课堂讲解录音，以下内容仅基于 PPT 文本整理。",
+                "timestamp_start": -1,
+                "timestamp_end": -1
+              }
+            ]
+          },
+          "active_notes": null,
+          "_cost": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      ],
+      "elapsed_s": 0.04
+    }
+  },
+  "finished_at": "2026-04-21 20:39:13",
+  "overall_status": "ready"
+}
