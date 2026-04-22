@@ -33,6 +33,7 @@ export async function uploadFiles(
   language: string = 'en',
   userAnchors?: { page_num: number; timestamp: number }[],
   pptId?: string,
+  existingSessionId?: string,
 ): Promise<{ session_id: string }> {
   const form = new FormData()
   if (pptFile) form.append('ppt', pptFile)
@@ -42,11 +43,30 @@ export async function uploadFiles(
     form.append('user_anchors', JSON.stringify(userAnchors))
   }
   if (pptId) form.append('ppt_id', pptId)
+  if (existingSessionId) form.append('existing_session_id', existingSessionId)
   return apiPost('/api/process', form)
 }
 
 export async function getSession(sessionId: string) {
   return apiGet(`/api/sessions/${sessionId}`)
+}
+
+export async function updateLiveSessionState(
+  sessionId: string,
+  payload: {
+    ppt_id?: string
+    ppt_filename?: string
+    pages?: { page_num: number; pdf_url: string | null; pdf_page_num: number; thumbnail_url: string | null; ppt_text: string }[]
+    live_transcript?: Array<{ text: string; timestamp: number; page_num?: number }>
+  },
+): Promise<void> {
+  await fetch(`${API_BASE}/api/sessions/${sessionId}/live-state`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).then((res) => {
+    if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
+  })
 }
 
 export async function retryPage(sessionId: string, pageNum: number) {
@@ -85,6 +105,54 @@ export async function listSessions(): Promise<
 
 export async function createLiveSession(name?: string): Promise<{ session_id: string }> {
   return apiPost('/api/sessions/live', { name: name ?? '' })
+}
+
+export async function liveAsk(
+  payload: {
+    session_id: string
+    question: string
+    current_page: number
+    current_page_ppt_text?: string
+    current_page_notes?: string
+    current_page_annotations?: string[]
+    recent_transcript: Array<{ text: string; timestamp: number; page_num?: number }>
+    model?: string
+  },
+  onChunk: (chunk: string) => void,
+): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/live/ask`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
+
+  const reader = res.body!.getReader()
+  const decoder = new TextDecoder()
+  let full = ''
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      try {
+        const parsed = JSON.parse(line.slice(6))
+        if (parsed.type === 'chunk' && parsed.content) {
+          full += parsed.content
+          onChunk(parsed.content)
+        }
+      } catch {
+        // ignore malformed sse chunks
+      }
+    }
+  }
+
+  return full
 }
 
 /**

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 
 export interface TextAnnotation {
   id: string
@@ -26,6 +26,10 @@ export function useTextAnnotations(sessionId: string) {
   )
   // 记住本次会话中用户最后一次设置的颜色和字号，新建标注时复用
   const lastFormatRef = useRef<{ color: string; fontSize: number }>({ color: '#1A1916', fontSize: 14 })
+
+  useEffect(() => {
+    setAnnotations(load().filter((a) => a.sessionId === sessionId))
+  }, [sessionId])
 
   const addAnnotation = useCallback((pageNum: number, x: number, y: number) => {
     const id = crypto.randomUUID()

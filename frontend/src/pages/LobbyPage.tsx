@@ -1342,7 +1342,7 @@ export default function LobbyPage() {
                 folders={folders}
                 onCardClick={(id) => {
                   const card = sessions.find(s => s.id === id)
-                  if (card?.status === 'live') {
+                  if (card?.status === 'live' || id.startsWith('live_') || id.startsWith('live-')) {
                     navigate(`/live?sessionId=${id}`)
                   } else {
                     openTab({ sessionId: id, label: card?.course ?? id })
@@ -1359,7 +1359,7 @@ export default function LobbyPage() {
                 folders={folders}
                 onRowClick={(id) => {
                   const card = sessions.find(s => s.id === id)
-                  if (card?.status === 'live') {
+                  if (card?.status === 'live' || id.startsWith('live_') || id.startsWith('live-')) {
                     navigate(`/live?sessionId=${id}`)
                   } else {
                     openTab({ sessionId: id, label: card?.course ?? id })

@@ -102,7 +102,7 @@ function PillUpload({ label, accept, active, fileName, onFile, icon }: PillUploa
 
 
 interface NewClassModalProps {
-  onUploadSuccess?: (sessionId: string, pages: PptPage[]) => void
+  onUploadSuccess?: (sessionId: string, pages: PptPage[], localPdfUrl?: string) => void
   onClose: () => void
 }
 
@@ -116,6 +116,7 @@ export default function NewClassModal({ onUploadSuccess, onClose }: NewClassModa
   const [audioError, setAudioError] = useState<string | null>(null)
   const [pptId, setPptId] = useState<string | null>(null)
   const [pptPages, setPptPages] = useState<PptPage[]>([])
+  const [localPdfUrl, setLocalPdfUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [selectedMode, setSelectedMode] = useState<'live' | 'upload' | null>('live')
@@ -126,9 +127,14 @@ export default function NewClassModal({ onUploadSuccess, onClose }: NewClassModa
     setPptError(err)
     setPptId(null)
     setPptPages([])
+    setLocalPdfUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null })
     if (!err) {
       const reqId = ++pptUploadReqIdRef.current
       setPptFile(file)
+      // PDF：立刻生成本地预览 URL
+      if (file.name.toLowerCase().endsWith('.pdf')) {
+        setLocalPdfUrl(URL.createObjectURL(file))
+      }
       uploadPpt(file)
         .then((res) => {
           if (reqId !== pptUploadReqIdRef.current) return
@@ -178,7 +184,7 @@ export default function NewClassModal({ onUploadSuccess, onClose }: NewClassModa
           setPptPages(res.pages)
         }
         const result = await uploadFiles(pptFile ?? undefined, audioFile, 'en', undefined, ensuredPptId ?? undefined)
-        onUploadSuccess(result.session_id, ensuredPptPages)
+        onUploadSuccess(result.session_id, ensuredPptPages, localPdfUrl ?? undefined)
       } catch (err) {
         console.error('Upload failed:', err)
         setUploadError('上传失败，请检查网络后重试')

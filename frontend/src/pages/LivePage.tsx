@@ -238,7 +238,7 @@ export default function LivePage() {
     t,
   } = useTranslation()
 
-  const requestedSessionId = searchParams.get('session')
+  const requestedSessionId = searchParams.get('session') || searchParams.get('sessionId')
   const createNewSession = searchParams.get('new') === '1' || !requestedSessionId
   // 用 ref 固定初始值，防止 searchParams 变化导致 effect 重跑、cancelled=true
   const createNewSessionRef = useRef(createNewSession)
@@ -323,6 +323,7 @@ export default function LivePage() {
   const [detailedNoteStreaming, setDetailedNoteStreaming] = useState(false)
   const [detailedNoteSource, setDetailedNoteSource] = useState('')
   const [detailedNotePageNum, setDetailedNotePageNum] = useState<number | null>(null)
+  const [notesFullscreen, setNotesFullscreen] = useState(false)
 
   const audioRef = useRef<HTMLAudioElement>(null)
   const segStartRef = useRef<number | null>(null)
@@ -354,6 +355,8 @@ export default function LivePage() {
   const totalPages = pageSource.length
   const isLiveMode = wsStatus !== 'done'
   const pagePhase: 'upload' | 'processing' | 'ready' = wsStatus === 'processing' ? 'processing' : 'ready'
+
+  // 全屏笔记由用户手动点按钮控制，不自动切换
 
   const getMyNoteText = useCallback((pageNum: number) => myNoteTexts.get(pageNum) ?? '', [myNoteTexts])
 
@@ -1048,7 +1051,7 @@ export default function LivePage() {
 
     setWsStatus('stopped')
     setSessionStatus('stopped')
-    setNoteMode('transcript')
+    setNoteMode('my')
 
     if (liveBackendSessionId) {
       try {
@@ -1135,6 +1138,10 @@ export default function LivePage() {
       }
 
       setSessionStatus('done')
+      setAiNotesText(prev => {
+        if (liveBackendSessionId) localStorage.setItem(`liberstudy:live-ai-notes:${liveBackendSessionId}`, prev)
+        return prev
+      })
     } catch {
       setSessionStatus('stopped')
     } finally {
@@ -1314,6 +1321,22 @@ export default function LivePage() {
           path: `/live?session=${requestedSessionIdRef.current}`,
         })
         applySessionData(requestedSessionIdRef.current!, typedData)
+        const sid = requestedSessionIdRef.current!
+        if (typedData.status === 'done' || typedData.status === 'stopped') {
+          setSessionStatus(typedData.status as 'stopped' | 'done')
+          setWsStatus('stopped')
+          setLiveBackendSessionId(sid)
+          const cached = localStorage.getItem(`liberstudy:live-ai-notes:${sid}`)
+          if (cached) setAiNotesText(cached)
+          fetch(`${API_BASE}/api/live/state/${sid}`)
+            .then(r => r.json())
+            .then(state => {
+              if (!cancelled && !unmountedRef.current && state.transcript) {
+                setPostClassTranscript(state.transcript)
+              }
+            })
+            .catch(() => {})
+        }
         if (typedData.status === 'processing') {
           void pollProcessedSession(requestedSessionIdRef.current!)
         }
@@ -1775,33 +1798,6 @@ export default function LivePage() {
           </aside>
         )}
 
-        {!hasPpt && (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100%',
-            color: '#c2c5c2',
-            gap: 12,
-            padding: 24,
-            textAlign: 'center',
-            width: '200px',
-            flexShrink: 0,
-          }}>
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <path d="M9 9h6M9 13h4" />
-            </svg>
-            <p style={{ fontSize: 13, margin: 0, lineHeight: 1.6 }}>
-              未上传 PPT<br />
-              <span style={{ fontSize: 12, color: '#c2c5c2' }}>笔记已全屏展开</span>
-            </p>
-          </div>
-        )}
-
-        {hasPpt && (
-          <>
         <main className="flex-1 flex flex-col overflow-hidden" style={{ background: C.bg }}>
           <CanvasToolbar
             navVisible={navVisible}
@@ -2080,8 +2076,6 @@ export default function LivePage() {
         >
           <div style={{ width: '1px', height: '100%', background: 'rgba(175,179,176,0.2)' }} />
         </div>
-          </>
-        )}
 
         <NotesPanel
           sessionId={panelSessionId}
@@ -2149,6 +2143,8 @@ export default function LivePage() {
           hasAnyAlignedSegments={session?.pages?.some((page) => (page.aligned_segments?.length ?? 0) > 0) ?? false}
           hasPendingAiNotes={session?.pages?.some((page) => !page.passive_notes?.bullets?.length) ?? false}
           draftOutlineLines={draftOutlineLines}
+          fullscreen={notesFullscreen}
+          onFullscreen={setNotesFullscreen}
         />
 
         {/* 课后 Transcript 覆盖层 */}

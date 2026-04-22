@@ -49,5 +49,10 @@ export interface SessionData {
   audio_url: string
   total_duration: number
   pages: PageData[]
-  progress?: { step: string; percent: number } | null
+  progress?: {
+    step: string
+    percent: number
+    ppt_id?: string | null
+    live_transcript?: Array<{ text: string; timestamp: number; page_num?: number | null }>
+  } | null
 }

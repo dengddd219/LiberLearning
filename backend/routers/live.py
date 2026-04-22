@@ -38,6 +38,7 @@ from services.live_store import (
     save_annotation, update_segment_assigned_pages,
 )
 from services.live_note_builder import stream_notes, generate_detailed_note
+import db as _db
 
 router = APIRouter(tags=["live"])
 
@@ -139,7 +140,12 @@ class ExplainRequest(BaseModel):
 @router.post("/live/session/start")
 def live_session_start(req: SessionStartRequest):
     session = create_session(ppt_id=req.ppt_id, language=req.language)
-    return {"session_id": session["session_id"], "status": session["status"]}
+    sid = session["session_id"]
+    try:
+        _db.save_session(sid, {"status": "live", "ppt_filename": "Live 课堂"})
+    except Exception:
+        pass
+    return {"session_id": sid, "status": session["status"]}
 
 
 # ── POST /api/live/page-snapshot ───────────────────────────────────────────────
@@ -242,6 +248,10 @@ def live_stop(req: SessionStopRequest):
     if not session:
         raise HTTPException(status_code=404, detail="session not found")
     update_session_status(req.session_id, "stopped", ended_at=int(time.time() * 1000))
+    try:
+        _db.update_session(req.session_id, {"status": "stopped"})
+    except Exception:
+        pass
     if req.ppt_pages:
         t = threading.Thread(
             target=_run_alignment_background,
@@ -271,10 +281,18 @@ def live_finalize_stream(req: FinalizeRequest):
         try:
             yield from stream_notes(raw_segments, req.ppt_pages, req.my_notes, max_retries=1)
             update_session_status(req.session_id, "done")
+            try:
+                _db.update_session(req.session_id, {"status": "done"})
+            except Exception:
+                pass
         except Exception as e:
-            update_session_status(req.session_id, "stopped")  # stopped 允许用户重试
+            update_session_status(req.session_id, "stopped")
+            try:
+                _db.update_session(req.session_id, {"status": "stopped"})
+            except Exception:
+                pass
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
-            yield "data: [DONE]\n\n"  # 确保客户端 SSE 循环能正常退出
+            yield "data: [DONE]\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 

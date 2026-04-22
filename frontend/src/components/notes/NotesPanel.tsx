@@ -71,6 +71,8 @@ export interface NotesPanelProps {
   hasAnyAlignedSegments?: boolean
   hasPendingAiNotes?: boolean
   draftOutlineLines: string[]
+  fullscreen?: boolean
+  onFullscreen?: (on: boolean) => void
 }
 
 const MODELS = [
@@ -130,6 +132,8 @@ export default function NotesPanel({
   hasAnyAlignedSegments = false,
   hasPendingAiNotes = false,
   draftOutlineLines,
+  fullscreen = false,
+  onFullscreen,
 }: NotesPanelProps) {
   const { t } = useTranslation()
   const pageChatBottomRef = useRef<HTMLDivElement>(null)
@@ -168,12 +172,17 @@ export default function NotesPanel({
   return (
     <aside
       className="flex-shrink-0 flex flex-col overflow-hidden"
-      style={{ width: notesPanelWidth != null ? `${notesPanelWidth}px` : '100%', background: C.white, position: 'relative' }}
+      style={
+        fullscreen
+          ? { position: 'fixed', inset: 0, zIndex: 50, background: C.white }
+          : { width: notesPanelWidth != null ? `${notesPanelWidth}px` : '100%', background: C.white, position: 'relative' }
+      }
     >
       <div
         className="flex-shrink-0 flex items-end"
         style={{ padding: '14px 18px 0', borderBottom: `1px solid ${C.divider}`, gap: 0 }}
       >
+        <div className="flex-1 flex items-end">
         {(['my', 'ai', 'transcript'] as const).map((mode) => {
           const label =
             mode === 'my'
@@ -244,6 +253,40 @@ export default function NotesPanel({
             </button>
           )
         })}
+        </div>
+        {onFullscreen && noteMode === 'my' && (
+          <button
+            type="button"
+            onClick={() => onFullscreen(!fullscreen)}
+            title={fullscreen ? '退出全屏' : '全屏笔记'}
+            style={{
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '28px',
+              height: '28px',
+              marginBottom: '6px',
+              background: 'none',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              color: C.muted,
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0,0,0,0.05)' }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'none' }}
+          >
+            {fullscreen ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+              </svg>
+            )}
+          </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 pb-4" onWheel={(event) => event.stopPropagation()}>

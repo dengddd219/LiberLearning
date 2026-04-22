@@ -94,6 +94,7 @@ export default function NotesPage() {
 
     if (event.event === 'all_done') {
       setPagePhase('ready')
+      setLocalPdfUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null })
       setAiNotesJustDone(true)
       setTimeout(() => setAiNotesJustDone(false), 1500)
     }
@@ -126,10 +127,13 @@ export default function NotesPage() {
     return () => clearInterval(timer)
   }, [pagePhase, processingSessionId])
 
-  const handleUploadSuccess = useCallback((newSessionId: string, pages: PptPage[]) => {
+  const [localPdfUrl, setLocalPdfUrl] = useState<string | null>(null)
+
+  const handleUploadSuccess = useCallback((newSessionId: string, pages: PptPage[], pdfUrl?: string) => {
     setProcessingSessionId(newSessionId)
     setPagePhase('processing')
     setLoading(false)
+    if (pdfUrl) setLocalPdfUrl(pdfUrl)
     navigate(`/notes/${newSessionId}`, { replace: true, state: { phase: 'processing' } })
     if (pages.length > 0) {
       const tempSession: SessionData = {
@@ -854,10 +858,35 @@ export default function NotesPage() {
             }}
           >
             {!resolvedSlideUrl && pagePhase === 'processing' && (
-              <div style={{ width: Math.round(canvasWidth * zoomLevel / 100), maxWidth: '100%', aspectRatio: '16/9', borderRadius: '8px', background: C.white, boxShadow: '0 4px 24px rgba(0,0,0,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
-                <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: C.secondary, borderTopColor: 'transparent' }} />
-                <span style={{ fontSize: '12px', color: C.muted }}>{t('notes_loading')}</span>
-              </div>
+              localPdfUrl ? (
+                <div
+                  ref={pageContainerRef}
+                  className="relative rounded-lg overflow-hidden"
+                  style={{ width: Math.round(canvasWidth * zoomLevel / 100), maxWidth: '100%', height: '80vh', background: C.white, boxShadow: '0 4px 24px rgba(0,0,0,0.10)' }}
+                >
+                  <iframe
+                    src={`${localPdfUrl}#page=${currentPage}&toolbar=0&navpanes=0&scrollbar=0`}
+                    style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+                    title="PDF Viewer"
+                  />
+                  <TextAnnotationLayer
+                    annotations={annotationsForPage(currentPage)}
+                    textToolActive={activeTool === 'text'}
+                    onPlaceAnnotation={(x, y) => addAnnotation(currentPage, x, y)}
+                    onUpdate={updateAnnotation}
+                    onRemove={removeAnnotation}
+                  />
+                  <div style={{ position: 'absolute', bottom: '12px', left: '12px', background: 'rgba(47,51,49,0.7)', color: '#fff', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div className="w-3 h-3 border border-t-transparent rounded-full animate-spin" style={{ borderColor: '#fff', borderTopColor: 'transparent' }} />
+                    正在处理 PPT...
+                  </div>
+                </div>
+              ) : (
+                <div style={{ width: Math.round(canvasWidth * zoomLevel / 100), maxWidth: '100%', aspectRatio: '16/9', borderRadius: '8px', background: C.white, boxShadow: '0 4px 24px rgba(0,0,0,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
+                  <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: C.secondary, borderTopColor: 'transparent' }} />
+                  <span style={{ fontSize: '12px', color: C.muted }}>{t('notes_loading')}</span>
+                </div>
+              )
             )}
             {!resolvedSlideUrl && pagePhase !== 'processing' && (
               <div style={{ width: Math.round(canvasWidth * zoomLevel / 100), maxWidth: '100%', aspectRatio: '16/9', borderRadius: '8px', background: C.white, boxShadow: '0 4px 24px rgba(0,0,0,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
