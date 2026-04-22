@@ -201,6 +201,48 @@ class CreateLiveRequest(BaseModel):
     name: Optional[str] = None
 
 
+class LiveStatePage(BaseModel):
+    page_num: int
+    pdf_url: Optional[str] = None
+    pdf_page_num: int
+    thumbnail_url: Optional[str] = None
+    ppt_text: str = ""
+
+
+class LiveStateTranscriptSegment(BaseModel):
+    text: str
+    timestamp: float
+    page_num: Optional[int] = None
+
+
+class LiveStateUpdateRequest(BaseModel):
+    ppt_id: Optional[str] = None
+    ppt_filename: Optional[str] = None
+    pages: Optional[list[LiveStatePage]] = None
+    live_transcript: Optional[list[LiveStateTranscriptSegment]] = None
+
+
+def _build_live_pages(pages: list[LiveStatePage]) -> list[dict]:
+    return [
+        {
+            "page_num": p.page_num,
+            "status": "live",
+            "pdf_url": p.pdf_url or "",
+            "pdf_page_num": p.pdf_page_num,
+            "thumbnail_url": p.thumbnail_url or None,
+            "ppt_text": p.ppt_text,
+            "page_start_time": 0,
+            "page_end_time": 0,
+            "alignment_confidence": 0,
+            "active_notes": None,
+            "passive_notes": None,
+            "page_supplement": None,
+            "aligned_segments": [],
+        }
+        for p in pages
+    ]
+
+
 @router.post("/sessions/live")
 def create_live_session(req: CreateLiveRequest = CreateLiveRequest()):
     import db as _db
@@ -210,8 +252,40 @@ def create_live_session(req: CreateLiveRequest = CreateLiveRequest()):
     _db.save_session(session_id, {
         "status": "live",
         "ppt_filename": name,
+        "progress": {"step": "live", "percent": 0, "ppt_id": None, "live_transcript": []},
     })
     return {"session_id": session_id}
+
+
+@router.patch("/sessions/{session_id}/live-state")
+def update_live_state(session_id: str, req: LiveStateUpdateRequest):
+    import db as _db
+
+    session = _db.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+
+    current_progress = session.get("progress") or {}
+    next_progress = {
+        "step": current_progress.get("step", "live"),
+        "percent": current_progress.get("percent", 0),
+        "ppt_id": current_progress.get("ppt_id"),
+        "live_transcript": current_progress.get("live_transcript", []),
+    }
+
+    updates: dict = {}
+    if req.ppt_id is not None:
+        next_progress["ppt_id"] = req.ppt_id
+    if req.live_transcript is not None:
+        next_progress["live_transcript"] = [seg.model_dump() for seg in req.live_transcript]
+    if req.ppt_filename is not None:
+        updates["ppt_filename"] = req.ppt_filename
+    if req.pages is not None:
+        updates["pages"] = _build_live_pages(req.pages)
+
+    updates["progress"] = next_progress
+    _db.update_session(session_id, updates)
+    return {"ok": True}
 
 
 @router.get("/settings")

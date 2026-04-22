@@ -181,7 +181,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 | `backend/main.py` | FastAPI app 工厂，挂载路由、静态目录、CORS |
 | `backend/routers/process.py` | `POST /api/process`（真实流水线）+ `POST /api/process-mock` + 单页重试 |
 | `backend/routers/sessions.py` | `GET /api/sessions/{id}`，mock 数据也在这里硬编码 |
-| `backend/routers/live.py` | WebSocket `/ws/live-asr`（流式 ASR）+ `POST /api/live/explain`（SSE Claude 解释） |
+| `backend/routers/live.py` | WebSocket `/ws/live-asr`（流式 ASR）+ `POST /api/live/explain`（SSE Claude 解释）+ live session CRUD（start/stop/finalize/state）+ detailed-note |
 | `backend/routers/diagnostics.py` | `GET /api/diagnostics`：全流程健康检查，逐步测试每个关键节点 |
 
 ### Services（核心逻辑）
@@ -208,6 +208,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 | `backend/services/bullet_alignment.py` | 实验性 bullet 级对齐（Method A/B/C） |
 | `backend/services/note_generator.py` | Claude 笔记生成：4模板×2粒度 + 批注扩写 `generate_annotations()` |
 | `backend/services/judge.py` | LLM-as-a-Judge 评分（完整性/准确性/可读性 1–5 分） |
+| `backend/services/live_store.py` | Live session SQLite 持久化（`live_data.db`）：sessions/segments/annotations/page_states 四表 CRUD |
+| `backend/services/live_note_builder.py` | Live 课堂 AI 笔记生成：`stream_notes()`（SSE 流式）+ `generate_detailed_note()`（逐行详解）|
 
 ### Prompts
 
@@ -331,7 +333,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ---
 
-### 前端（未与真实 API 联通）
+### 前端
 
 #### 入口 & 配置
 
@@ -346,7 +348,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 | 路径 | 内容 |
 |------|------|
 | `frontend/src/pages/LobbyPage.tsx` | 大厅工作台：侧边栏 + session 卡片网格/列表视图切换。Icons(L7) / CardMenu 三点菜单(L103) / CourseCard 接口(L199) / ProcessingCard(L237) / DoneCard 网格卡片(L267) / ListRow 列表行(L342) / ListTable(L426) / ProcessingToast(L473) / SettingsPanel(L597) / LobbyPage state(L651) / handleRename(L655) / handleDelete(L664) / toast轮询(L683) / listSessions初始加载(L733) / JSX return(L754) / 侧边栏导航(L803) / 网格/列表切换渲染(L854) |
-| `frontend/src/pages/LivePage.tsx` | 课中实时录音主页（1954行）：PDF 渲染、录音控制、笔记面板、高亮/文字标注、Transcript、Page Chat 全在此 |
+| `frontend/src/pages/LivePage.tsx` | 课中实时录音主页（~2400行）：PDF 渲染、录音控制（WebSocket ASR）、笔记面板、高亮/文字标注、实时字幕、Transcript、AI Notes SSE 生成、Detailed Note 侧边栏、Page Chat、无 PPT 模式。状态机：idle → live → stopped → finalizing → done |
 | `frontend/src/pages/ProcessingPage.tsx` | 处理中等待页：流水线进度显示 |
 | `frontend/src/pages/NotesPage.tsx` | 笔记主视图：三栏布局（slide nav + PPT 画布 + 笔记面板）。IndexedDB 持久化(L20) / 类型定义(L114) / `RevealText`(L178) / `LineByLineReveal`(L219) / `StreamingExpandText`(L332) / `InlineQA`(L360) / `AiBulletRow`(L532) / `NotesPage` state(L764) / My Notes 状态(L815) / Page Chat 状态(L860) |
 | `frontend/src/pages/DetailedNotePage.tsx` | 单页笔记详情视图 |
@@ -376,6 +378,12 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 | `frontend/src/components/TextAnnotationLayer.tsx` | 画布文字标注层（渲染 TextAnnotation） |
 | `frontend/src/components/RunLogModal.tsx` | 流水线运行日志弹窗 |
 | `frontend/src/components/SearchDropdown.tsx` | 搜索下拉结果列表 |
+| `frontend/src/components/notes/NotesPanel.tsx` | 笔记面板（My Notes / AI Notes / Transcript tab 切换 + Page Chat 抽屉 + 全屏模式）|
+| `frontend/src/components/notes/AiBulletRow.tsx` | AI Notes 单行 bullet 展示（时间戳 + 展开详解）|
+| `frontend/src/components/notes/StreamingExpandText.tsx` | 流式展开文本组件 |
+| `frontend/src/components/notes/RevealText.tsx` | 逐字揭示动画文本 |
+| `frontend/src/components/notes/LineByLineReveal.tsx` | 逐行揭示动画 |
+| `frontend/src/components/notes/InlineQA.tsx` | 行内问答组件 |
 
 #### UI 参考设计文档
 
@@ -387,4 +395,4 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 | `UI/figma-wireframe-script.js` | Figma 线框生成脚本 |
 | `UI/figma-plugin/` | Figma 插件（manifest.json + code.js） |
 
-> 前端已接真实流水线（SSE 实时进度推送），`/api/process-mock` 仅测试用。
+> 前端已接真实流水线（SSE 实时进度推送）+ Live 课堂全流程（WebSocket ASR + SSE AI Notes）。`/api/process-mock` 仅测试用。

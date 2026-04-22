@@ -38,6 +38,18 @@ MAX_AUDIO_SECONDS = _settings.MAX_AUDIO_SECONDS
 ALLOWED_LANGUAGES = {"zh", "en"}
 
 
+def _ppt_disk_cache_exists(ppt_id: str) -> bool:
+    meta = Path(tempfile.gettempdir()) / "liberstudy" / f"ppt_{ppt_id}" / "ppt_meta.json"
+    return meta.exists()
+
+
+def _load_ppt_from_disk(ppt_id: str) -> dict:
+    import json as _json_local
+    meta = Path(tempfile.gettempdir()) / "liberstudy" / f"ppt_{ppt_id}" / "ppt_meta.json"
+    with open(meta, encoding="utf-8") as f:
+        return _json_local.load(f)
+
+
 # ── Health check ───────────────────────────────────────────────────────────────
 
 @router.get("/process/health")
@@ -92,6 +104,19 @@ async def upload_ppt(ppt: UploadFile = File(...)):
         "ppt_pages": ppt_pages,
     }
 
+    # 持久化 parse 结果到磁盘，防止后端重启后 _ppt_cache 丢失
+    try:
+        import json as _json_local
+        meta_path = tmp_dir / "ppt_meta.json"
+        with open(meta_path, "w", encoding="utf-8") as f:
+            _json_local.dump({
+                "ppt_path": str(ppt_path),
+                "slides_dir": slides_dir,
+                "ppt_pages": ppt_pages,
+            }, f, ensure_ascii=False)
+    except Exception:
+        pass  # 持久化失败不影响主流程
+
     return {
         "ppt_id": ppt_id,
         "num_pages": len(ppt_pages),
@@ -129,6 +154,7 @@ async def process_real(
     language: str = Form("en"),
     user_anchors: str = Form("[]"),
     ppt_id: Optional[str] = Form(None),
+    existing_session_id: Optional[str] = Form(None),
 ):
     # 1. 参数校验
     if language not in ALLOWED_LANGUAGES:
@@ -169,7 +195,7 @@ async def process_real(
             raise HTTPException(status_code=429, detail=str(exc))
 
     # 3. 保存上传文件
-    session_id = str(uuid.uuid4())
+    session_id = existing_session_id or str(uuid.uuid4())
     session_dir = Path(tempfile.gettempdir()) / "liberstudy" / session_id
     session_dir.mkdir(parents=True, exist_ok=True)
 
@@ -184,16 +210,30 @@ async def process_real(
             f.write(await ppt.read())
 
     # 4. 注册 session（写入 SQLite）
-    db.save_session(session_id, {
-        "session_id": session_id,
-        "status": "processing",
-        "ppt_filename": ppt.filename if ppt else None,
-        "audio_url": None,
-        "total_duration": 0,
-        "pages": [],
-        "progress": {"step": "uploading", "percent": 5},
-        "error": None,
-    })
+    if existing_session_id:
+        existing = db.get_session(existing_session_id)
+        if existing is None:
+            raise HTTPException(status_code=404, detail=f"Session '{existing_session_id}' not found")
+        db.update_session(session_id, {
+            "status": "processing",
+            "ppt_filename": ppt.filename if ppt else existing.get("ppt_filename"),
+            "audio_url": None,
+            "total_duration": 0,
+            "pages": [],
+            "progress": {"step": "uploading", "percent": 5},
+            "error": None,
+        })
+    else:
+        db.save_session(session_id, {
+            "session_id": session_id,
+            "status": "processing",
+            "ppt_filename": ppt.filename if ppt else None,
+            "audio_url": None,
+            "total_duration": 0,
+            "pages": [],
+            "progress": {"step": "uploading", "percent": 5},
+            "error": None,
+        })
 
     background_tasks.add_task(
         _run_pipeline,
@@ -301,15 +341,19 @@ async def _run_pipeline(
             db.update_session(session_id, {"progress": {"step": "parsing_ppt", "percent": 30}})
             slides_dir = str(Path("static") / "slides" / session_id)
             ppt_pages: list[dict] = []
-            if ppt_id and ppt_id in _ppt_cache:
-                # Reuse pre-parsed result; move slides to session-specific subdir
-                cached = _ppt_cache.pop(ppt_id)
+            if ppt_id and (ppt_id in _ppt_cache or _ppt_disk_cache_exists(ppt_id)):
+                # Reuse pre-parsed result（内存优先，内存丢失时从磁盘恢复）
+                if ppt_id in _ppt_cache:
+                    cached = _ppt_cache.pop(ppt_id)
+                else:
+                    cached = _load_ppt_from_disk(ppt_id)
                 src_slides = Path(cached["slides_dir"])
                 dst_slides = Path(slides_dir)
                 if src_slides != dst_slides:
                     if dst_slides.exists():
                         shutil.rmtree(dst_slides)
-                    shutil.move(str(src_slides), str(dst_slides))
+                    if src_slides.exists():
+                        shutil.move(str(src_slides), str(dst_slides))
                 ppt_pages = cached["ppt_pages"]
                 # Fix pdf_url / thumbnail_url to use new session_id path
                 for page in ppt_pages:
