@@ -94,6 +94,7 @@ def _get_nls_token() -> str:
 class SessionStartRequest(BaseModel):
     ppt_id: str | None = None
     language: str = "zh"
+    session_id: str | None = None
 
 
 class PageSnapshotRequest(BaseModel):
@@ -139,13 +140,8 @@ class ExplainRequest(BaseModel):
 
 @router.post("/live/session/start")
 def live_session_start(req: SessionStartRequest):
-    session = create_session(ppt_id=req.ppt_id, language=req.language)
-    sid = session["session_id"]
-    try:
-        _db.save_session(sid, {"status": "live", "ppt_filename": "Live 课堂"})
-    except Exception:
-        pass
-    return {"session_id": sid, "status": session["status"]}
+    session = create_session(ppt_id=req.ppt_id, language=req.language, session_id=req.session_id)
+    return {"session_id": session["session_id"], "status": session["status"]}
 
 
 # ── POST /api/live/page-snapshot ───────────────────────────────────────────────

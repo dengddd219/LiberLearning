@@ -8,12 +8,14 @@ import { useHighlights } from '../hooks/useHighlights'
 import { useTextAnnotations } from '../hooks/useTextAnnotations'
 import { useTabs } from '../context/TabsContext'
 import { useTranslation } from '../context/TranslationContext'
+import { capture } from '../lib/analytics'
 import {
   askBullet,
   createLiveSession,
   generateMyNote,
   getSession,
   liveAsk,
+  renameSession,
   retryPage,
   updateLiveSessionState,
   uploadFiles,
@@ -347,6 +349,17 @@ export default function LivePage() {
   const panelSessionId = processedSessionId ?? notesSessionId ?? 'live-unbound'
   const { addHighlight, removeHighlight, highlightsForPage } = useHighlights(notesSessionId ?? '')
   const { addAnnotation, updateAnnotation, removeAnnotation, annotationsForPage } = useTextAnnotations(notesSessionId ?? '')
+  const trackedAnnotationIdsRef = useRef<Set<string>>(new Set())
+  const handleAnnotationUpdate = useCallback((id: string, text: string, color?: string, fontSize?: number) => {
+    updateAnnotation(id, text, color, fontSize)
+    if (text.trim() && !trackedAnnotationIdsRef.current.has(id)) {
+      trackedAnnotationIdsRef.current.add(id)
+      capture('annotation_added', {
+        page_index: currentPage,
+        session_duration_at_action: Math.round((Date.now() - recordingStartTimeRef.current) / 1000),
+      })
+    }
+  }, [updateAnnotation, currentPage])
 
   const pageSource = session?.pages && session.pages.length > 0 ? session.pages : pptPages
   const activePageData = session?.pages.find((page) => page.page_num === currentPage) ?? null
@@ -815,6 +828,7 @@ export default function LivePage() {
       if (unmountedRef.current) return
       setPptId(result.ppt_id)
       setPptPages(result.pages)
+      capture('ppt_uploaded', { slide_count: result.pages.length, file_size_mb: +(file.size / 1024 / 1024).toFixed(2) })
       // 后端处理完成，释放本地 PDF objectURL
       setLocalPdfUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null })
       setCurrentPage(1)
@@ -867,9 +881,12 @@ export default function LivePage() {
     }
   }, [notesSessionId, localPdfUrl])
 
+  const recordingStartTimeRef = useRef<number>(0)
+
   const startRecording = useCallback(async () => {
     setWsStatus('connecting')
     audioChunksRef.current = []
+    recordingStartTimeRef.current = Date.now()
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -881,7 +898,7 @@ export default function LivePage() {
           const startRes = await fetch(`${API_BASE}/api/live/session/start`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ppt_id: pptId ?? null, language: 'zh' }),
+            body: JSON.stringify({ ppt_id: pptId ?? null, language: 'zh', session_id: notesSessionId }),
           })
           const startData = await startRes.json() as { session_id: string; status: string }
           backendSid = startData.session_id
@@ -900,6 +917,7 @@ export default function LivePage() {
 
       ws.onopen = () => {
         setWsStatus('live')
+        capture('recording_started', { has_ppt: !!pptId })
         openTab({
           sessionId: draftSessionId ?? notesSessionId ?? 'live-unbound',
           label: 'Live Session',
@@ -1051,7 +1069,7 @@ export default function LivePage() {
 
     setWsStatus('stopped')
     setSessionStatus('stopped')
-    setNoteMode('my')
+    capture('recording_ended', { duration_seconds: Math.round((Date.now() - recordingStartTimeRef.current) / 1000) })
 
     if (liveBackendSessionId) {
       try {
@@ -1873,7 +1891,7 @@ export default function LivePage() {
                   annotations={annotationsForPage(currentPage)}
                   textToolActive={activeTool === 'text'}
                   onPlaceAnnotation={(x, y) => addAnnotation(currentPage, x, y)}
-                  onUpdate={updateAnnotation}
+                  onUpdate={handleAnnotationUpdate}
                   onRemove={removeAnnotation}
                 />
                 {pptUploading && (
@@ -2012,7 +2030,7 @@ export default function LivePage() {
                     annotations={annotationsForPage(currentPage)}
                     textToolActive={activeTool === 'text'}
                     onPlaceAnnotation={(x, y) => addAnnotation(currentPage, x, y)}
-                    onUpdate={updateAnnotation}
+                    onUpdate={handleAnnotationUpdate}
                     onRemove={removeAnnotation}
                   />
                   <div
@@ -2083,7 +2101,10 @@ export default function LivePage() {
           pageData={activePageData}
           notesPanelWidth={notesPanelWidth}
           noteMode={noteMode}
-          onNoteModeChange={setNoteMode}
+          onNoteModeChange={(mode) => {
+            setNoteMode(mode)
+            if (mode === 'ai') capture('ai_notes_opened', { session_duration_at_action: Math.round((Date.now() - recordingStartTimeRef.current) / 1000) })
+          }}
           isLive={isLiveMode}
           subtitleLines={subtitleLines}
           wsStatus={normalizePanelWsStatus(wsStatus)}

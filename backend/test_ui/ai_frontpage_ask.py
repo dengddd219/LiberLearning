@@ -4,7 +4,7 @@ from pathlib import Path
 import streamlit as st
 
 # ── Prompt 路径 ────────────────────────────────────────────────────────────────
-PROMPTS_BASE = Path(__file__).parent.parent.parent / "prompts"
+PROMPTS_BASE = Path(__file__).parent.parent / "prompts"
 TEMPLATE_NAME = "ai_frontpage_ask"
 
 

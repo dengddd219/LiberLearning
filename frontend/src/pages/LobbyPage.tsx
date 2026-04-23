@@ -4,6 +4,7 @@ import { useTabs } from '../context/TabsContext'
 import { listSessions, renameSession, deleteSession } from '../lib/api'
 import { useTranslation } from '../context/TranslationContext'
 import RunLogModal from '../components/RunLogModal'
+import { capture } from '../lib/analytics'
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 
@@ -652,7 +653,7 @@ function GridView({ sessions, folders, onCardClick, onRename, onDelete, onShare 
         <div className="flex flex-col items-center justify-center py-16 w-full">
           <p className="text-sm mb-4" style={{ color: '#D0CFC5' }}>{t('lobby_empty_hint')}</p>
           <button
-            onClick={() => navigate('/notes/new')}
+            onClick={() => { capture('session_create_started'); navigate('/notes/new') }}
             className="px-4 py-2 text-white text-sm rounded-full cursor-pointer hover:opacity-85 border-none"
             style={{ backgroundColor: '#798C00' }}
           >
@@ -1004,6 +1005,10 @@ export default function LobbyPage() {
   const mainAreaRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    capture('lobby_viewed')
+  }, [])
+
+  useEffect(() => {
     const el = mainAreaRef.current
     if (!el) return
     const handler = (e: WheelEvent) => {
@@ -1187,7 +1192,7 @@ export default function LobbyPage() {
         {/* New Class CTA */}
         <div className="px-3 pb-3 flex-shrink-0">
           <button
-            onClick={() => navigate('/notes/new')}
+            onClick={() => { capture('session_create_started'); navigate('/notes/new') }}
             className="w-full px-4 py-3 rounded-2xl inline-flex justify-start items-center gap-2 border-none cursor-pointer hover:opacity-90 transition-opacity"
             style={{ backgroundColor: '#798C00' }}
           >

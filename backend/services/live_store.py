@@ -66,8 +66,8 @@ def init_db():
 
 # ── LiveSession ────────────────────────────────────────────────────────────────
 
-def create_session(ppt_id: str | None = None, language: str = "zh") -> dict:
-    sid = f"live_{uuid.uuid4().hex[:12]}"
+def create_session(ppt_id: str | None = None, language: str = "zh", session_id: str | None = None) -> dict:
+    sid = session_id or f"live_{uuid.uuid4().hex[:12]}"
     now = int(time.time() * 1000)
     with _conn() as conn:
         conn.execute(

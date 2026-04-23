@@ -1,0 +1,279 @@
+459
+01:12:29.980 --> 01:12:40.049
+Xiao Lei: So, before the break, we have mentioned that, you should try to train a model with 2 layers and a model with 6 layers.
+
+460
+01:12:40.210 --> 01:12:48.410
+Xiao Lei: and one thing that you may have observed is that a 6-layer model may not be as good.
+
+461
+01:12:48.560 --> 01:12:50.269
+Xiao Lei: As a simple model.
+
+462
+01:12:50.740 --> 01:12:55.319
+Xiao Lei: And this is weird, because we have mentioned that,
+
+463
+01:12:55.950 --> 01:13:10.340
+Xiao Lei: Deep neural network becomes powerful because we have more layers, but now this is not the case. So, in the rest of this lecture, we are going to discuss several practical aspects
+
+464
+01:13:10.510 --> 01:13:12.780
+Xiao Lei: training neural network models.
+
+465
+01:13:13.090 --> 01:13:15.849
+Xiao Lei: So, let's start with the easy thing.
+
+466
+01:13:16.130 --> 01:13:22.960
+Xiao Lei: Let's consider a practical scenario in our real life, that is, I may want to predict.
+
+467
+01:13:23.210 --> 01:13:26.440
+Xiao Lei: Who will repay their loan, and who… default.
+
+468
+01:13:26.640 --> 01:13:29.940
+Xiao Lei: So in such a scenario, a lender hurts you.
+
+469
+01:13:31.100 --> 01:13:35.870
+Xiao Lei: This problem, and you are given the fails of 100 applicants.
+
+470
+01:13:36.270 --> 01:13:42.839
+Xiao Lei: Among these 5100 applicants, there are 5 of them defaulted, wasting 3 years.
+
+471
+01:13:43.020 --> 01:13:52.670
+Xiao Lei: So, your goal is to build a model, Who else is going to… For such a job.
+
+472
+01:13:52.910 --> 01:13:55.470
+Xiao Lei: What you may find this?
+
+473
+01:13:55.970 --> 01:14:03.899
+Xiao Lei: Give you some photos, and they find that all the 5 people who defaulted worn blue shirts during their interviews.
+
+474
+01:14:04.330 --> 01:14:10.739
+Xiao Lei: And you might also find that blue shirts is a strong signal for, default.
+
+475
+01:14:11.160 --> 01:14:13.130
+Xiao Lei: So, why are these?
+
+476
+01:14:13.280 --> 01:14:14.330
+Xiao Lei: are valid.
+
+477
+01:14:15.140 --> 01:14:17.240
+Xiao Lei: Or whether there are some problems.
+
+478
+01:14:18.040 --> 01:14:19.100
+Xiao Lei: this conclusion.
+
+479
+01:14:24.590 --> 01:14:35.580
+Xiao Lei: This is a very classic problem of overfitting, or there's no caudal evidence that blue shirts actually predict
+
+480
+01:14:36.170 --> 01:14:37.759
+Xiao Lei: Applicant's default behavior.
+
+481
+01:14:38.040 --> 01:14:40.929
+Xiao Lei: Right? The reason is because all of them
+
+482
+01:14:41.050 --> 01:14:56.060
+Xiao Lei: are wearing blue shirts, so you cannot say only those who default, wear such a blue shirt. This is one thing. The other thing is, using human logic, we know that the color of the shirts should have no.
+
+483
+01:14:56.060 --> 01:15:06.869
+Xiao Lei: no caudal inference with whether he's going to default or not. So because of that, we know that this feature may not be a valid feature.
+
+484
+01:15:07.760 --> 01:15:25.020
+Xiao Lei: And this introduced our classic discussion of training error and generalization error. Basically, training error means, the error on the training dataset. And generalization error refers to your error on a new data.
+
+485
+01:15:25.150 --> 01:15:33.339
+Xiao Lei: And we always say that the performance on the training data does not represent the performance on a new dataset.
+
+486
+01:15:33.490 --> 01:15:40.249
+Xiao Lei: This is very similar to, we make practices for a future exam ways past exams.
+
+487
+01:15:40.510 --> 01:15:44.129
+Xiao Lei: And for those who do well on past exam.
+
+488
+01:15:44.300 --> 01:15:56.100
+Xiao Lei: That means you get a very small training error that does not guarantee a good score on the filter exam, where the future exam actually represents the generalization error, right?
+
+489
+01:15:56.210 --> 01:16:05.830
+Xiao Lei: And one student may get zero error on past exam by route learning. That means he remembered all the answers mechanically.
+
+490
+01:16:06.010 --> 01:16:22.919
+Xiao Lei: But that student may have a worse score compared to another student who understands the reasons for a given number of answers. So even if student B may not have good score on past exams, may not be that good at pass exam.
+
+491
+01:16:22.920 --> 01:16:27.570
+Xiao Lei: As long as he can understand the reasonings, he should be able to have a higher score.
+
+492
+01:16:27.810 --> 01:16:40.109
+Xiao Lei: So this is the trade-off we have mentioned for, in your Model 3 class about, training and, generalization, or they call it bias and virus in some cases, right?
+
+493
+01:16:40.110 --> 01:16:49.340
+Xiao Lei: So, because of that, we need to evaluate our model to understand whether it has a good generalization performance.
+
+494
+01:16:49.500 --> 01:16:54.170
+Xiao Lei: So, in this process, we say that we can have two datasets.
+
+495
+01:16:54.220 --> 01:17:11.040
+Xiao Lei: One dataset is called validation dataset. This is the data used to evaluate the model, and this data should not be mixed with your training data, and the validation data set will be used to do model selection, like which model should I train?
+
+496
+01:17:12.710 --> 01:17:32.210
+Xiao Lei: The test dataset will be the dataset that… to evaluate your final performance. So that could be a filter exam, or the health cell price, I bid it, or the dataset we use in final, to determine the final winner on a CAGO computation that is called Private Leaderboard.
+
+497
+01:17:32.210 --> 01:17:36.999
+Xiao Lei: So in your homework, too, you will actually have such a test data set.
+
+498
+01:17:38.340 --> 01:17:40.110
+Xiao Lei: So,
+
+499
+01:17:41.180 --> 01:17:54.899
+Xiao Lei: I'm sure you have learned, how to use training, validation, and test procedure in the machine learning course. Basically, you may have learned I should split the data, like, 70-30.
+
+500
+01:17:55.230 --> 01:18:00.899
+Xiao Lei: This is the most classic way. And you have also learned about K-fold cross-validation.
+
+501
+01:18:00.990 --> 01:18:08.170
+Xiao Lei: However, all of them are not applicable for, deep learning models.
+
+502
+01:18:08.170 --> 01:18:25.030
+Xiao Lei: So K-Fold cross-validation is too expensive, because you have known that training a deep learning model should take hours, or even millions of hours. So because of that, it is impossible to just determine which model structure is better using K-Fold.
+
+503
+01:18:25.620 --> 01:18:37.580
+Xiao Lei: On the other hand, splitting the data in a 70-30 proportion may also not a good idea, because, now I have a very large data.
+
+504
+01:18:37.580 --> 01:18:48.780
+Xiao Lei: I may have 1 million or even 1 billion data points. In that case, using 30% of the data to be validation or testing data may be a waste of your data.
+
+505
+01:18:48.820 --> 01:18:50.189
+Xiao Lei: So because of that.
+
+506
+01:18:50.280 --> 01:19:09.730
+Xiao Lei: deep learning, people usually leave, like, 10,000 or 1,000 data points as testing data, and use all the other data as training data. So the percentage of training, validation, and testing could be very extreme. It could be, like, 98% for training and 1% for validation and test.
+
+507
+01:19:09.730 --> 01:19:20.940
+Xiao Lei: Or even, if you have really 1 million data, then I will only need 5,000 for validation and testing, and use all the 99.5% of the data to train the model.
+
+508
+01:19:21.000 --> 01:19:28.379
+Xiao Lei: So this is a difference between, traditional machine learning model training as well as deep learning model training.
+
+509
+01:19:29.290 --> 01:19:36.709
+Xiao Lei: And here, we have mentioned two concepts. One is called parameter, the other is called hyperparameters.
+
+510
+01:19:36.810 --> 01:19:43.100
+Xiao Lei: Parameters in machine… in neural networks refers to the weight and bias.
+
+511
+01:19:43.240 --> 01:19:55.569
+Xiao Lei: Hyperparameters are the parameters that you are going to choose using model selection, and your model selection criteria is the performance on the validation data set.
+
+512
+01:19:55.640 --> 01:20:08.769
+Xiao Lei: But so far, we have mentioned so many hyperparameters, like learning rate, epoch, batch size, hidden layers, hidden units, so on and so forth. All of them should be determined using the validation dataset.
+
+513
+01:20:10.740 --> 01:20:20.740
+Xiao Lei: So… how to decide what is the best combination of hyperparameters. Basically, when we train deep learning models.
+
+514
+01:20:20.740 --> 01:20:38.769
+Xiao Lei: This process is a very empirical process. So some people actually compare training a deep learning model with alchemy, because people believe that there are so many hidden secrets that humans cannot explain. Why on earth should I do this?
+
+515
+01:20:39.170 --> 01:21:03.090
+Xiao Lei: And, if you love video games, there is actually a video game that, gives you experience of how to be a data scientist using deep learning. So this game is called Well True Learn. It's a puzzle game, but it also teaches you those basic concepts we give you in this course. It's very fun, but in this process, you can see why
+
+516
+01:21:03.090 --> 01:21:08.460
+Xiao Lei: I mentioned that, training a deep learning model is a very empirical process.
+
+517
+01:21:08.910 --> 01:21:22.529
+Xiao Lei: So, basically, when we train the model, it is like we do this loop. So, we start with the idea of what could be a good model, then code the model and see what happens using experiment.
+
+518
+01:21:22.670 --> 01:21:33.729
+Xiao Lei: Once you see the loss curve, that is the progress board we have seen in the code, you may figure out what could be the problem, and then,
+
+519
+01:21:34.800 --> 01:21:48.689
+Xiao Lei: come up with a new idea, like, what could be a better model, and then try the model one more time, and see if the performance becomes better or not. So, the key thing here is you can read the loss curve.
+
+520
+01:21:48.690 --> 01:22:05.160
+Xiao Lei: For example, if I see a loss curve like this, that means I have very slow progress after a few epochs, right? And this could mean that my model have some fundamental problem so that the loss cannot decrease over time.
+
+521
+01:22:06.250 --> 01:22:10.770
+Xiao Lei: So that comes up the problem of underfeiting and overfeeding.
+
+522
+01:22:11.160 --> 01:22:23.619
+Xiao Lei: Underfitting means that my model is too simple to fit the model, and overfitting means that my model is too complex so that it cannot see the correct pattern.
+
+523
+01:22:23.700 --> 01:22:33.020
+Xiao Lei: So here is a classic example where the underlying model could be Y equals to X squared plus some random noise, epsilon.
+
+524
+01:22:33.340 --> 01:22:45.460
+Xiao Lei: In this case, underfitting model could be a linear model. So if I fit a linear model without those blue dots right here, we shall find that the optimal model is a flight line.
+
+525
+01:22:45.680 --> 01:22:51.130
+Xiao Lei: And this line cannot represent the true relationship between those data points, right?
+
+526
+01:22:51.290 --> 01:23:08.040
+Xiao Lei: On the other hand, an overfitting model could be a highly polynomial model that fits perfectly with every data point. We also know that this model is not a good model because the model learns the noises in this
+
+527
+01:23:08.250 --> 01:23:09.070
+Xiao Lei: Theta.
+
+528
+01:23:09.250 --> 01:23:11.330
+Xiao Lei: And this could not be a good thing.
