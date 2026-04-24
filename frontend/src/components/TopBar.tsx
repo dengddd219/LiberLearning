@@ -2,6 +2,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTabs } from '../context/TabsContext'
 import { useTranslation } from '../context/TranslationContext'
+import { useAuth } from '../context/AuthContext'
 import { useRef, useEffect, useState } from 'react'
 
 const C = {
@@ -230,6 +231,7 @@ export default function TopBar() {
   const location = useLocation()
   const { tabs, activeTabId, closeTab, activateTab, updateTabLabel } = useTabs()
   const { t } = useTranslation()
+  const { user, logout } = useAuth()
 
   // 记录哪些 tab 是刚刚新开的（需要 autoEdit）
   // 只对从未 rename 过的 tab 触发，用 localStorage 跨页面持久化
@@ -266,6 +268,10 @@ export default function TopBar() {
   const currentSessionId = notesMatch ? notesMatch[1] : null
 
   const onLobby = location.pathname === '/'
+
+  if (location.pathname === '/login') {
+    return null
+  }
 
   function handleDashboard() {
     navigate('/')
@@ -391,8 +397,8 @@ export default function TopBar() {
       </div>
 
       {/* 右侧：Detailed Note 按钮（仅在 notes 页面显示） */}
-      {currentSessionId && (
-        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: `${TAB_H}px` }}>
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '8px', height: `${TAB_H}px` }}>
+        {currentSessionId && (
           <button
             onClick={() => navigate(`/notes/detail/${currentSessionId}`)}
             style={{
@@ -408,8 +414,71 @@ export default function TopBar() {
           >
             {t('topbar_detailed_note')}
           </button>
-        </div>
-      )}
+        )}
+
+        {user && (
+          <>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '4px 10px',
+                borderRadius: '9999px',
+                background: 'rgba(175,179,176,0.12)',
+                color: C.muted,
+                fontSize: '12px',
+              }}
+            >
+              {user.avatar_url ? (
+                <img
+                  src={user.avatar_url}
+                  alt={user.name}
+                  style={{ width: '20px', height: '20px', borderRadius: '50%' }}
+                />
+              ) : (
+                <span
+                  style={{
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    background: 'rgba(85,96,113,0.18)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 700,
+                    color: C.fg,
+                  }}
+                >
+                  {user.name.slice(0, 1).toUpperCase()}
+                </span>
+              )}
+              <span style={{ maxWidth: '140px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {user.name}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                void logout().then(() => navigate('/login'))
+              }}
+              style={{
+                fontSize: '12px',
+                color: C.muted,
+                background: 'transparent',
+                border: `1px solid ${C.border}`,
+                borderRadius: '6px',
+                padding: '3px 10px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              退出
+            </button>
+          </>
+        )}
+      </div>
     </header>
   )
 }

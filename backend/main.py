@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 import logging
 import os
 
+import auth
 from routers import process, sessions, diagnostics, live
 from db import init_db
 from services.live_store import init_db as _live_init_db
@@ -34,10 +35,11 @@ app.mount("/slides", StaticFiles(directory="static/slides"), name="slides")
 app.mount("/audio", StaticFiles(directory="static/audio"), name="audio")
 app.mount("/runs", StaticFiles(directory="static/runs"), name="runs")
 
-app.include_router(process.router, prefix="/api")
-app.include_router(sessions.router, prefix="/api")
-app.include_router(diagnostics.router, prefix="/api")
-app.include_router(live.router, prefix="/api")
+app.include_router(auth.router, prefix="/api")
+app.include_router(process.router, prefix="/api", dependencies=[Depends(auth.require_user)])
+app.include_router(sessions.router, prefix="/api", dependencies=[Depends(auth.require_user)])
+app.include_router(diagnostics.router, prefix="/api", dependencies=[Depends(auth.require_user)])
+app.include_router(live.router, prefix="/api", dependencies=[Depends(auth.require_user)])
 
 def _mask_key(key: str) -> str:
     if not key:

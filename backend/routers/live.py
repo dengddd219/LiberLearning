@@ -27,11 +27,12 @@ import threading
 from datetime import datetime, timezone
 
 import websockets
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import anthropic
 
+import auth as _auth
 from services.live_store import (
     create_session, get_session, update_session_status,
     update_session_page, save_segment, get_segments,
@@ -41,6 +42,20 @@ from services.live_note_builder import stream_notes, generate_detailed_note
 import db as _db
 
 router = APIRouter(tags=["live"])
+
+
+def _current_user_id(request: Request) -> str:
+    user = getattr(request.state, "current_user", None)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return user["id"]
+
+
+def _owned_live_session_or_404(session_id: str, user_id: str) -> dict:
+    session = get_session(session_id)
+    if not session or session.get("user_id") != user_id:
+        raise HTTPException(status_code=404, detail="session not found")
+    return session
 
 # ── NLS Token 缓存 ─────────────────────────────────────────────────────────────
 _nls_token: str = ""
@@ -139,18 +154,24 @@ class ExplainRequest(BaseModel):
 # ── POST /api/live/session/start ───────────────────────────────────────────────
 
 @router.post("/live/session/start")
-def live_session_start(req: SessionStartRequest):
-    session = create_session(ppt_id=req.ppt_id, language=req.language, session_id=req.session_id)
+def live_session_start(req: SessionStartRequest, request: Request):
+    user_id = _current_user_id(request)
+    if req.session_id and _db.get_session(req.session_id, user_id=user_id) is None:
+        raise HTTPException(status_code=404, detail="main session not found")
+    session = create_session(
+        ppt_id=req.ppt_id,
+        language=req.language,
+        session_id=req.session_id,
+        user_id=user_id,
+    )
     return {"session_id": session["session_id"], "status": session["status"]}
 
 
 # ── POST /api/live/page-snapshot ───────────────────────────────────────────────
 
 @router.post("/live/page-snapshot")
-def live_page_snapshot(req: PageSnapshotRequest):
-    session = get_session(req.session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="session not found")
+def live_page_snapshot(req: PageSnapshotRequest, request: Request):
+    _owned_live_session_or_404(req.session_id, _current_user_id(request))
     update_session_page(req.session_id, req.current_page)
     return {"ok": True, "current_page": req.current_page}
 
@@ -158,10 +179,8 @@ def live_page_snapshot(req: PageSnapshotRequest):
 # ── POST /api/live/annotations ─────────────────────────────────────────────────
 
 @router.post("/live/annotations")
-def live_save_annotation(req: AnnotationRequest):
-    session = get_session(req.session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="session not found")
+def live_save_annotation(req: AnnotationRequest, request: Request):
+    _owned_live_session_or_404(req.session_id, _current_user_id(request))
     ann = save_annotation(req.session_id, req.page_num, req.text, req.x, req.y)
     return ann
 
@@ -169,10 +188,8 @@ def live_save_annotation(req: AnnotationRequest):
 # ── GET /api/live/state/{session_id} ──────────────────────────────────────────
 
 @router.get("/live/state/{session_id}")
-def live_get_state(session_id: str, page_num: int | None = None):
-    session = get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="session not found")
+def live_get_state(session_id: str, request: Request, page_num: int | None = None):
+    session = _owned_live_session_or_404(session_id, _current_user_id(request))
     segments = get_segments(session_id)
     if page_num is not None:
         filtered = [
@@ -239,10 +256,8 @@ def _run_alignment_background(session_id: str, ppt_pages: list[dict]):
 # ── POST /api/live/stop ────────────────────────────────────────────────────────
 
 @router.post("/live/stop")
-def live_stop(req: SessionStopRequest):
-    session = get_session(req.session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="session not found")
+def live_stop(req: SessionStopRequest, request: Request):
+    _owned_live_session_or_404(req.session_id, _current_user_id(request))
     update_session_status(req.session_id, "stopped", ended_at=int(time.time() * 1000))
     try:
         _db.update_session(req.session_id, {"status": "stopped"})
@@ -261,10 +276,8 @@ def live_stop(req: SessionStopRequest):
 # ── POST /api/live/finalize-stream ────────────────────────────────────────────
 
 @router.post("/live/finalize-stream")
-def live_finalize_stream(req: FinalizeRequest):
-    session = get_session(req.session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="session not found")
+def live_finalize_stream(req: FinalizeRequest, request: Request):
+    session = _owned_live_session_or_404(req.session_id, _current_user_id(request))
     if session["status"] != "stopped":
         raise HTTPException(
             status_code=400, detail=f"cannot finalize in status {session['status']}; call /live/stop first"
@@ -296,20 +309,16 @@ def live_finalize_stream(req: FinalizeRequest):
 # ── GET /api/live/finalize/status/{session_id} ────────────────────────────────
 
 @router.get("/live/finalize/status/{session_id}")
-def live_finalize_status(session_id: str):
-    session = get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="session not found")
+def live_finalize_status(session_id: str, request: Request):
+    session = _owned_live_session_or_404(session_id, _current_user_id(request))
     return {"session_id": session_id, "status": session["status"]}
 
 
 # ── POST /api/live/detailed-note ──────────────────────────────────────────────
 
 @router.post("/live/detailed-note")
-def live_detailed_note(req: DetailedNoteRequest):
-    session = get_session(req.session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="session not found")
+def live_detailed_note(req: DetailedNoteRequest, request: Request):
+    _owned_live_session_or_404(req.session_id, _current_user_id(request))
     from services.live_note_builder import _detailed_note_semaphore
     if not _detailed_note_semaphore.acquire(blocking=False):
         raise HTTPException(status_code=429, detail="too many concurrent detailed-note requests, try again")
@@ -373,6 +382,15 @@ async def live_asr(websocket: WebSocket, session_id: str | None = None):
     转发给阿里云 NLS 流式 ASR，将识别结果推回前端。
     消息格式：{text: str, is_final: bool, timestamp: float}
     """
+    user = _auth.get_user_from_session_token(websocket.cookies.get(_auth.SESSION_COOKIE_NAME))
+    if user is None or not session_id:
+        await websocket.close(code=1008)
+        return
+    session = get_session(session_id)
+    if not session or session.get("user_id") != user["id"]:
+        await websocket.close(code=1008)
+        return
+
     await websocket.accept()
 
     # 获取 NLS token 和 AppKey

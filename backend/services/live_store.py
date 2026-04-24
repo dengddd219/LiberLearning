@@ -1,9 +1,13 @@
 import sqlite3
 import time
 import uuid
+import os
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent.parent / "live_data.db"
+DB_PATH = Path(
+    os.getenv("LIBERSTUDY_LIVE_DB_PATH", str(Path(__file__).parent.parent / "live_data.db"))
+).expanduser()
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 def _conn() -> sqlite3.Connection:
@@ -22,7 +26,8 @@ def init_db():
             status       TEXT NOT NULL DEFAULT 'live',
             current_page INTEGER NOT NULL DEFAULT 1,
             started_at   INTEGER NOT NULL,
-            ended_at     INTEGER
+            ended_at     INTEGER,
+            user_id      TEXT
         );
         CREATE TABLE IF NOT EXISTS live_segments (
             id                TEXT PRIMARY KEY,
@@ -62,17 +67,37 @@ def init_db():
             PRIMARY KEY (session_id, page_num)
         );
         """)
+        columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(live_sessions)").fetchall()
+        }
+        if "user_id" not in columns:
+            conn.execute("ALTER TABLE live_sessions ADD COLUMN user_id TEXT")
 
 
 # ── LiveSession ────────────────────────────────────────────────────────────────
 
-def create_session(ppt_id: str | None = None, language: str = "zh", session_id: str | None = None) -> dict:
+def create_session(
+    ppt_id: str | None = None,
+    language: str = "zh",
+    session_id: str | None = None,
+    user_id: str | None = None,
+) -> dict:
     sid = session_id or f"live_{uuid.uuid4().hex[:12]}"
     now = int(time.time() * 1000)
     with _conn() as conn:
+        existing = conn.execute(
+            "SELECT * FROM live_sessions WHERE session_id=?",
+            (sid,),
+        ).fetchone()
+        if existing:
+            return dict(existing)
         conn.execute(
-            "INSERT INTO live_sessions VALUES (?,?,?,?,?,?,?)",
-            (sid, ppt_id, language, "live", 1, now, None),
+            """
+            INSERT INTO live_sessions
+            (session_id, ppt_id, language, status, current_page, started_at, ended_at, user_id)
+            VALUES (?,?,?,?,?,?,?,?)
+            """,
+            (sid, ppt_id, language, "live", 1, now, None, user_id),
         )
     return get_session(sid)  # type: ignore[return-value]
 

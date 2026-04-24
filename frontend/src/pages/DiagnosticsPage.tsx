@@ -2,6 +2,7 @@
 // 访问 /diagnostics 触发
 
 import { useState } from 'react'
+import { apiFetch } from '../lib/api'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -147,7 +148,7 @@ export default function DiagnosticsPage() {
 
     try {
       const url = fast ? '/api/diagnostics?fast=true' : '/api/diagnostics'
-      const res = await fetch(url)
+      const res = await apiFetch(url)
       if (!res.ok) {
         const text = await res.text()
         throw new Error(`后端返回 HTTP ${res.status}: ${text.slice(0, 300)}`)

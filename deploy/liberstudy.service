@@ -1,0 +1,16 @@
+[Unit]
+Description=LiberStudy FastAPI
+After=network.target
+
+[Service]
+User=liberstudy
+Group=liberstudy
+WorkingDirectory=/var/www/liberstudy/backend
+Environment="PATH=/var/www/liberstudy/venv/bin"
+EnvironmentFile=/var/www/liberstudy/backend/.env
+ExecStart=/var/www/liberstudy/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

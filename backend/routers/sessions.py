@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 from pathlib import Path
@@ -10,6 +10,23 @@ import settings as _settings
 from services.events import wait_for_event
 
 router = APIRouter(tags=["sessions"])
+
+
+def _current_user_id(request: Request) -> str:
+    user = getattr(request.state, "current_user", None)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return user["id"]
+
+
+def _owned_session_or_404(session_id: str, request: Request, allow_mock: bool = False) -> dict:
+    if allow_mock and session_id == "mock-session-001":
+        return MOCK_SESSION
+    import db as _db
+    session = _db.get_session(session_id, user_id=_current_user_id(request))
+    if session:
+        return session
+    raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
 
 # ---------------------------------------------------------------------------
 # Mock data — 3-page session covering all note scenarios:
@@ -168,22 +185,18 @@ class RenameRequest(BaseModel):
 
 
 @router.patch("/sessions/{session_id}")
-def rename_session(session_id: str, req: RenameRequest):
+def rename_session(session_id: str, req: RenameRequest, request: Request):
     import db as _db
-    session = _db.get_session(session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    _owned_session_or_404(session_id, request)
     _db.update_session(session_id, {"ppt_filename": req.ppt_filename.strip()})
     return {"ok": True}
 
 
 @router.delete("/sessions/{session_id}")
-def delete_session(session_id: str):
+def delete_session(session_id: str, request: Request):
     import db as _db
     from sqlmodel import Session as DbSession
-    session = _db.get_session(session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    _owned_session_or_404(session_id, request)
     with DbSession(_db.engine) as s:
         row = s.get(_db.SessionRow, session_id)
         if row:
@@ -244,12 +257,13 @@ def _build_live_pages(pages: list[LiveStatePage]) -> list[dict]:
 
 
 @router.post("/sessions/live")
-def create_live_session(req: CreateLiveRequest = CreateLiveRequest()):
+def create_live_session(request: Request, req: CreateLiveRequest = CreateLiveRequest()):
     import db as _db
     import uuid
     session_id = f"live-{uuid.uuid4().hex[:8]}"
     name = (req.name or "").strip() or "Live 课堂"
     _db.save_session(session_id, {
+        "user_id": _current_user_id(request),
         "status": "live",
         "ppt_filename": name,
         "progress": {"step": "live", "percent": 0, "ppt_id": None, "live_transcript": []},
@@ -258,12 +272,10 @@ def create_live_session(req: CreateLiveRequest = CreateLiveRequest()):
 
 
 @router.patch("/sessions/{session_id}/live-state")
-def update_live_state(session_id: str, req: LiveStateUpdateRequest):
+def update_live_state(session_id: str, req: LiveStateUpdateRequest, request: Request):
     import db as _db
 
-    session = _db.get_session(session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+    session = _owned_session_or_404(session_id, request)
 
     current_progress = session.get("progress") or {}
     next_progress = {
@@ -295,22 +307,14 @@ def get_settings():
 
 
 @router.get("/sessions")
-def list_sessions():
+def list_sessions(request: Request):
     import db as _db
-    return _db.list_sessions()
+    return _db.list_sessions(user_id=_current_user_id(request))
 
 
 @router.get("/sessions/{session_id}")
-def get_session(session_id: str):
-    if session_id == "mock-session-001":
-        return MOCK_SESSION
-
-    import db as _db
-    session = _db.get_session(session_id)
-    if session:
-        return session
-
-    raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+def get_session(session_id: str, request: Request):
+    return _owned_session_or_404(session_id, request, allow_mock=True)
 
 
 MY_NOTES_SYSTEM_PROMPT = """# Role & Philosophy
@@ -470,8 +474,9 @@ def _json_to_markdown(raw: str) -> str:
 
 
 @router.post("/sessions/{session_id}/page/{page_num}/my-notes")
-async def generate_my_note(session_id: str, page_num: int, req: MyNoteRequest):
+async def generate_my_note(session_id: str, page_num: int, req: MyNoteRequest, request: Request):
     """流式生成 My Notes AI 扩写。返回 text/event-stream，每个 SSE event 是一个文本 chunk。"""
+    _owned_session_or_404(session_id, request)
     from services.note_generator import (
         PROVIDER_ZHONGZHUAN,
         PROVIDER_QWEN,
@@ -561,8 +566,9 @@ async def generate_my_note(session_id: str, page_num: int, req: MyNoteRequest):
 
 
 @router.get("/sessions/{session_id}/events")
-async def session_events(session_id: str):
+async def session_events(session_id: str, request: Request):
     """SSE endpoint: pushes processing progress events for a session."""
+    _owned_session_or_404(session_id, request)
     async def event_stream():
         while True:
             event = await wait_for_event(session_id, timeout=300)
@@ -576,8 +582,9 @@ async def session_events(session_id: str):
 
 
 @router.get("/sessions/{session_id}/slide/{page_num}.png")
-def get_slide_png(session_id: str, page_num: int):
+def get_slide_png(session_id: str, page_num: int, request: Request):
     """Render a single PDF page to PNG on demand (for sessions that predate thumbnail generation)."""
+    _owned_session_or_404(session_id, request)
     slides_dir = Path("static") / "slides" / session_id
     png_path = slides_dir / f"slide_{page_num:03d}.png"
 
@@ -618,8 +625,9 @@ class AskRequest(BaseModel):
 
 
 @router.post("/sessions/{session_id}/ask")
-async def ask_bullet(session_id: str, req: AskRequest):
+async def ask_bullet(session_id: str, req: AskRequest, request: Request):
     """针对单条 bullet 的流式问答。返回 text/event-stream (SSE)。"""
+    _owned_session_or_404(session_id, request)
     from services.note_generator import (
         PROVIDER_ZHONGZHUAN,
         PROVIDER_QWEN,
@@ -711,7 +719,8 @@ async def ask_bullet(session_id: str, req: AskRequest):
 _RUNS_ROOT = Path("static/runs").resolve()
 
 @router.get("/sessions/{session_id}/run-log")
-def get_run_log(session_id: str):
+def get_run_log(session_id: str, request: Request):
+    _owned_session_or_404(session_id, request)
     run_log_path = (_RUNS_ROOT / session_id / "run_data.json").resolve()
     if not str(run_log_path).startswith(str(_RUNS_ROOT)):
         raise HTTPException(status_code=400, detail="invalid session_id")

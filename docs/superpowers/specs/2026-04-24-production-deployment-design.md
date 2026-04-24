@@ -1,204 +1,318 @@
 # 生产部署设计规格
 
 **日期**：2026-04-24  
-**状态**：目标设计（尚未可执行）
+**状态**：可执行目标设计（基础设施优先版）
 
-> ⚠️ **执行前提**：第 4、5 节描述的认证体系（`backend/auth.py`、`/api/auth/*` 路由、前端 `PrivateRoute`、`credentials: 'include'`）**当前仓库尚未实现**。  
-> 部署 runbook（第 8 节）需等认证改造完成后才能完整执行。基础设施搭建（ECS、域名、Nginx、HTTPS）可提前进行。
+> 本版面向 **5 人熟人邀请内测**，默认所有受邀用户都可稳定使用 Google。
+> 目标不是一次性做完整生产体系，而是先把基础设施、HTTPS、最小可用登录、数据持久化和自动备份做对。
 
-**范围**：LiberStudy 首次上线到阿里云，含用户认证、HTTPS、Google OAuth
+**范围**：LiberStudy 首次上线到阿里云 ECS，包含：
+- ECS 单机部署
+- Nginx + HTTPS
+- systemd 托管 FastAPI
+- SQLite 持久化
+- 自动备份
+- Google OAuth 单一登录方式
+- 受邀邮箱白名单
 
 ---
 
 ## 1. 目标
 
-将 LiberStudy（FastAPI 后端 + React 前端）部署到阿里云 ECS，支持 5 名用户通过 Google OAuth 登录后公开访问，全程 HTTPS，费用控制在 300 元/年以内。
+将 LiberStudy 部署到阿里云 ECS，支持 5 名受邀测试用户通过 Google 登录后访问，满足以下约束：
+
+- 全站 HTTPS
+- 单机可持续运行
+- 代码更新流程简单
+- 数据可持久化且不会被 `git pull` 覆盖
+- 每日自动备份
+- 成本控制在小规模内测可接受范围
 
 ---
 
-## 2. 基础设施
+## 2. 推荐方案
 
-| 资源 | 选型 | 费用 |
+### 2.1 整体策略
+
+本次上线采用两层思路：
+
+1. **基础设施先落地**
+   ECS、Nginx、HTTPS、systemd、SQLite、自动备份先搭好，保证服务能稳定在线。
+2. **认证只做最小闭环**
+   不做开放注册，不做密码体系，不做多身份供应商，不做权限分级。
+   只支持 Google OAuth，并加受邀邮箱白名单。
+
+### 2.2 为什么这样做
+
+对于当前场景，这个方案最合适：
+
+- 用户少，都是你认识的人，不需要开放注册
+- 用户都能用 Google，没必要再引入邮箱密码、验证码、找回密码
+- 白名单能挡掉非邀请用户，足够满足这一阶段的访问控制
+- 单机 SQLite 对 5 人内测完全够用，复杂数据库和容器编排都不是当前收益点
+
+### 2.3 本版不做
+
+- 开放注册
+- GitHub / Apple / Email Magic Link 等其他登录方式
+- RBAC 权限分级
+- 多机部署
+- CI/CD
+- 云数据库
+- 对外正式商用级审计与监控
+
+---
+
+## 3. 基础设施选型
+
+| 资源 | 选型 | 说明 |
 |------|------|------|
-| 计算 | 阿里云 ECS 2核2G，Ubuntu 22.04 | ~99元/年（新用户） |
-| 域名 | `.top` / `.xyz` 后缀 | ~10-30元/年 |
-| HTTPS 证书 | Let's Encrypt（Certbot 自动续签） | 免费 |
-| 数据库 | SQLite（保持现有） | 免费 |
-| Google OAuth | Google Cloud Console | 免费 |
+| 计算 | 阿里云 ECS 2核2G，Ubuntu 22.04 | 足够支撑 5 人邀请内测 |
+| Web Server | Nginx | 反向代理、TLS 终止、静态前端托管 |
+| HTTPS | Let's Encrypt + Certbot | 免费证书，自动续签 |
+| App Runtime | Python venv + systemd | 简单直接，便于排障 |
+| Frontend Build | Node.js 22 LTS | 不使用 Ubuntu 默认 `apt nodejs` |
+| 主数据库 | SQLite | 保持与当前仓库一致 |
+| 备份 | 本机定时备份到 `/var/backups/liberstudy/` | 日备份 + 保留策略 |
 
-**安全组开放端口**：22（SSH）、80（HTTP，仅用于 Let's Encrypt 验证后重定向）、443（HTTPS）
+**关键约束**：
+
+- 前端构建必须使用 **Node 22 LTS**
+- 不要使用 Ubuntu 22.04 默认仓库里的 `nodejs`
+- 持久化目录必须独立于代码目录
 
 ---
 
-## 3. 系统架构
+## 4. 系统架构
 
-```
+```text
 用户浏览器
     ↓ HTTPS :443
 Nginx
-    ├── /api/ws/*  → proxy_pass http://127.0.0.1:8000（WebSocket upgrade，必须在 /api/ 之前）
+    ├── /api/ws/*  → proxy_pass http://127.0.0.1:8000
     ├── /api/*     → proxy_pass http://127.0.0.1:8000
-    └── /*         → root /var/www/liberstudy/dist（React 静态文件）
+    ├── /slides/*  → proxy_pass http://127.0.0.1:8000
+    ├── /audio/*   → proxy_pass http://127.0.0.1:8000
+    ├── /runs/*    → proxy_pass http://127.0.0.1:8000
+    └── /*         → /var/www/liberstudy/dist
 
-uvicorn（FastAPI，systemd 管理，开机自启）
-    ├── 业务路由：process / sessions / live / diagnostics
-    ├── 新增路由：auth（Google OAuth + JWT）
-    ├── SQLite database.db → /var/lib/liberstudy/database.db（backend/db.py 改绝对路径）
-    └── SQLite live_data.db → /var/lib/liberstudy/live_data.db（backend/services/live_store.py 改绝对路径）
+uvicorn（systemd 托管）
+    ├── FastAPI 路由
+    ├── Google OAuth + allowlist 认证
+    ├── SQLite: /var/lib/liberstudy/database.db
+    ├── SQLite: /var/lib/liberstudy/live_data.db
+    └── StaticFiles: /var/lib/liberstudy/static/*
 
-系统依赖
-    ├── LibreOffice headless（PPT→PDF）+ 中文字体包
-    └── FFmpeg（WebM/Opus→WAV）
+定时备份
+    └── 每日打包 DB + runs 输出到 /var/backups/liberstudy/
 ```
 
-**持久化目录**（独立于代码目录，git pull 不覆盖）：
-- `/var/lib/liberstudy/database.db`（主数据库）
-- `/var/lib/liberstudy/live_data.db`（直播数据库）
+### 4.1 持久化目录
+
+所有可持久化数据都放到代码目录外：
+
+- `/var/lib/liberstudy/database.db`
+- `/var/lib/liberstudy/live_data.db`
 - `/var/lib/liberstudy/static/slides/`
 - `/var/lib/liberstudy/static/audio/`
 - `/var/lib/liberstudy/static/runs/`
+- `/var/backups/liberstudy/`
 
-**落地方式**：代码中两个 DB 路径改为绝对路径（`backend/db.py` L14、`backend/services/live_store.py` L6）；`backend/static/` 建软链指向 `/var/lib/liberstudy/static/`（因为 `main.py` L33 用相对路径挂载 StaticFiles）。
+### 4.2 代码适配点
+
+当前仓库里有几个现状需要在实施时改掉：
+
+- `backend/db.py` 当前主库路径仍是相对路径
+- `backend/services/live_store.py` 当前 live DB 路径仍是相对路径
+- `backend/main.py` 当前 `StaticFiles` 使用 `static/...` 相对路径挂载
+
+因此落地方式为：
+
+1. 把两个 SQLite 路径改成绝对路径
+2. 将 `backend/static/` 软链到 `/var/lib/liberstudy/static/`
+3. 保持现有 `/slides`、`/audio`、`/runs` 路径不变，减少前端改动
 
 ---
 
-## 4. 用户认证设计
+## 5. 认证方案
 
-### 4.1 Google OAuth 流程
+### 5.1 推荐方案
 
+本次内测认证采用：
+
+- **Google OAuth 单一登录**
+- **受邀邮箱白名单**
+- **HttpOnly Cookie**
+- **服务端 session 模式**
+
+不推荐在这个阶段继续使用上一版文档里的 “JWT + 自动续签 + 泛化多用户体系”。
+对 5 人熟人内测，这套东西太重了，维护收益低。
+
+### 5.2 为什么不是开放 Google 登录
+
+只做 Google 登录还不够。
+如果不加白名单，任何能访问到域名并拥有 Google 账号的人都可能登录。
+
+所以应采用：
+
+- Google 负责身份确认
+- 后端白名单负责访问授权
+
+### 5.3 登录流程
+
+```text
+前端访问 /login
+    ↓
+点击“使用 Google 登录”
+    ↓
+GET /api/auth/google/login
+    ↓
+跳转 Google 授权页
+    ↓
+Google 回调 /api/auth/google/callback?code=...
+    ↓
+后端换取 profile（email、name、picture）
+    ↓
+检查 email 是否在 allowlist 中
+    ├── 不在白名单：返回 403
+    └── 在白名单：upsert user，创建 session
+    ↓
+set-cookie: liberstudy_session=...
+    ↓
+跳转前端首页 /
 ```
-前端 → GET /api/auth/google/login
-    → 后端返回 Google OAuth 授权 URL
-    → 浏览器重定向到 Google 授权页
-    → 用户授权后 Google 回调 /api/auth/google/callback?code=xxx
-    → 后端用 code 换取 access_token，再获取用户 profile（email、name、picture）
-    → 后端 upsert users 表，生成 JWT
-    → set-cookie: access_token=<jwt>; HttpOnly; Secure; SameSite=Lax; Path=/
-    → 重定向到前端首页 /
+
+### 5.4 白名单设计
+
+白名单优先采用 **环境变量** 管理，不在本阶段引入复杂后台管理页。
+
+新增环境变量：
+
+```env
+ALLOWED_GOOGLE_EMAILS=user1@gmail.com,user2@gmail.com,user3@gmail.com
 ```
 
-### 4.2 数据库变更
+优点：
 
-新增 `users` 表（在 `backend/db.py`）：
+- 实现最简单
+- 部署时可控
+- 用户数量少，手动维护完全可接受
+
+### 5.5 数据库变更
+
+建议新增 `users` 表：
 
 ```python
 class UserRow(SQLModel, table=True):
     __tablename__ = "users"
-    id: str = Field(primary_key=True)          # uuid
+    id: str = Field(primary_key=True)
     google_id: str = Field(unique=True)
-    email: str = Field(unique=True)
+    email: str = Field(unique=True, index=True)
     name: str
     avatar_url: Optional[str] = None
     created_at: float = Field(default_factory=time.time)
 ```
 
-`SessionRow` 新增字段：
+建议为主 session 数据增加归属：
+
 ```python
 user_id: Optional[str] = Field(default=None, foreign_key="users.id")
 ```
 
-### 4.3 JWT 设计
+`live_data.db` 中的 `live_sessions` 也应增加：
 
-- 算法：HS256
-- Payload：`{ sub: user_id, email, exp: now+7days }`
-- 存储：`HttpOnly` cookie，同域无跨域问题（Nginx 反代后前后端同域）
-- 续签：每次请求时如果 token 剩余有效期 < 1 天，自动刷新
+```sql
+user_id TEXT
+```
 
-### 4.4 认证中间件
+原因很直接：
 
-新增 `backend/auth.py`：
-- `get_current_user(request)` —— 从 cookie 读 JWT，验证并返回 UserRow
-- 各路由 `Depends(get_current_user)` 注入
-- 未认证返回 401，前端跳转到 `/login`
+- 登录之后必须能区分“谁的录音、谁的笔记、谁的 live session”
+- 如果只给主库加 `user_id`，而 live 库不加，认证是半套的
 
-### 4.5 数据隔离
+### 5.6 Session 设计
 
-`GET /api/sessions` 和所有 session 相关接口加 `WHERE user_id = current_user.id` 过滤，确保用户只能看到自己的数据。
+本阶段推荐 **服务端 session**，不要做 JWT 刷新。
 
-限流从按 IP 改为按 `user_id`（更精准，防止共享 IP 误触发）。
+最小可行做法：
 
----
+- 后端生成随机 `session_id`
+- 以 `HttpOnly + Secure + SameSite=Lax` cookie 下发
+- session 信息存储在 SQLite 新表 `auth_session`
+- 有效期 7 天
+- 登出时删除 cookie 并删除服务端 session 记录
 
-## 5. 前端改动
+这样做的好处：
 
-### 5.1 新增页面
+- 逻辑比 JWT 刷新简单
+- 可直接失效会话
+- 对 5 人内测性能完全不是问题
 
-`/login` —— 登录页，只有一个"使用 Google 账号登录"按钮，点击调用 `/api/auth/google/login`。
+### 5.7 前端改动
 
-### 5.2 路由守卫
+前端只做必要改动：
 
-`frontend/src/App.tsx` 新增 `<PrivateRoute>` 组件：
-- 调用 `/api/auth/me` 检查登录状态
-- 未登录跳转 `/login`
-- 所有现有页面（LobbyPage、LivePage、NotesPage 等）都包在 `<PrivateRoute>` 内
+1. 新增 `/login` 页面
+2. `App.tsx` 增加 `PrivateRoute`
+3. 新增 `/api/auth/me` 检查当前登录态
+4. `fetch` 统一带上 `credentials: 'include'`
+5. 在 Lobby 页展示头像、名字、退出按钮
 
-### 5.3 用户信息展示
+### 5.8 本阶段不做的认证能力
 
-LobbyPage 顶部侧边栏底部显示当前用户头像 + 名字 + 退出登录按钮。退出调用 `POST /api/auth/logout`（清除 cookie）。
-
-### 5.4 API 调用
-
-因为用 `HttpOnly` cookie，前端 fetch 只需加 `credentials: 'include'`，不需要手动管理 token。`frontend/src/lib/api.ts` 统一加上此选项。
+- 密码登录
+- 注册页
+- 忘记密码
+- 多设备会话管理
+- 角色权限系统
+- Google 之外的登录方式
 
 ---
 
 ## 6. Nginx 配置
 
-首次部署分两阶段：先用 HTTP-only 配置让 Certbot 能完成 ACME 验证，再切换到完整 HTTPS 配置。
+首次部署仍采用两阶段：
 
-### 6a. 阶段一：HTTP-only（`deploy/nginx-http.conf`，仅首次用）
+1. HTTP-only，先完成证书申请
+2. 切换到完整 HTTPS 配置
+
+### 6.1 阶段一：HTTP-only（仅 ACME 验证）
+
+`deploy/nginx-http.conf`
 
 ```nginx
 server {
     listen 80;
     server_name yourdomain.com;
 
-    # Certbot ACME 验证（不能重定向到 HTTPS，否则 Certbot 无法访问）
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
 
-    # 其余请求代理到后端（后端在第 11 步才启动，此阶段 API 不可用，仅 ACME 验证需要 Nginx 在线）
-    location /api/ws/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_read_timeout 3600s;
-    }
-
-    location /api/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-
-    location ~* ^/(slides|audio|runs)/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-    }
-
-    root /var/www/liberstudy/dist;
-    index index.html;
     location / {
-        try_files $uri $uri/ /index.html;
+        return 444;
     }
 }
 ```
 
-### 6b. 阶段二：完整 HTTPS（`deploy/nginx.conf`，证书申请后替换）
+说明：
+
+- 阶段一的目标只有一个：让 Certbot 完成 ACME 验证
+- 因此不暴露前端页面，不转发 API，不转发 WebSocket
+- 拿到证书后再切换到完整 HTTPS 配置
+
+### 6.2 阶段二：完整 HTTPS
+
+`deploy/nginx.conf`
 
 ```nginx
 server {
-    listen 443 ssl;
+    listen 443 ssl http2;
     server_name yourdomain.com;
 
     ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
 
-    # WebSocket（Live ASR）— 必须在 /api/ 之前
-    # 实际路径：/api/ws/live-asr（live router prefix=/api，路由=/ws/live-asr）
     location /api/ws/ {
         proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
@@ -208,22 +322,19 @@ server {
         proxy_read_timeout 3600s;
     }
 
-    # 后端 API
     location /api/ {
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # 静态资源（课件 PDF、缩略图、录音、run log）
-    # 这些路径由 FastAPI StaticFiles 挂载（main.py L33-L35），必须转发到后端
-    # 不能落到 Nginx 前端 root，否则返回 404
     location ~* ^/(slides|audio|runs)/ {
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;
     }
 
-    # 前端 SPA
     root /var/www/liberstudy/dist;
     index index.html;
     location / {
@@ -231,12 +342,10 @@ server {
     }
 }
 
-# HTTP 强制跳转 HTTPS，保留 ACME challenge 路径供续签用
 server {
     listen 80;
     server_name yourdomain.com;
 
-    # Certbot webroot 续签时走这里（certbot renew 不会触发 HTTPS 重定向）
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
@@ -249,89 +358,103 @@ server {
 
 ---
 
-## 7. 环境变量新增
+## 7. 环境变量
 
-`backend/.env.example` 新增：
+`backend/.env.example` 建议新增：
 
-```
+```env
+# Frontend origin
+FRONTEND_ORIGIN=https://yourdomain.com
+
 # Google OAuth
 GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
 GOOGLE_REDIRECT_URI=https://yourdomain.com/api/auth/google/callback
 
-# JWT
-JWT_SECRET=your_random_secret_key_min_32_chars
-JWT_EXPIRE_DAYS=7
+# Invite allowlist
+ALLOWED_GOOGLE_EMAILS=user1@gmail.com,user2@gmail.com
 
-# 生产域名
-FRONTEND_ORIGIN=https://yourdomain.com
+# Session cookie
+SESSION_SECRET=your_random_secret_key_min_32_chars
+SESSION_EXPIRE_DAYS=7
+
+# Production paths
+LIBERSTUDY_DB_PATH=/var/lib/liberstudy/database.db
+LIBERSTUDY_LIVE_DB_PATH=/var/lib/liberstudy/live_data.db
 ```
 
 ---
 
 ## 8. 部署流程
 
-### 8.1 一次性初始化（首次部署，纯净 ECS 执行）
+### 8.1 一次性初始化
 
 ```bash
-# 1. 系统依赖（含 Node.js）
-apt update && apt install -y nginx python3 python3-pip python3-venv \
-    ffmpeg certbot python3-certbot-nginx nodejs npm
-apt install -y libreoffice fonts-noto-cjk
+# 1. 系统依赖
+apt update
+apt install -y nginx python3 python3-pip python3-venv ffmpeg certbot \
+  python3-certbot-nginx libreoffice fonts-noto-cjk sqlite3 curl
 
-# 2. 拉取代码
+# 2. 安装 Node.js 22 LTS
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+apt install -y nodejs
+
+# 3. 创建应用用户
+adduser --system --group --no-create-home liberstudy
+
+# 4. 拉取代码
 git clone https://github.com/你的账号/LiberLearning.git /var/www/liberstudy
 cd /var/www/liberstudy
 
-# 3. 持久化数据目录 + 目录权限（www-data 是后端运行用户，必须有写权限）
-mkdir -p /var/lib/liberstudy/static/{slides,audio,runs}
-chown -R www-data:www-data /var/lib/liberstudy
-chmod -R 755 /var/lib/liberstudy
-# backend/static/ 软链到持久化目录（main.py 用相对路径挂载 StaticFiles）
-ln -sfn /var/lib/liberstudy/static /var/www/liberstudy/backend/static
-# 代码目录也要给 www-data 写权限（SQLite 在 backend/ 下创建临时文件）
-chown -R www-data:www-data /var/www/liberstudy
+# 4.1 统一代码目录所有者
+chown -R liberstudy:liberstudy /var/www/liberstudy
 
-# 4. 后端 venv
+# 5. 创建持久化目录
+mkdir -p /var/lib/liberstudy/static/{slides,audio,runs}
+mkdir -p /var/backups/liberstudy
+chown -R liberstudy:liberstudy /var/lib/liberstudy /var/backups/liberstudy
+
+# 6. 静态目录软链
+ln -sfn /var/lib/liberstudy/static /var/www/liberstudy/backend/static
+
+# 7. 后端虚拟环境
 python3 -m venv /var/www/liberstudy/venv
 source /var/www/liberstudy/venv/bin/activate
+pip install --upgrade pip
 pip install -r backend/requirements.txt
 
-# 5. 前端构建
-cd frontend && npm ci && npm run build
+# 8. 前端构建
+cd frontend
+npm ci
+npm run build
 rm -rf /var/www/liberstudy/dist
 cp -r dist /var/www/liberstudy/dist
 cd ..
 
-# 6. 配置 .env（手动上传或 scp，不进 git）
-# scp .env root@your-server-ip:/var/www/liberstudy/backend/.env
-chown www-data:www-data /var/www/liberstudy/backend/.env
+# 9. 配置 .env
+# 手动上传到 /var/www/liberstudy/backend/.env
+chown liberstudy:liberstudy /var/www/liberstudy/backend/.env
 chmod 600 /var/www/liberstudy/backend/.env
 
-# 7. 阶段一：启用 HTTP-only Nginx 配置（此时证书还不存在，不能用 HTTPS 配置）
+# 10. Nginx 阶段一
 cp deploy/nginx-http.conf /etc/nginx/sites-available/liberstudy
 ln -s /etc/nginx/sites-available/liberstudy /etc/nginx/sites-enabled/liberstudy
-# 删除默认站点避免冲突
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
 
-# 8. 域名 DNS 解析到 ECS 公网 IP（必须等待生效，用 dig yourdomain.com 确认）
-
-# 9. 申请 SSL 证书
+# 11. DNS 生效后申请证书
 mkdir -p /var/www/certbot
 certbot certonly --webroot -w /var/www/certbot -d yourdomain.com
-# Certbot 自动配置 cron 续签，无需手动处理
 
-# 10. 阶段二：切换到完整 HTTPS Nginx 配置
+# 12. 切换 HTTPS 配置
 cp deploy/nginx.conf /etc/nginx/sites-available/liberstudy
 nginx -t && systemctl reload nginx
 
-# 11. 注册并启动 systemd 服务
+# 13. systemd 服务
 cp deploy/liberstudy.service /etc/systemd/system/liberstudy.service
 systemctl daemon-reload
 systemctl enable liberstudy
 systemctl start liberstudy
-systemctl status liberstudy  # 确认 active (running)
 ```
 
 ### 8.2 日常更新代码
@@ -340,26 +463,59 @@ systemctl status liberstudy  # 确认 active (running)
 cd /var/www/liberstudy
 git pull origin main
 
-# 前端重新构建（先删旧 dist 避免层级错误）
-cd frontend && npm ci && npm run build
+cd frontend
+npm ci
+npm run build
 rm -rf /var/www/liberstudy/dist
 cp -r dist /var/www/liberstudy/dist
 cd ..
 
-# 后端依赖更新
 source /var/www/liberstudy/venv/bin/activate
 pip install -r backend/requirements.txt
 
 systemctl restart liberstudy
 ```
 
-### 8.3 需提前准备的部署文件
+### 8.3 自动备份
 
-实施时需在仓库中新建 `deploy/` 目录，存放以下三个文件：
+建议新增 `deploy/backup-liberstudy.sh`：
 
-- **`deploy/nginx-http.conf`**（对应第 6a 节，首次部署阶段一用）
-- **`deploy/nginx.conf`**（对应第 6b 节，证书申请后切换）
-- **`deploy/liberstudy.service`**（对应本节 systemd 配置）
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+BACKUP_ROOT="/var/backups/liberstudy"
+STAMP="$(date +%F_%H-%M-%S)"
+TMP_DIR="$BACKUP_ROOT/$STAMP"
+
+mkdir -p "$TMP_DIR"
+
+sqlite3 /var/lib/liberstudy/database.db ".backup '$TMP_DIR/database.db'"
+sqlite3 /var/lib/liberstudy/live_data.db ".backup '$TMP_DIR/live_data.db'"
+tar -czf "$TMP_DIR/runs.tar.gz" -C /var/lib/liberstudy/static runs
+
+# 保留最近 7 天
+find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -mtime +7 -exec rm -rf {} \;
+```
+
+然后通过 cron 或 systemd timer 每天凌晨执行一次。
+
+推荐 cron：
+
+```cron
+0 3 * * * root /var/www/liberstudy/deploy/backup-liberstudy.sh >> /var/log/liberstudy-backup.log 2>&1
+```
+
+### 8.4 需提前准备的部署文件
+
+仓库中建议新增 `deploy/` 目录，至少包含：
+
+- `deploy/nginx-http.conf`
+- `deploy/nginx.conf`
+- `deploy/liberstudy.service`
+- `deploy/backup-liberstudy.sh`
+
+`deploy/liberstudy.service`：
 
 ```ini
 [Unit]
@@ -367,7 +523,8 @@ Description=LiberStudy FastAPI
 After=network.target
 
 [Service]
-User=www-data
+User=liberstudy
+Group=liberstudy
 WorkingDirectory=/var/www/liberstudy/backend
 Environment="PATH=/var/www/liberstudy/venv/bin"
 EnvironmentFile=/var/www/liberstudy/backend/.env
@@ -381,27 +538,73 @@ WantedBy=multi-user.target
 
 ---
 
-## 9. 风险与注意事项
+## 9. 代码改造清单
 
-| 风险 | 措施 |
-|------|------|
-| LibreOffice 中文字体乱码 | 安装 `fonts-noto-cjk`，测试一次 PPT 上传 |
-| SQLite 路径（database.db） | `backend/db.py` L14 改绝对路径：`/var/lib/liberstudy/database.db` |
-| SQLite 路径（live_data.db） | `backend/services/live_store.py` L6 改绝对路径：`/var/lib/liberstudy/live_data.db` |
-| www-data 写不进数据库/静态目录 | 首次部署步骤 3 已包含 `chown -R www-data /var/lib/liberstudy` 和 `/var/www/liberstudy` |
-| static/ 目录被 git pull 覆盖 | `backend/static/` 软链到 `/var/lib/liberstudy/static/`（首次部署步骤 3 已包含） |
-| /slides、/audio、/runs 资源 404 | Nginx 加 `location ~* ^/(slides\|audio\|runs)/` 转发到后端（第 6 节已包含） |
-| HTTPS 配置引导死锁 | 分两阶段：阶段一 HTTP-only + Certbot 申请证书；阶段二切换 HTTPS 配置（第 6a/6b 节） |
-| Google OAuth 回调域名 | Google Console 白名单必须填写完整回调 URL |
-| Let's Encrypt 证书续签 | Certbot 自动配置 cron，90 天自动续签 |
-| 2G 内存 LibreOffice OOM | LibreOffice 转换完立即退出（headless 模式），风险低 |
-| dist 目录层级错误 | 每次构建前先 `rm -rf dist`，再 `cp -r`（日常更新步骤已包含） |
+在真正执行本部署方案前，代码层需要至少完成以下改造：
+
+### 9.1 基础设施必需改造
+
+- `backend/db.py` 支持从环境变量读取主库绝对路径
+- `backend/services/live_store.py` 支持从环境变量读取 live DB 绝对路径
+- `backend/static/` 可安全软链到持久化目录
+
+### 9.2 登录最小闭环改造
+
+这一节不是部署配置，而是一个独立开发任务包。
+不能把它和 Nginx、systemd、`.env` 配置混在一起理解。
+
+- 新增 `backend/auth.py`
+- 新增 `/api/auth/google/login`
+- 新增 `/api/auth/google/callback`
+- 新增 `/api/auth/me`
+- 新增 `/api/auth/logout`
+- 新增白名单校验
+- 新增用户表与 session 表
+- 主 session 数据增加 `user_id`
+- live session 数据增加 `user_id`
+
+建议在实际开工前，再单独补一份认证实现计划，至少拆成：
+
+- 后端 OAuth 与服务端 session 存储
+- `users` / `auth_session` / `user_id` 数据模型改造
+- live session 归属与鉴权
+- 前端 `/login`、`PrivateRoute`、登录态恢复
+
+### 9.3 前端最小改造
+
+- 新增 `/login`
+- `frontend/src/App.tsx` 增加 `PrivateRoute`
+- `frontend/src/lib/api.ts` 统一加 `credentials: 'include'`
+- LobbyPage 增加当前用户展示与退出
 
 ---
 
-## 10. 不在本次范围内
+## 10. 风险与注意事项
 
-- 监控告警（Prometheus / 阿里云监控）
-- 自动化 CI/CD（GitHub Actions）
-- 多用户权限分级（当前5人均为普通用户）
-- 备份策略（SQLite 手动定期 scp 到本地即可）
+| 风险 | 措施 |
+|------|------|
+| Ubuntu 默认 `nodejs` 版本过低，前端构建失败 | 明确使用 Node.js 22 LTS，不走默认 apt 源 |
+| SQLite 路径仍是相对路径 | 改为环境变量驱动的绝对路径 |
+| live 库没有 `user_id`，导致登录后仍无法隔离 live 数据 | 在 `live_sessions` 中补 `user_id` |
+| `backend/static/` 被代码更新覆盖 | 使用软链指向 `/var/lib/liberstudy/static/` |
+| `/slides`、`/audio`、`/runs` 返回 404 | Nginx 明确转发到后端 |
+| Google 登录开放给所有人 | 必须加邮箱白名单 |
+| 单机 SQLite 数据丢失 | 每日自动备份 DB + runs，保留 7 天 |
+| 给整个代码目录写权限过宽 | 使用独立应用用户 `liberstudy`，仅对必要目录赋写权限 |
+| 阶段一 HTTP-only 暴露不必要路由 | 阶段一配置仅保留 ACME challenge，其余请求直接拒绝 |
+| 代码目录 owner 与 systemd 运行用户不一致 | `git clone` 后立即执行 `chown -R liberstudy:liberstudy /var/www/liberstudy` |
+| 2G 内存下 LibreOffice 转换偶发压力 | 保持单机低并发，观察真实使用情况，必要时升级实例 |
+
+---
+
+## 11. 不在本次范围内
+
+- 开放注册
+- 管理后台
+- 多角色权限
+- CI/CD
+- Docker / Kubernetes
+- 云数据库
+- 多机高可用
+- 监控告警平台
+- 正式商用级审计和合规

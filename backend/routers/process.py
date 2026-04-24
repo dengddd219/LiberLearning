@@ -156,6 +156,8 @@ async def process_real(
     ppt_id: Optional[str] = Form(None),
     existing_session_id: Optional[str] = Form(None),
 ):
+    current_user = request.state.current_user
+
     # 1. 参数校验
     if language not in ALLOWED_LANGUAGES:
         raise HTTPException(
@@ -211,7 +213,7 @@ async def process_real(
 
     # 4. 注册 session（写入 SQLite）
     if existing_session_id:
-        existing = db.get_session(existing_session_id)
+        existing = db.get_session(existing_session_id, user_id=current_user["id"])
         if existing is None:
             raise HTTPException(status_code=404, detail=f"Session '{existing_session_id}' not found")
         db.update_session(session_id, {
@@ -226,6 +228,7 @@ async def process_real(
     else:
         db.save_session(session_id, {
             "session_id": session_id,
+            "user_id": current_user["id"],
             "status": "processing",
             "ppt_filename": ppt.filename if ppt else None,
             "audio_url": None,
@@ -562,11 +565,11 @@ async def _run_pipeline(
 # ── Per-page retry ─────────────────────────────────────────────────────────────
 
 @router.post("/sessions/{session_id}/page/{page_num}/retry")
-async def retry_page(session_id: str, page_num: int):
+async def retry_page(session_id: str, page_num: int, request: Request):
     if session_id == "mock-session-001":
         return {"status": "ok", "message": f"Page {page_num} retry queued (mock)"}
 
-    session = db.get_session(session_id)
+    session = db.get_session(session_id, user_id=request.state.current_user["id"])
     if not session:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
 

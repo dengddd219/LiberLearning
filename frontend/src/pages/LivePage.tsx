@@ -11,14 +11,13 @@ import { useTranslation } from '../context/TranslationContext'
 import { capture } from '../lib/analytics'
 import {
   askBullet,
+  apiFetch,
   createLiveSession,
   generateMyNote,
   getSession,
   liveAsk,
-  renameSession,
   retryPage,
   updateLiveSessionState,
-  uploadFiles,
   uploadPpt,
 } from '../lib/api'
 import { loadMyNote, loadPageChat, saveMyNote, savePageChat } from '../lib/notesDb'
@@ -266,7 +265,6 @@ export default function LivePage() {
   const subtitleHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [liveTranscriptSegments, setLiveTranscriptSegments] = useState<LiveTranscriptSegment[]>([])
 
-  const [pptFile, setPptFile] = useState<File | null>(null)
   const [pptId, setPptId] = useState<string | null>(null)
   const [pptPages, setPptPages] = useState<PptPage[]>([])
   const [pptUploading, setPptUploading] = useState(false)
@@ -363,7 +361,6 @@ export default function LivePage() {
 
   const pageSource = session?.pages && session.pages.length > 0 ? session.pages : pptPages
   const activePageData = session?.pages.find((page) => page.page_num === currentPage) ?? null
-  const hasPpt = pageSource.length > 0 || !!localPdfUrl
   const draftPage = pptPages.find((page) => page.page_num === currentPage) ?? null
   const totalPages = pageSource.length
   const isLiveMode = wsStatus !== 'done'
@@ -806,7 +803,6 @@ export default function LivePage() {
   }, [playingSegIdx, stopSegmentPlayback])
 
   const handleUploadPpt = useCallback(async (file: File) => {
-    setPptFile(file)
     setInitError(null)
 
     // PDF：立刻本地显示，无需等后端
@@ -894,25 +890,21 @@ export default function LivePage() {
       // 创建服务端 live session（如果尚未创建）
       let backendSid = liveBackendSessionId
       if (!backendSid) {
-        try {
-          const startRes = await fetch(`${API_BASE}/api/live/session/start`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ppt_id: pptId ?? null, language: 'zh', session_id: notesSessionId }),
-          })
-          const startData = await startRes.json() as { session_id: string; status: string }
-          backendSid = startData.session_id
-          setLiveBackendSessionId(backendSid)
-        } catch {
-          // session/start 失败不影响录音继续
+        const startRes = await apiFetch('/api/live/session/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ppt_id: pptId ?? null, language: 'zh', session_id: notesSessionId }),
+        })
+        if (!startRes.ok) {
+          throw new Error(`live/session/start failed: ${startRes.status}`)
         }
+        const startData = await startRes.json() as { session_id: string; status: string }
+        backendSid = startData.session_id
+        setLiveBackendSessionId(backendSid)
       }
+      if (!backendSid) throw new Error('live backend session missing')
       setSessionStatus('live')
-      const ws = new WebSocket(
-        backendSid
-          ? `${WS_BASE}/api/ws/live-asr?session_id=${backendSid}`
-          : `${WS_BASE}/api/ws/live-asr`
-      )
+      const ws = new WebSocket(`${WS_BASE}/api/ws/live-asr?session_id=${backendSid}`)
       wsRef.current = ws
 
       ws.onopen = () => {
@@ -995,47 +987,6 @@ export default function LivePage() {
     setWsStatus('live')
   }, [])
 
-  const stopRecording = useCallback(async () => {
-    await flushPendingMyNotes()
-    clearProcessingPoll()
-
-    const recorder = mediaRecorderRef.current
-    const stream = recorder?.stream
-
-    if (recorder && recorder.state !== 'inactive') {
-      await new Promise<void>((resolve) => {
-        recorder.addEventListener('stop', () => resolve(), { once: true })
-        recorder.stop()
-      })
-    }
-
-    stream?.getTracks().forEach((track) => track.stop())
-    mediaStreamRef.current = null
-    wsRef.current?.close()
-    setWsStatus('processing')
-    setNoteMode('transcript')
-
-    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-    const audioFile = new File([audioBlob], 'recording.webm', { type: 'audio/webm' })
-
-    try {
-      const result = await uploadFiles(
-        pptFile ?? undefined,
-        audioFile,
-        'zh',
-        undefined,
-        pptId ?? undefined,
-        notesSessionId ?? undefined,
-      )
-      const nextSessionId = result.session_id
-      setProcessedSessionId(nextSessionId)
-      await pollProcessedSession(nextSessionId)
-    } catch (stopError) {
-      setError(stopError instanceof Error ? stopError.message : '结束录音后处理失败')
-      setWsStatus('stopped')
-    }
-  }, [clearProcessingPoll, flushPendingMyNotes, notesSessionId, pollProcessedSession, pptFile, pptId])
-
   const handleEndClass = useCallback(async () => {
     await flushPendingMyNotes()
     clearProcessingPoll()
@@ -1052,12 +1003,12 @@ export default function LivePage() {
     mediaStreamRef.current = null
     wsRef.current?.close()
 
-    if (liveBackendSessionId) {
-      try {
-        await fetch(`${API_BASE}/api/live/stop`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+      if (liveBackendSessionId) {
+        try {
+          await apiFetch('/api/live/stop', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
             session_id: liveBackendSessionId,
             ppt_pages: pptPages.length > 0
               ? pptPages.map(p => ({ page_num: p.page_num, ppt_text: p.ppt_text ?? '' }))
@@ -1073,7 +1024,7 @@ export default function LivePage() {
 
     if (liveBackendSessionId) {
       try {
-        const res = await fetch(`${API_BASE}/api/live/state/${liveBackendSessionId}`)
+        const res = await apiFetch(`/api/live/state/${liveBackendSessionId}`)
         const data = await res.json() as {
           transcript: Array<{ text: string; page: number | null; seq: number }>
         }
@@ -1115,7 +1066,7 @@ export default function LivePage() {
     const myNotesPayload = allMyNotesList.filter(n => n.text.trim())
 
     try {
-      const res = await fetch(`${API_BASE}/api/live/finalize-stream`, {
+      const res = await apiFetch('/api/live/finalize-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1181,7 +1132,7 @@ export default function LivePage() {
     setDetailedNoteOpen(true)
 
     try {
-      const res = await fetch(`${API_BASE}/api/live/detailed-note`, {
+      const res = await apiFetch('/api/live/detailed-note', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1260,7 +1211,7 @@ export default function LivePage() {
 
   useEffect(() => {
     if (!liveBackendSessionId || sessionStatus !== 'live') return
-    fetch(`${API_BASE}/api/live/page-snapshot`, {
+    apiFetch('/api/live/page-snapshot', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1346,7 +1297,7 @@ export default function LivePage() {
           setLiveBackendSessionId(sid)
           const cached = localStorage.getItem(`liberstudy:live-ai-notes:${sid}`)
           if (cached) setAiNotesText(cached)
-          fetch(`${API_BASE}/api/live/state/${sid}`)
+          apiFetch(`/api/live/state/${sid}`)
             .then(r => r.json())
             .then(state => {
               if (!cancelled && !unmountedRef.current && state.transcript) {

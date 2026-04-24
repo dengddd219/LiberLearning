@@ -1,14 +1,28 @@
 export const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
 
+export type AuthUser = {
+  id: string
+  email: string
+  name: string
+  avatar_url?: string | null
+}
+
+export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(`${API_BASE}${path}`, {
+    credentials: 'include',
+    ...init,
+  })
+}
+
 export async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`)
+  const res = await apiFetch(path)
   if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
   return res.json()
 }
 
 export async function apiPost<T>(path: string, body?: FormData | object): Promise<T> {
   const isFormData = body instanceof FormData
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await apiFetch(path, {
     method: 'POST',
     headers: isFormData ? undefined : { 'Content-Type': 'application/json' },
     body: isFormData ? body : body ? JSON.stringify(body) : undefined,
@@ -60,7 +74,7 @@ export async function updateLiveSessionState(
     live_transcript?: Array<{ text: string; timestamp: number; page_num?: number }>
   },
 ): Promise<void> {
-  await fetch(`${API_BASE}/api/sessions/${sessionId}/live-state`, {
+  await apiFetch(`/api/sessions/${sessionId}/live-state`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -78,7 +92,7 @@ export async function getRunLog(sessionId: string): Promise<unknown> {
 }
 
 export async function renameSession(sessionId: string, newName: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`, {
+  const res = await apiFetch(`/api/sessions/${sessionId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ppt_filename: newName }),
@@ -87,7 +101,7 @@ export async function renameSession(sessionId: string, newName: string): Promise
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`, { method: 'DELETE' })
+  const res = await apiFetch(`/api/sessions/${sessionId}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
 }
 
@@ -120,7 +134,7 @@ export async function liveAsk(
   },
   onChunk: (chunk: string) => void,
 ): Promise<string> {
-  const res = await fetch(`${API_BASE}/api/live/ask`, {
+  const res = await apiFetch('/api/live/ask', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -167,7 +181,7 @@ export async function generateMyNote(
   provider: string,
   onChunk: (chunk: string) => void,
 ): Promise<string> {
-  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/page/${pageNum}/my-notes`, {
+  const res = await apiFetch(`/api/sessions/${sessionId}/page/${pageNum}/my-notes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ user_note: userNote, ppt_text: pptText, provider }),
@@ -212,7 +226,7 @@ export async function askBullet(
   model: string,
   onChunk: (chunk: string) => void,
 ): Promise<string> {
-  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/ask`, {
+  const res = await apiFetch(`/api/sessions/${sessionId}/ask`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -249,4 +263,13 @@ export async function askBullet(
     }
   }
   return full
+}
+
+export async function getCurrentUser(): Promise<AuthUser> {
+  return apiGet('/api/auth/me')
+}
+
+export async function logout(): Promise<void> {
+  const res = await apiFetch('/api/auth/logout', { method: 'POST' })
+  if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
 }
