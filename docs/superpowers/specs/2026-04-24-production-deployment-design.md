@@ -125,7 +125,7 @@ user_id: Optional[str] = Field(default=None, foreign_key="users.id")
 
 ### 5.3 用户信息展示
 
-LobbyPage 顶部侧边栏底部显示当前用户头像 + 名字 + 退出登录按钮。退出调用 `DELETE /api/auth/logout`（清除 cookie）。
+LobbyPage 顶部侧边栏底部显示当前用户头像 + 名字 + 退出登录按钮。退出调用 `POST /api/auth/logout`（清除 cookie）。
 
 ### 5.4 API 调用
 
@@ -148,20 +148,22 @@ server {
     index index.html;
     try_files $uri $uri/ /index.html;  # SPA 路由支持
 
+    # WebSocket（Live ASR）— 必须放在 /api/ 之前，否则被普通 proxy 块先匹配
+    # 实际路径：/api/ws/live-asr（live router prefix=/api + 路由=/ws/live-asr）
+    location /api/ws/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 3600s;
+    }
+
     # 后端 API
     location /api/ {
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-    }
-
-    # WebSocket（Live ASR）
-    location /ws/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_read_timeout 3600s;  # WebSocket 长连接
     }
 }
 
@@ -274,7 +276,7 @@ WantedBy=multi-user.target
 | SQLite 文件路径变更 | `db.py` 中路径改为绝对路径 `/var/lib/liberstudy/database.db` |
 | Google OAuth 回调域名 | Google Console 白名单必须填写完整回调 URL |
 | Let's Encrypt 证书续签 | Certbot 自动配置 cron，90 天自动续签 |
-| static/ 目录被 git pull 覆盖 | static/ 目录软链到 /var/lib/liberstudy/static/，与代码分离 |
+| static/ 目录被 git pull 覆盖 | `backend/static/` 软链到 `/var/lib/liberstudy/static/`（注意是 backend/ 下，因为 main.py 用相对路径挂载） |
 | 2G 内存 LibreOffice OOM | LibreOffice 转换完立即退出（headless 模式已是如此），风险低 |
 
 ---
