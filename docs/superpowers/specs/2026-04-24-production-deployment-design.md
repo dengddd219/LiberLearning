@@ -1,7 +1,11 @@
 # 生产部署设计规格
 
 **日期**：2026-04-24  
-**状态**：已批准  
+**状态**：目标设计（尚未可执行）
+
+> ⚠️ **执行前提**：第 4、5 节描述的认证体系（`backend/auth.py`、`/api/auth/*` 路由、前端 `PrivateRoute`、`credentials: 'include'`）**当前仓库尚未实现**。  
+> 部署 runbook（第 8 节）需等认证改造完成后才能完整执行。基础设施搭建（ECS、域名、Nginx、HTTPS）可提前进行。
+
 **范围**：LiberStudy 首次上线到阿里云，含用户认证、HTTPS、Google OAuth
 
 ---
@@ -154,7 +158,7 @@ server {
         root /var/www/certbot;
     }
 
-    # 其余请求暂时也走后端，让站点首次可访问
+    # 其余请求代理到后端（后端在第 11 步才启动，此阶段 API 不可用，仅 ACME 验证需要 Nginx 在线）
     location /api/ws/ {
         proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
@@ -227,11 +231,19 @@ server {
     }
 }
 
-# HTTP 强制跳转 HTTPS
+# HTTP 强制跳转 HTTPS，保留 ACME challenge 路径供续签用
 server {
     listen 80;
     server_name yourdomain.com;
-    return 301 https://$host$request_uri;
+
+    # Certbot webroot 续签时走这里（certbot renew 不会触发 HTTPS 重定向）
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
 }
 ```
 
