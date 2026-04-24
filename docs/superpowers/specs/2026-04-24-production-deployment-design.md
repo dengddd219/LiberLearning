@@ -32,24 +32,29 @@
 用户浏览器
     ↓ HTTPS :443
 Nginx
-    ├── /api/*  → proxy_pass http://127.0.0.1:8000
-    ├── /ws/*   → proxy_pass http://127.0.0.1:8000（WebSocket upgrade）
-    └── /*      → root /var/www/liberstudy/dist（React 静态文件）
+    ├── /api/ws/*  → proxy_pass http://127.0.0.1:8000（WebSocket upgrade，必须在 /api/ 之前）
+    ├── /api/*     → proxy_pass http://127.0.0.1:8000
+    └── /*         → root /var/www/liberstudy/dist（React 静态文件）
 
 uvicorn（FastAPI，systemd 管理，开机自启）
     ├── 业务路由：process / sessions / live / diagnostics
     ├── 新增路由：auth（Google OAuth + JWT）
-    └── SQLite：/var/lib/liberstudy/database.db + live_data.db
+    ├── SQLite database.db → /var/lib/liberstudy/database.db（backend/db.py 改绝对路径）
+    └── SQLite live_data.db → /var/lib/liberstudy/live_data.db（backend/services/live_store.py 改绝对路径）
 
 系统依赖
     ├── LibreOffice headless（PPT→PDF）+ 中文字体包
     └── FFmpeg（WebM/Opus→WAV）
 ```
 
-**静态资源目录**（部署时不覆盖）：
+**持久化目录**（独立于代码目录，git pull 不覆盖）：
+- `/var/lib/liberstudy/database.db`（主数据库）
+- `/var/lib/liberstudy/live_data.db`（直播数据库）
 - `/var/lib/liberstudy/static/slides/`
 - `/var/lib/liberstudy/static/audio/`
 - `/var/lib/liberstudy/static/runs/`
+
+**落地方式**：代码中两个 DB 路径改为绝对路径（`backend/db.py` L14、`backend/services/live_store.py` L6）；`backend/static/` 建软链指向 `/var/lib/liberstudy/static/`（因为 `main.py` L33 用相对路径挂载 StaticFiles）。
 
 ---
 
@@ -199,32 +204,55 @@ FRONTEND_ORIGIN=https://yourdomain.com
 
 ## 8. 部署流程
 
-### 8.1 一次性初始化（首次部署）
+### 8.1 一次性初始化（首次部署，纯净 ECS 执行）
 
 ```bash
-# 1. 系统依赖
-apt update && apt install -y nginx python3 python3-pip python3-venv ffmpeg certbot python3-certbot-nginx
-apt install -y libreoffice fonts-noto-cjk  # LibreOffice + 中文字体（防乱码）
+# 1. 系统依赖（含 Node.js）
+apt update && apt install -y nginx python3 python3-pip python3-venv \
+    ffmpeg certbot python3-certbot-nginx nodejs npm
+apt install -y libreoffice fonts-noto-cjk
 
-# 2. 项目目录
-mkdir -p /var/www/liberstudy
-mkdir -p /var/lib/liberstudy/static/{slides,audio,runs}
-
-# 3. 后端 venv
+# 2. 拉取代码
+git clone https://github.com/你的账号/LiberLearning.git /var/www/liberstudy
 cd /var/www/liberstudy
-python3 -m venv venv
-source venv/bin/activate
+
+# 3. 持久化数据目录（独立于代码，git pull 不覆盖）
+mkdir -p /var/lib/liberstudy/static/{slides,audio,runs}
+# backend/static/ 软链到持久化目录（main.py 用相对路径挂载 StaticFiles）
+ln -sfn /var/lib/liberstudy/static /var/www/liberstudy/backend/static
+
+# 4. 后端 venv
+python3 -m venv /var/www/liberstudy/venv
+source /var/www/liberstudy/venv/bin/activate
 pip install -r backend/requirements.txt
 
-# 4. 配置 .env（手动上传，不进 git）
+# 5. 前端构建
+cd frontend && npm ci && npm run build
+# 把 dist/ 放到 Nginx root 指向的位置
+rm -rf /var/www/liberstudy/dist
+cp -r dist /var/www/liberstudy/dist
+cd ..
 
-# 5. 域名 DNS 解析到 ECS 公网 IP（提前做，等待生效）
+# 6. 配置 .env（手动上传或 scp，不进 git）
+# scp .env root@your-server-ip:/var/www/liberstudy/backend/.env
 
-# 6. 申请 SSL 证书
+# 7. Nginx 配置落盘并启用
+cp deploy/nginx.conf /etc/nginx/sites-available/liberstudy
+ln -s /etc/nginx/sites-available/liberstudy /etc/nginx/sites-enabled/liberstudy
+nginx -t && systemctl reload nginx
+
+# 8. 域名 DNS 解析到 ECS 公网 IP（提前做，等待生效后再执行下一步）
+
+# 9. 申请 SSL 证书（Certbot 会自动修改 Nginx 配置并 reload）
 certbot --nginx -d yourdomain.com
+# Certbot 自动配置 cron 续签，无需手动处理
 
-# 7. systemd 服务
-# 见 8.3
+# 10. 注册并启动 systemd 服务
+cp deploy/liberstudy.service /etc/systemd/system/liberstudy.service
+systemctl daemon-reload
+systemctl enable liberstudy
+systemctl start liberstudy
+systemctl status liberstudy  # 确认 active (running)
 ```
 
 ### 8.2 日常更新代码
@@ -233,20 +261,26 @@ certbot --nginx -d yourdomain.com
 cd /var/www/liberstudy
 git pull origin main
 
-# 前端
+# 前端重新构建（先删旧 dist 避免层级错误）
 cd frontend && npm ci && npm run build
+rm -rf /var/www/liberstudy/dist
 cp -r dist /var/www/liberstudy/dist
+cd ..
 
-# 后端
-source venv/bin/activate
+# 后端依赖更新
+source /var/www/liberstudy/venv/bin/activate
 pip install -r backend/requirements.txt
 
 systemctl restart liberstudy
 ```
 
-### 8.3 systemd 服务文件
+### 8.3 需提前准备的部署文件
 
-`/etc/systemd/system/liberstudy.service`：
+实施时需在仓库中新建 `deploy/` 目录，存放以下两个文件（内容见第 6 节和本节）：
+
+**`deploy/nginx.conf`**（对应第 6 节完整内容）
+
+**`deploy/liberstudy.service`**：
 
 ```ini
 [Unit]
@@ -273,11 +307,13 @@ WantedBy=multi-user.target
 | 风险 | 措施 |
 |------|------|
 | LibreOffice 中文字体乱码 | 安装 `fonts-noto-cjk`，测试一次 PPT 上传 |
-| SQLite 文件路径变更 | `db.py` 中路径改为绝对路径 `/var/lib/liberstudy/database.db` |
+| SQLite 路径（database.db） | `backend/db.py` L14 改绝对路径：`/var/lib/liberstudy/database.db` |
+| SQLite 路径（live_data.db） | `backend/services/live_store.py` L6 改绝对路径：`/var/lib/liberstudy/live_data.db` |
+| static/ 目录被 git pull 覆盖 | `backend/static/` 软链到 `/var/lib/liberstudy/static/`（首次部署步骤 3 已包含） |
 | Google OAuth 回调域名 | Google Console 白名单必须填写完整回调 URL |
 | Let's Encrypt 证书续签 | Certbot 自动配置 cron，90 天自动续签 |
-| static/ 目录被 git pull 覆盖 | `backend/static/` 软链到 `/var/lib/liberstudy/static/`（注意是 backend/ 下，因为 main.py 用相对路径挂载） |
-| 2G 内存 LibreOffice OOM | LibreOffice 转换完立即退出（headless 模式已是如此），风险低 |
+| 2G 内存 LibreOffice OOM | LibreOffice 转换完立即退出（headless 模式），风险低 |
+| dist 目录层级错误 | 每次构建前先 `rm -rf dist`，再 `cp -r`（日常更新步骤已包含） |
 
 ---
 
