@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+test_output/
+asr_benchmark_results/
+static/audio/
+static/runs/
+static/slides/
+*.db
+*.log

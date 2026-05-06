@@ -4,7 +4,7 @@ import urllib.parse
 from typing import Optional
 
 import httpx
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 
 import db
@@ -27,9 +27,18 @@ def _cookie_secure() -> bool:
     return _frontend_origin().startswith("https://")
 
 
+def _cookie_samesite() -> str:
+    value = os.getenv("SESSION_COOKIE_SAMESITE", "lax").strip().lower()
+    return value if value in {"lax", "strict", "none"} else "lax"
+
+
 def _allowed_google_emails() -> set[str]:
     raw = os.getenv("ALLOWED_GOOGLE_EMAILS", "")
     return {item.strip().lower() for item in raw.split(",") if item.strip()}
+
+
+def _public_guest_access_enabled() -> bool:
+    return os.getenv("PUBLIC_GUEST_ACCESS", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _session_expire_days() -> int:
@@ -45,13 +54,13 @@ def get_user_from_session_token(session_token: Optional[str]) -> Optional[dict]:
     return db.get_user_by_auth_session(session_token)
 
 
-def _set_session_cookie(response: RedirectResponse, session_token: str) -> None:
+def _set_session_cookie(response: Response, session_token: str) -> None:
     response.set_cookie(
         SESSION_COOKIE_NAME,
         session_token,
         httponly=True,
         secure=_cookie_secure(),
-        samesite="lax",
+        samesite=_cookie_samesite(),
         max_age=_session_expire_days() * 86400,
         path="/",
     )
@@ -62,15 +71,29 @@ def _clear_session_cookie(response: RedirectResponse) -> None:
         SESSION_COOKIE_NAME,
         httponly=True,
         secure=_cookie_secure(),
-        samesite="lax",
+        samesite=_cookie_samesite(),
         path="/",
     )
 
 
-async def require_user(request: Request) -> dict:
+def _create_guest_user() -> dict:
+    guest_id = secrets.token_hex(8)
+    return db.upsert_google_user(
+        google_id=f"guest:{guest_id}",
+        email=f"guest-{guest_id}@liberstudy.local",
+        name="访客用户",
+        avatar_url=None,
+    )
+
+
+async def require_user(request: Request, response: Response) -> dict:
     user = get_user_from_session_token(request.cookies.get(SESSION_COOKIE_NAME))
     if user is None:
-        raise HTTPException(status_code=401, detail="Authentication required")
+        if not _public_guest_access_enabled():
+            raise HTTPException(status_code=401, detail="Authentication required")
+        user = _create_guest_user()
+        session_token = db.create_auth_session(user["id"], expire_days=_session_expire_days())
+        _set_session_cookie(response, session_token)
     request.state.current_user = user
     return user
 
@@ -100,7 +123,7 @@ def google_login():
         state,
         httponly=True,
         secure=_cookie_secure(),
-        samesite="lax",
+        samesite=_cookie_samesite(),
         max_age=600,
         path="/",
     )
@@ -176,8 +199,8 @@ async def google_callback(request: Request, code: Optional[str] = None, state: O
 
 
 @router.get("/auth/me")
-async def auth_me(request: Request):
-    user = await require_user(request)
+async def auth_me(request: Request, response: Response):
+    user = await require_user(request, response)
     return user
 
 

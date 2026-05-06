@@ -49,7 +49,7 @@ export default function LoginPage() {
           LiberStudy
         </div>
         <p style={{ fontSize: '14px', color: '#72726E', lineHeight: 1.7, margin: '0 0 24px' }}>
-          当前版本为邀请内测。请使用已加入白名单的 Google 账号登录。
+          当前版本为作品展示环境。打开公开访客模式后，访问者会自动进入真实产品；团队成员也可以继续使用 Google 登录。
         </p>
 
         {errorText && (
