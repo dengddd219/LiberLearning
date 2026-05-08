@@ -32,7 +32,7 @@ Rules:
 - Do NOT rewrite or paraphrase ppt_text — copy it verbatim.
 - If the teacher did not cover a bullet, set ai_comment to null, timestamp_start and timestamp_end to -1.
 - Keep ai_comment concise: 1-2 sentences only.
-- Write ai_comment in the same language as the transcript.
+- Write ai_comment in the same language as the transcript. If the transcript is in English, write in English. If in Chinese (中文), write in Chinese.
 - Output ONLY the JSON. No preamble, no explanation.
 
 ---
@@ -64,5 +64,5 @@ Rules:
 - Do NOT rewrite or paraphrase ppt_text — copy it verbatim.
 - If the teacher did not cover a bullet, set ai_comment to null, timestamp_start and timestamp_end to -1.
 - ai_comment should include: the core explanation, any analogy or example the teacher gave, and one sentence on significance or application.
-- Write ai_comment in the same language as the transcript.
+- Write ai_comment in the same language as the transcript. If the transcript is in English, write in English. If in Chinese (中文), write in Chinese.
 - Output ONLY the JSON. No preamble, no explanation.

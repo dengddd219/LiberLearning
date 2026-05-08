@@ -513,6 +513,7 @@ async def _run_pipeline(
         llm_results = await generate_notes_for_all_pages(
             pages_with_audio, provider=_settings.NOTE_PROVIDER,
             on_page_done=_on_page_done,
+            language=language,
         ) if pages_with_audio else []
 
         # Merge and sort by page_num to preserve original order (for run_data stats)

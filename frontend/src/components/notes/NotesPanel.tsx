@@ -734,8 +734,8 @@ export default function NotesPanel({
                   <p style={{ fontSize: '13px', color: C.muted }}>实时字幕准备中…</p>
                 </div>
               )
-            ) : pageData?.aligned_segments && pageData.aligned_segments.length > 0 ? (
-              pageData.aligned_segments.map((seg, index) => (
+            ) : pageData?.aligned_segments && pageData.aligned_segments.filter(s => s.text && s.text !== '...').length > 0 ? (
+              pageData.aligned_segments.filter(s => s.text && s.text !== '...').map((seg, index) => (
                 <div
                   key={index}
                   onClick={() => onSegmentPlay(seg, index)}

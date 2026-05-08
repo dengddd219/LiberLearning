@@ -245,9 +245,14 @@ def _get_async_call_fn(provider: str):
                 max_tokens=2048,
                 system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
                 messages=[{"role": "user", "content": user_msg}],
+                timeout=60.0,
             )
-            text_blocks = [b for b in resp.content if isinstance(b, TextBlock)]
+            logger.debug("raw resp content types: %s", [type(b).__name__ for b in resp.content])
+            logger.debug("stop_reason: %s usage: %s", resp.stop_reason, resp.usage)
+            text_blocks = [b for b in resp.content if isinstance(b, TextBlock) and b.type == "text"]
             text = text_blocks[0].text if text_blocks else ""
+            if not text:
+                logger.error("EMPTY text from Claude. stop_reason=%s content=%r", resp.stop_reason, resp.content)
             return text, resp.usage.input_tokens, resp.usage.output_tokens
 
         return call_fn, model, call_meta
@@ -326,10 +331,11 @@ def _extract_json(text: str) -> dict:
 
 def _safe_extract_json(text: str, page_num: Any, template: str) -> dict:
     """Wrapper that returns a degraded-but-safe dict on parse failure."""
+    text = text or ""
     try:
         return _extract_json(text)
     except Exception as e:
-        logger.error("JSON parse failed for page %s (template=%s): %s", page_num, template, e)
+        logger.error("JSON parse failed for page %s (template=%s): %s | text type=%s repr=%r", page_num, template, e, type(text), text[:200] if text else text)
         return {
             "status": "failed",
             "error": str(e),
@@ -347,6 +353,7 @@ def _prepare_tasks(
     system_prompt: str,
     template: str,
     is_passive: bool,
+    language: str = "en",
 ) -> tuple[list[LLMTask], list[PageData]]:
     """
     Stage 1: Expand off-slide virtual pages and build the list of LLM tasks.
@@ -376,9 +383,11 @@ def _prepare_tasks(
             transcript = _format_segments(p.aligned_segments)
 
             if is_passive:
+                lang_hint = "Chinese (中文)" if language == "zh" else "English"
                 user_msg = (
                     f"## PPT Bullet Points\n{ppt_bullets}\n\n"
-                    f"## Transcript\n{transcript}"
+                    f"## Transcript\n{transcript}\n\n"
+                    f"## Language Instruction\nWrite all ai_comment fields in {lang_hint}."
                 )
                 tasks.append(LLMTask(
                     page=p,
@@ -456,7 +465,7 @@ async def _execute_llm_batch(
                     "LLM call failed (attempt %d/%d) for page %s: %s",
                     attempt + 1, MAX_RETRIES, task.page.page_num, e,
                 )
-                await asyncio.sleep(2 ** attempt)
+                await asyncio.sleep(5 * (2 ** attempt))
 
         # All retries exhausted — return a failed sentinel instead of raising
         logger.error(
@@ -553,6 +562,7 @@ async def generate_notes_for_all_pages(
     granularity: str = _settings.NOTE_GRANULARITY,
     provider: str = PROVIDER_ZHONGZHUAN,
     on_page_done=None,
+    language: str = "en",
 ) -> list[dict]:
     """
     Generate notes for every page concurrently using the specified template.
@@ -584,7 +594,7 @@ async def generate_notes_for_all_pages(
 
     # Stage 1: expand virtual off-slide pages + build task list
     # expanded_pages is the single authoritative flat list; no second expansion needed.
-    tasks, expanded_pages = _prepare_tasks(typed_pages, system_prompt, template, is_passive)
+    tasks, expanded_pages = _prepare_tasks(typed_pages, system_prompt, template, is_passive, language=language)
 
     # Stage 2: concurrent LLM calls
     _on_result = None

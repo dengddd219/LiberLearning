@@ -184,16 +184,15 @@ MY_NOTES_SYSTEM_PROMPT = """# Role & Philosophy
 - <Transcript>: 老师讲解的逐字稿（含时间戳）。
 
 # Processing Workflow (Chain of Thought)
-在生成最终结果前，你必须进行以下内部推演：
+在生成最终结果前，先在脑中完成以下推演（不要输出推演过程）：
 1. **意图锚定**：逐句拆解 <Student_Note>，识别每个核心词/短语对应的知识点，每个锚点独立处理。
-2. **时空定位**：在 <Transcript> 中定位对应内容，提取时间戳（Start/End）。
+2. **时空定位**：在 <Transcript> 中定位对应内容，提取时间戳。
 3. **融合升级 + 主张判断**：
    - 将用户原词/短语直接升级为笔记 heading（最小改写，保留原意）。
    - 如果 heading 是一个主张或结论，**必须**在逐字稿/PPT中找"为什么这个主张成立"的底层原因、具体实例或反例，填入 bullets——这是支撑，不是复述。
-   - **支撑 vs 复述的区分**：支撑 = 解释"为什么成立"（原因、机制、具体例子）；复述 = 换措辞重说同一件事。找到支撑材料就必须填，不得以"heading 已完整"为由留空。
 4. **案例提取**：该知识点有什么具体例子？直接织入对应的 bullet 中。
 5. **跨条目隔离**：每条 bullets 只能是当前 heading 的增量信息。禁止把其他锚点的内容写入当前条目。
-6. **遗漏扫描**：处理完所有学生锚点后，通读 <Transcript> 和 <PPT_Text>，找出学生笔记**完全未覆盖**的重要知识点。判断标准：该知识点在任何一个 heading 或其 bullets 中均未出现，且在 <Transcript> 中有明确讲解。将这些遗漏知识点收集到 supplements 数组，每条格式与 notes 条目相同。如果没有遗漏，supplements 为空数组。
+6. **遗漏扫描**：处理完所有学生锚点后，找出学生笔记**完全未覆盖**的重要知识点，在末尾用"## 课堂补充"小节输出。**如果没有真正遗漏的知识点，绝对不要输出"课堂补充"小节。**
 
 # Few-Shot Examples (学习范例)
 
@@ -210,40 +209,19 @@ MY_NOTES_SYSTEM_PROMPT = """# Role & Philosophy
 </Example_Input>
 
 <Example_Output>
-{
-  "_thought_process": "1. 锚点A='梯度消失，太深传不回来'；锚点B='relu解决'。2. A在[14:20]，B在[15:10]。3. 两条 heading 均为事实描述，bullets 填底层机制。4. 跨条目隔离：ReLU 只写进锚点B。5. 遗漏扫描：[15:40] 讲了学习率选择，学生笔记完全未提及，收入 supplements。",
-  "notes": [
-    {
-      "heading": "梯度消失：网络太深，误差信号传不回来",
-      "bullets": [
-        "**根本机制**：反向传播基于**链式法则**，小于1的数值不断连乘，传到浅层时梯度趋近于0",
-        "**深度的影响**：网络越深，连乘次数越多，衰减越严重，前层权重几乎得不到有效更新"
-      ],
-      "timestamp_start": "14:20",
-      "timestamp_end": "14:55"
-    },
-    {
-      "heading": "ReLU 解决了梯度消失",
-      "bullets": [
-        "**为什么有效**：ReLU 在正区间导数恒为 1，消除了连乘衰减问题",
-        "**历史意义**：用 ReLU 替换 Sigmoid 是深度学习的重要突破之一"
-      ],
-      "timestamp_start": "15:10",
-      "timestamp_end": "15:30"
-    }
-  ],
-  "supplements": [
-    {
-      "heading": "学习率的选择影响训练稳定性",
-      "bullets": [
-        "**太大**：训练不稳定，参数更新幅度过大",
-        "**太小**：收敛速度过慢，训练效率低"
-      ],
-      "timestamp_start": "15:40",
-      "timestamp_end": "15:55"
-    }
-  ]
-}
+## 梯度消失：网络太深，误差信号传不回来
+- **根本机制**：反向传播基于**链式法则**，小于1的数值不断连乘，传到浅层时梯度趋近于0
+- **深度的影响**：网络越深，连乘次数越多，衰减越严重，前层权重几乎得不到有效更新
+
+## ReLU 解决了梯度消失
+- **为什么有效**：ReLU 在正区间导数恒为 1，消除了连乘衰减问题
+- **历史意义**：用 ReLU 替换 Sigmoid 是深度学习的重要突破之一
+
+## 课堂补充
+
+### 学习率的选择影响训练稳定性
+- **太大**：训练不稳定，参数更新幅度过大
+- **太小**：收敛速度过慢，训练效率低
 </Example_Output>
 
 ## Example 2 — 完整句主张，supplements 捡回遗漏知识点
@@ -260,60 +238,54 @@ MY_NOTES_SYSTEM_PROMPT = """# Role & Philosophy
 </Example_Input>
 
 <Example_Output>
-{
-  "_thought_process": "1. 锚点A='跨家族比较没有意义'；锚点B='同家族内通过参数数量/参数值比较'。2. A在[17:07]，B在[17:21]。3. 锚点A是主张句，bullets 填支撑原因。4. 跨条目隔离。5. 遗漏扫描：[18:51] 讲了如何调整复杂度，[19:13] 讲了数据点数量影响数据复杂度，两者在学生笔记中完全未提及，收入 supplements。",
-  "notes": [
-    {
-      "heading": "跨家族模型比较复杂度没有意义",
-      "bullets": [
-        "**结构根本不同**：决策树基于离散的分裂阈值，神经网络基于连续权重矩阵，参数含义完全不同",
-        "**缺乏统一度量**：不同家族的参数数量衡量的不是同一种「复杂度」，无法用同一标准比较"
-      ],
-      "timestamp_start": "17:07",
-      "timestamp_end": "17:21"
-    },
-    {
-      "heading": "有意义的比较在同一家族内：用参数数量或参数值衡量复杂度",
-      "bullets": [
-        "**参数数量**：参数越多模型越复杂；例：多层感知机参数远多于线性回归，因此更复杂",
-        "**参数取值**：大量参数为零或共享相同值时，模型实际描述复杂度降低",
-        "**权重共享**：卷积网络通过权重共享减少需要独立描述的参数数量，比同规模全连接网络更简单"
-      ],
-      "timestamp_start": "17:21",
-      "timestamp_end": "18:22"
-    }
-  ],
-  "supplements": [
-    {
-      "heading": "实践操作：如何调整模型复杂度",
-      "bullets": [
-        "**增加复杂度**：增加层数或隐藏单元数量",
-        "**降低复杂度**：减少层数或隐藏单元数量"
-      ],
-      "timestamp_start": "18:51",
-      "timestamp_end": "19:00"
-    },
-    {
-      "heading": "数据复杂度的评估",
-      "bullets": [
-        "**数据点数量**：样本数量是衡量数据复杂度的重要因素之一"
-      ],
-      "timestamp_start": "19:13",
-      "timestamp_end": "19:20"
-    }
-  ]
-}
+## 跨家族模型比较复杂度没有意义
+- **结构根本不同**：决策树基于离散的分裂阈值，神经网络基于连续权重矩阵，参数含义完全不同
+- **缺乏统一度量**：不同家族的参数数量衡量的不是同一种「复杂度」，无法用同一标准比较
+
+## 有意义的比较在同一家族内：用参数数量或参数值衡量复杂度
+- **参数数量**：参数越多模型越复杂；例：多层感知机参数远多于线性回归，因此更复杂
+- **参数取值**：大量参数为零或共享相同值时，模型实际描述复杂度降低
+- **权重共享**：卷积网络通过权重共享减少需要独立描述的参数数量，比同规模全连接网络更简单
+
+## 课堂补充
+
+### 实践操作：如何调整模型复杂度
+- **增加复杂度**：增加层数或隐藏单元数量
+- **降低复杂度**：减少层数或隐藏单元数量
+
+### 数据复杂度的评估
+- **数据点数量**：样本数量是衡量数据复杂度的重要因素之一
 </Example_Output>
 
+## Example 3 — 学生笔记已覆盖全部内容，无课堂补充
+<Example_Input>
+<Student_Note>
+过拟合问题严重
+</Student_Note>
+<Transcript>
+[05:10] 教授：过拟合是指模型在训练集上表现很好，但在新数据上表现很差。比如训练数据里5个违约者都穿蓝衬衫，模型就把蓝衬衫当成违约的预测信号，但这只是随机巧合，不是真实规律。
+[05:45] 教授：所以过拟合的本质是模型记住了训练集的噪声，而不是学到了真正的规律。
+</Transcript>
+</Example_Input>
+
+<Example_Output>
+## 过拟合问题严重
+- **定义**：模型在训练集上表现好，但在新数据上表现差——记住了噪声而非规律
+- **经典案例**：训练数据中5名违约者均穿蓝色衬衫，模型将「蓝色衬衫」识别为违约信号，实为随机巧合
+- **根本原因**：训练集缺乏对照组，模型捕捉到的是虚假相关，而非因果关系
+</Example_Output>
+
+（注意：上例中 Transcript 的内容已被学生笔记完全覆盖，因此不输出"课堂补充"小节。）
+
 # Output Constraints
-1. **纯净 JSON**：输出且仅输出一个合法的 JSON 对象，不要使用 ```json 这样的 Markdown 格式包裹。
-2. **heading 来自用户原词**：notes 中的标题必须以学生的关键词/短语为主干，最小改写使其语法完整；禁止 AI 自创与原笔记无关的标题。supplements 中的标题由 AI 自拟，需简洁准确。
-3. **bullets 格式**：每条必须用 `**要点名**：内容` 格式，禁止使用"比较方法之一是..."、"一是...二是..."等序数句式。
+1. **纯净 Markdown**：直接输出 Markdown 文本，不要输出 JSON，不要用代码块包裹，不要输出推演过程。
+2. **heading 来自用户原词**：`##` 标题必须以学生的关键词/短语为主干，最小改写使其语法完整；禁止 AI 自创与原笔记无关的标题。"课堂补充"小节的 `###` 标题由 AI 自拟，需简洁准确。
+3. **bullets 格式**：每条必须用 `- **要点名**：内容` 格式，禁止使用"比较方法之一是..."、"一是...二是..."等序数句式。
 4. **bullets 是新增知识，主张句禁止留空**：每条 bullet 必须是当前 heading 中未出现的新信息（原理、机制、例子）。如果 heading 是主张或结论，**必须**填入支撑该主张的底层原因或具体例子，禁止留空。
 5. **跨条目隔离**：每条 bullets 只能是当前 heading 的增量，禁止把其他锚点的内容写入当前条目。
 6. **bullets 是陈述事实**：直接写"是什么/为什么/怎么做"，严禁出现"讲稿说"、"老师指出"、"根据逐字稿"等元叙述语言。
-7. **拒绝幻觉**：所有 bullet 内容必须来自 <Transcript> 或 <PPT_Text>，确实找不到支撑内容时 bullets 才可留空数组。
-8. **supplements 只收真正遗漏的知识点**：supplements 中的每条必须满足两个条件——① 在 notes 的任何 heading 或 bullets 中均未出现；② 在 <Transcript> 或 <PPT_Text> 中有明确讲解。不得把 notes 已覆盖的内容重复写入 supplements。"""
+7. **拒绝幻觉**：所有 bullet 内容必须来自 <Transcript> 或 <PPT_Text>，确实找不到支撑内容时 bullets 才可留空。
+8. **课堂补充只收真正遗漏的知识点**：每条必须满足——① 在正文任何 heading 或 bullets 中均未出现；② 在当前页的 <Transcript> 或 <PPT_Text> 中有**明确的文字依据**，可以逐字引用。**禁止从训练记忆、示例或其他来源编造内容**。没有遗漏则不输出"课堂补充"小节。"""
 
 
 class MyNoteRequest(BaseModel):
@@ -342,29 +314,6 @@ def _build_my_note_user_msg(user_note: str, ppt_text: str, session_id: str, page
     )
 
 
-def _json_to_markdown(raw: str) -> str:
-    """把 prompt_v5.0 输出的 JSON 转成 Markdown，供前端渲染。"""
-    try:
-        data = json.loads(raw)
-        parts: list[str] = []
-        for note in data.get("notes", []):
-            parts.append(f"## {note.get('heading', '')}")
-            for b in note.get("bullets", []):
-                parts.append(f"- {b}")
-            parts.append("")
-        supplements = data.get("supplements", [])
-        if supplements:
-            parts.append("## 课堂补充")
-            for note in supplements:
-                parts.append(f"### {note.get('heading', '')}")
-                for b in note.get("bullets", []):
-                    parts.append(f"- {b}")
-                parts.append("")
-        return "\n".join(parts).strip()
-    except Exception:
-        if "_thought_process" in raw:
-            return "## 生成结果解析失败\n- 请重试一次"
-        return raw
 
 
 @router.post("/sessions/{session_id}/page/{page_num}/my-notes")
@@ -384,8 +333,8 @@ async def generate_my_note(session_id: str, page_num: int, req: MyNoteRequest, r
 
     user_msg = _build_my_note_user_msg(req.user_note, req.ppt_text, session_id, page_num)
 
-    # 收集完整 JSON 输出，解析后转 Markdown 再推送（prompt v4.1 输出 JSON）
-    async def collect_and_stream_anthropic():
+    # 直接流式推送 Markdown chunks（prompt 已改为 Markdown 输出）
+    async def stream_anthropic():
         import anthropic as _anthropic
         import os
         api_key = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -395,7 +344,6 @@ async def generate_my_note(session_id: str, page_num: int, req: MyNoteRequest, r
             kwargs["default_headers"] = {"Authorization": f"Bearer {api_key}"}
         client = _anthropic.AsyncAnthropic(api_key=api_key, **kwargs)
         model = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
-        full = ""
         async with client.messages.stream(
             model=model,
             max_tokens=2048,
@@ -403,12 +351,10 @@ async def generate_my_note(session_id: str, page_num: int, req: MyNoteRequest, r
             messages=[{"role": "user", "content": user_msg}],
         ) as stream:
             async for text in stream.text_stream:
-                full += text
-        md = _json_to_markdown(full)
-        yield f"data: {json.dumps({'chunk': md})}\n\n"
+                yield f"data: {json.dumps({'chunk': text})}\n\n"
         yield "data: [DONE]\n\n"
 
-    async def collect_and_stream_openai_compat(base_url: str, api_key: str, model: str):
+    async def stream_openai_compat(base_url: str, api_key: str, model: str):
         import openai as _openai
         client = _openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
         stream = await client.chat.completions.create(
@@ -420,13 +366,10 @@ async def generate_my_note(session_id: str, page_num: int, req: MyNoteRequest, r
                 {"role": "user", "content": user_msg},
             ],
         )
-        full = ""
         async for chunk in stream:
             delta = chunk.choices[0].delta.content if chunk.choices else None
             if delta:
-                full += delta
-        md = _json_to_markdown(full)
-        yield f"data: {json.dumps({'chunk': md})}\n\n"
+                yield f"data: {json.dumps({'chunk': delta})}\n\n"
         yield "data: [DONE]\n\n"
 
     import os
@@ -434,21 +377,21 @@ async def generate_my_note(session_id: str, page_num: int, req: MyNoteRequest, r
     provider = req.provider
 
     if provider == PROVIDER_ZHONGZHUAN:
-        gen = collect_and_stream_anthropic()
+        gen = stream_anthropic()
     elif provider == PROVIDER_QWEN:
-        gen = collect_and_stream_openai_compat(
+        gen = stream_openai_compat(
             base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
             api_key=os.environ.get("DASHSCOPE_API_KEY", ""),
             model=os.environ.get("QWEN_MODEL", "qwen-plus"),
         )
     elif provider == PROVIDER_DEEPSEEK:
-        gen = collect_and_stream_openai_compat(
+        gen = stream_openai_compat(
             base_url="https://api.deepseek.com",
             api_key=os.environ.get("DEEPSEEK_API_KEY", ""),
             model=os.environ.get("DEEPSEEK_MODEL", "deepseek-chat"),
         )
     elif provider == PROVIDER_DOUBAO:
-        gen = collect_and_stream_openai_compat(
+        gen = stream_openai_compat(
             base_url="https://ark.cn-beijing.volces.com/api/v3",
             api_key=os.environ.get("VOLC_API_KEY", ""),
             model=os.environ.get("DOUBAO_MODEL", "doubao-pro-4k"),

@@ -49,7 +49,8 @@ ALIGNMENT_LOW_CONFIDENCE_THRESHOLD: float = 0.60
 #   "whisper"  OpenAI Whisper API（支持中英文）
 #   "aliyun"   阿里云录音文件识别 RESTful API（支持中英文，需配置 ALIYUN_* + OSS 环境变量）
 #   "race"     同时跑 aliyun + whisper，谁先完成用谁
-ASR_ENGINE: str = "race"
+import os as _os
+ASR_ENGINE: str = _os.environ.get("ASR_ENGINE", "whisper")
 
 # Whisper 模型（目前 API 只有 whisper-1）
 ASR_WHISPER_MODEL: str = "whisper-1"
@@ -68,7 +69,7 @@ ASR_MAX_MERGE_CHARS: int = 200
 # 笔记生成 provider，可选值：
 #   "中转站"  使用 ANTHROPIC_API_KEY（Anthropic SDK）
 #   "智增增"  使用 OPENAI_API_KEY + OPENAI_BASE_URL（OpenAI 兼容 SDK）
-NOTE_PROVIDER: str = "中转站"
+NOTE_PROVIDER: str = "智增增"
 
 # Claude 模型版本（仅 provider=中转站 生效）
 NOTE_MODEL: str = "claude-sonnet-4-6"
@@ -87,7 +88,7 @@ NOTE_ACTIVE_TEMPLATE: str = "active_expand"
 NOTE_GRANULARITY: str = "detailed"
 
 # 每页 LLM 调用最大并发数
-NOTE_MAX_CONCURRENT: int = 10
+NOTE_MAX_CONCURRENT: int = 2
 
 # 每页失败最大重试次数
 NOTE_MAX_RETRIES: int = 3
