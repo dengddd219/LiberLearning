@@ -1,0 +1,394 @@
+[
+  {
+    "version": "baseline_student_note_only",
+    "method1_fact_coverage": {
+      "count": 4.0,
+      "runs": [
+        4,
+        4,
+        4
+      ]
+    },
+    "method2a_vs_transcript": {
+      "type_of_overlap": "subset",
+      "contradiction": false,
+      "runs_overlap": [
+        "subset",
+        "subset",
+        "subset"
+      ],
+      "runs_contradiction": [
+        false,
+        false,
+        false
+      ]
+    },
+    "method2b_vs_ideal_note": {
+      "type_of_overlap": "subset",
+      "contradiction": false,
+      "runs_overlap": [
+        "subset",
+        "subset",
+        "subset"
+      ],
+      "runs_contradiction": [
+        false,
+        false,
+        false
+      ]
+    },
+    "method3_anchor_preservation": {
+      "anchor_preserved": true,
+      "coverage_ratio": 1.0,
+      "ignored_anchors": [],
+      "runs_ratio": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  },
+  {
+    "version": "baseline_transcript_summary",
+    "method1_fact_coverage": {
+      "count": 10.0,
+      "runs": [
+        10,
+        10,
+        10
+      ]
+    },
+    "method2a_vs_transcript": {
+      "type_of_overlap": "subset",
+      "contradiction": false,
+      "runs_overlap": [
+        "subset",
+        "subset",
+        "subset"
+      ],
+      "runs_contradiction": [
+        false,
+        false,
+        false
+      ]
+    },
+    "method2b_vs_ideal_note": {
+      "type_of_overlap": "subset",
+      "contradiction": false,
+      "runs_overlap": [
+        "subset",
+        "subset",
+        "subset"
+      ],
+      "runs_contradiction": [
+        false,
+        false,
+        false
+      ]
+    },
+    "method3_anchor_preservation": {
+      "anchor_preserved": true,
+      "coverage_ratio": 1.0,
+      "ignored_anchors": [],
+      "runs_ratio": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  },
+  {
+    "version": "v0",
+    "method1_fact_coverage": {
+      "count": 10.0,
+      "runs": [
+        10,
+        10,
+        10
+      ]
+    },
+    "method2a_vs_transcript": {
+      "type_of_overlap": "subset",
+      "contradiction": false,
+      "runs_overlap": [
+        "superset",
+        "subset",
+        "subset"
+      ],
+      "runs_contradiction": [
+        false,
+        false,
+        false
+      ]
+    },
+    "method2b_vs_ideal_note": {
+      "type_of_overlap": "equal",
+      "contradiction": false,
+      "runs_overlap": [
+        "equal",
+        "equal",
+        "equal"
+      ],
+      "runs_contradiction": [
+        false,
+        false,
+        false
+      ]
+    },
+    "method3_anchor_preservation": {
+      "anchor_preserved": true,
+      "coverage_ratio": 1.0,
+      "ignored_anchors": [],
+      "runs_ratio": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  },
+  {
+    "version": "v1",
+    "method1_fact_coverage": {
+      "count": 10.0,
+      "runs": [
+        10,
+        10,
+        10
+      ]
+    },
+    "method2a_vs_transcript": {
+      "type_of_overlap": "superset",
+      "contradiction": false,
+      "runs_overlap": [
+        "superset",
+        "equal",
+        "superset"
+      ],
+      "runs_contradiction": [
+        false,
+        false,
+        false
+      ]
+    },
+    "method2b_vs_ideal_note": {
+      "type_of_overlap": "superset",
+      "contradiction": false,
+      "runs_overlap": [
+        "superset",
+        "superset",
+        "superset"
+      ],
+      "runs_contradiction": [
+        false,
+        false,
+        false
+      ]
+    },
+    "method3_anchor_preservation": {
+      "anchor_preserved": true,
+      "coverage_ratio": 1.0,
+      "ignored_anchors": [],
+      "runs_ratio": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  },
+  {
+    "version": "v3.1",
+    "method1_fact_coverage": {
+      "count": 7.7,
+      "runs": [
+        8,
+        7,
+        8
+      ]
+    },
+    "method2a_vs_transcript": {
+      "type_of_overlap": "subset",
+      "contradiction": false,
+      "runs_overlap": [
+        "overlapping",
+        "subset",
+        "subset"
+      ],
+      "runs_contradiction": [
+        false,
+        false,
+        false
+      ]
+    },
+    "method2b_vs_ideal_note": {
+      "type_of_overlap": "superset",
+      "contradiction": false,
+      "runs_overlap": [
+        "superset",
+        "superset",
+        "superset"
+      ],
+      "runs_contradiction": [
+        false,
+        false,
+        false
+      ]
+    },
+    "method3_anchor_preservation": {
+      "anchor_preserved": true,
+      "coverage_ratio": 1.0,
+      "ignored_anchors": [],
+      "runs_ratio": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  },
+  {
+    "version": "v3",
+    "method1_fact_coverage": {
+      "count": 8.3,
+      "runs": [
+        8,
+        8,
+        9
+      ]
+    },
+    "method2a_vs_transcript": {
+      "type_of_overlap": "subset",
+      "contradiction": false,
+      "runs_overlap": [
+        "subset",
+        "subset",
+        "subset"
+      ],
+      "runs_contradiction": [
+        false,
+        false,
+        false
+      ]
+    },
+    "method2b_vs_ideal_note": {
+      "type_of_overlap": "subset",
+      "contradiction": false,
+      "runs_overlap": [
+        "subset",
+        "subset",
+        "subset"
+      ],
+      "runs_contradiction": [
+        false,
+        false,
+        false
+      ]
+    },
+    "method3_anchor_preservation": {
+      "anchor_preserved": true,
+      "coverage_ratio": 1.0,
+      "ignored_anchors": [],
+      "runs_ratio": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  },
+  {
+    "version": "v4.0",
+    "method1_fact_coverage": {
+      "count": 8.3,
+      "runs": [
+        8,
+        8,
+        9
+      ]
+    },
+    "method2a_vs_transcript": {
+      "type_of_overlap": "subset",
+      "contradiction": false,
+      "runs_overlap": [
+        "subset",
+        "subset",
+        "subset"
+      ],
+      "runs_contradiction": [
+        false,
+        false,
+        false
+      ]
+    },
+    "method2b_vs_ideal_note": {
+      "type_of_overlap": "subset",
+      "contradiction": false,
+      "runs_overlap": [
+        "subset",
+        "subset",
+        "overlapping"
+      ],
+      "runs_contradiction": [
+        false,
+        false,
+        false
+      ]
+    },
+    "method3_anchor_preservation": {
+      "anchor_preserved": true,
+      "coverage_ratio": 1.0,
+      "ignored_anchors": [],
+      "runs_ratio": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  },
+  {
+    "version": "v4.1",
+    "method1_fact_coverage": {
+      "count": 7.7,
+      "runs": [
+        8,
+        8,
+        7
+      ]
+    },
+    "method2a_vs_transcript": {
+      "type_of_overlap": "subset",
+      "contradiction": false,
+      "runs_overlap": [
+        "subset",
+        "subset",
+        "subset"
+      ],
+      "runs_contradiction": [
+        false,
+        false,
+        false
+      ]
+    },
+    "method2b_vs_ideal_note": {
+      "type_of_overlap": "subset",
+      "contradiction": false,
+      "runs_overlap": [
+        "subset",
+        "subset",
+        "subset"
+      ],
+      "runs_contradiction": [
+        false,
+        false,
+        false
+      ]
+    },
+    "method3_anchor_preservation": {
+      "anchor_preserved": true,
+      "coverage_ratio": 1.0,
+      "ignored_anchors": [],
+      "runs_ratio": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  }
+]

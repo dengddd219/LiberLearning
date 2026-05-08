@@ -1,0 +1,49 @@
+{
+  "version": "v1",
+  "method1_fact_coverage": {
+    "count": 10.0,
+    "runs": [
+      10,
+      10,
+      10
+    ]
+  },
+  "method2a_vs_transcript": {
+    "type_of_overlap": "superset",
+    "contradiction": false,
+    "runs_overlap": [
+      "superset",
+      "equal",
+      "superset"
+    ],
+    "runs_contradiction": [
+      false,
+      false,
+      false
+    ]
+  },
+  "method2b_vs_ideal_note": {
+    "type_of_overlap": "superset",
+    "contradiction": false,
+    "runs_overlap": [
+      "superset",
+      "superset",
+      "superset"
+    ],
+    "runs_contradiction": [
+      false,
+      false,
+      false
+    ]
+  },
+  "method3_anchor_preservation": {
+    "anchor_preserved": true,
+    "coverage_ratio": 1.0,
+    "ignored_anchors": [],
+    "runs_ratio": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  }
+}
