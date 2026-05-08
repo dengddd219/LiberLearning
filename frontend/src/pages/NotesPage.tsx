@@ -100,10 +100,10 @@ export default function NotesPage() {
     }
   }, [processingSessionId, loading, pipelineSyncLagging])
 
-  useSessionEvents(processingSessionId, pagePhase === 'processing', handleSSEEvent)
+  useSessionEvents(processingSessionId, pagePhase === 'processing' && processingSessionId !== '__pending__', handleSSEEvent)
 
   useEffect(() => {
-    if (pagePhase !== 'processing' || !processingSessionId) return
+    if (pagePhase !== 'processing' || !processingSessionId || processingSessionId === '__pending__') return
     const timer = setInterval(async () => {
       const idleMs = Date.now() - lastPipelineTickMsRef.current
       if (idleMs > 15000) setPipelineSyncLagging(true)
@@ -130,11 +130,7 @@ export default function NotesPage() {
   const [localPdfUrl, setLocalPdfUrl] = useState<string | null>(null)
 
   const handleUploadSuccess = useCallback((newSessionId: string, pages: PptPage[], pdfUrl?: string) => {
-    setProcessingSessionId(newSessionId)
-    setPagePhase('processing')
-    setLoading(false)
     if (pdfUrl) setLocalPdfUrl(pdfUrl)
-    navigate(`/notes/${newSessionId}`, { replace: true, state: { phase: 'processing' } })
     if (pages.length > 0) {
       const tempSession: SessionData = {
         session_id: newSessionId,
@@ -159,9 +155,19 @@ export default function NotesPage() {
       }
       setPptPageCount(pages.length)
       setSession(tempSession)
-    } else {
-      setLoading(true)
     }
+    // __pending__ 表示 PPT 已上传完但 session 还未创建，先跳转展示 PPT
+    if (newSessionId === '__pending__') {
+      setPagePhase('processing')
+      setLoading(false)
+      navigate('/notes/__pending__', { replace: true, state: { phase: 'processing' } })
+      return
+    }
+    setProcessingSessionId(newSessionId)
+    setPagePhase('processing')
+    setLoading(false)
+    navigate(`/notes/${newSessionId}`, { replace: true, state: { phase: 'processing' } })
+    if (pages.length === 0) setLoading(true)
   }, [navigate])
 
   const [playingSegIdx, setPlayingSegIdx] = useState<number | null>(null)

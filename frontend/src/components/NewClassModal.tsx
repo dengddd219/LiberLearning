@@ -172,8 +172,6 @@ export default function NewClassModal({ onUploadSuccess, onClose }: NewClassModa
       setUploading(true)
       setUploadError(null)
       try {
-        // Correctness first: always lock this submit to the currently selected PPT.
-        // This avoids any stale ppt_id/pages from previous async pre-upload attempts.
         let ensuredPptId = pptId
         let ensuredPptPages = pptPages
         if (pptFile) {
@@ -182,9 +180,19 @@ export default function NewClassModal({ onUploadSuccess, onClose }: NewClassModa
           ensuredPptPages = res.pages
           setPptId(res.ppt_id)
           setPptPages(res.pages)
+          // PPT 上传完立刻跳转，传入 pages 让笔记页先渲染 PPT
+          // uploadFiles 在后台继续，完成后通过 onUploadSuccess 更新 session_id
+          onUploadSuccess('__pending__', ensuredPptPages, localPdfUrl ?? undefined)
+          uploadFiles(undefined, audioFile, 'en', undefined, ensuredPptId)
+            .then(result => onUploadSuccess(result.session_id, ensuredPptPages, localPdfUrl ?? undefined))
+            .catch(err => {
+              console.error('Upload failed:', err)
+            })
+        } else {
+          // 无 PPT，直接等结果
+          const result = await uploadFiles(undefined, audioFile, 'en', undefined, undefined)
+          onUploadSuccess(result.session_id, ensuredPptPages, localPdfUrl ?? undefined)
         }
-        const result = await uploadFiles(pptFile ?? undefined, audioFile, 'en', undefined, ensuredPptId ?? undefined)
-        onUploadSuccess(result.session_id, ensuredPptPages, localPdfUrl ?? undefined)
       } catch (err) {
         console.error('Upload failed:', err)
         setUploadError('上传失败，请检查网络后重试')
