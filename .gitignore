@@ -41,3 +41,6 @@ __pycache__/
 
 # SQLite database
 backend/database.db
+
+# Private notes
+人，读一下/
