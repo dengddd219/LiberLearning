@@ -19,165 +19,12 @@ def _current_user_id(request: Request) -> str:
     return user["id"]
 
 
-def _owned_session_or_404(session_id: str, request: Request, allow_mock: bool = False) -> dict:
-    if allow_mock and session_id == "mock-session-001":
-        return MOCK_SESSION
+def _owned_session_or_404(session_id: str, request: Request) -> dict:
     import db as _db
     session = _db.get_session(session_id, user_id=_current_user_id(request))
     if session:
         return session
     raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
-
-# ---------------------------------------------------------------------------
-# Mock data — 3-page session covering all note scenarios:
-#   Page 1: user has annotations → active_notes rendered
-#   Page 2: pure lecture, no annotations → passive_notes only
-#   Page 3: teacher left PPT → page_supplement populated
-# ---------------------------------------------------------------------------
-MOCK_SESSION = {
-    "session_id": "mock-session-001",
-    "status": "ready",
-    "ppt_filename": "计算机网络第三章.pptx",
-    "audio_url": "/audio/sample.mp3",
-    "total_duration": 5400,  # 90 minutes in seconds
-    "pages": [
-        {
-            "page_num": 1,
-            "status": "ready",
-            "pdf_url": "/slides/slides.pdf",
-            "pdf_page_num": 1,
-            "ppt_text": "第三章 数据链路层\n• 功能与服务\n• 成帧（Framing）\n• 差错控制\n• 流量控制",
-            "page_start_time": 0,
-            "page_end_time": 1200,
-            "alignment_confidence": 0.92,
-            "active_notes": {
-                "user_note": "老师说这章是重点，期末必考",
-                "ai_expansion": "数据链路层是OSI七层模型的第二层，负责在相邻节点之间的链路上传送以帧为单位的数据。其核心功能包括：\n\n**成帧**：将网络层传来的数据报文封装成帧，加上帧头和帧尾标识边界。\n\n**差错控制**：通过CRC循环冗余校验检测传输错误，常见方案包括停止等待协议（Stop-and-Wait）和滑动窗口协议。\n\n**流量控制**：防止发送方速率超过接收方处理能力，避免缓冲区溢出。"
-            },
-            "passive_notes": {
-                "bullets": [
-                    {
-                        "ppt_text": "第三章 数据链路层",
-                        "level": 0,
-                        "ai_comment": "本章是OSI七层模型的第二层。核心职责是在相邻节点之间以帧为单位可靠传输数据。注意它只管一跳（hop）之内的传输，跨节点的端到端可靠性由传输层负责。",
-                        "timestamp_start": 45,
-                        "timestamp_end": 98
-                    },
-                    {
-                        "ppt_text": "功能与服务",
-                        "level": 1,
-                        "ai_comment": "数据链路层提供三大核心服务：成帧、差错控制、流量控制。成帧负责封装数据报；差错控制用CRC检错、ARQ纠错；流量控制用滑动窗口限速。三者协同保证一跳内的可靠传输。",
-                        "timestamp_start": 100,
-                        "timestamp_end": 170
-                    },
-                    {
-                        "ppt_text": "成帧（Framing）",
-                        "level": 1,
-                        "ai_comment": "将网络层数据报封装成帧，加帧头帧尾标识边界。常见方法有三种：字节计数法（帧头写长度）、字节填充法（FLAG字节转义）、比特填充法（5个1后插0）。帧头还包含源/目MAC地址和帧类型字段。",
-                        "timestamp_start": 120,
-                        "timestamp_end": 210
-                    },
-                    {
-                        "ppt_text": "差错控制",
-                        "level": 1,
-                        "ai_comment": "CRC只检错不纠错；ARQ负责重传。常见ARQ协议：Stop-and-Wait、Go-Back-N、Selective Repeat。",
-                        "timestamp_start": 380,
-                        "timestamp_end": 490
-                    },
-                    {
-                        "ppt_text": "流量控制",
-                        "level": 1,
-                        "ai_comment": "滑动窗口机制限制发送方速率，防止接收方缓冲区溢出。吞吐量上限 = window_size / RTT。",
-                        "timestamp_start": 670,
-                        "timestamp_end": 740
-                    }
-                ]
-            },
-            "aligned_segments": [
-                {"start": 45,  "end": 98,  "text": "数据链路层是OSI七层模型的第二层，负责在相邻节点之间以帧为单位传送数据。"},
-                {"start": 120, "end": 210, "text": "成帧就是把数据报文加上帧头帧尾，常见方法有字节计数法和比特填充法。"},
-                {"start": 380, "end": 490, "text": "差错控制用CRC来检测错误，ARQ负责重传，Stop-and-Wait是最基础的ARQ协议。"},
-                {"start": 670, "end": 740, "text": "流量控制用滑动窗口限制发送方速率，窗口大小除以RTT就是吞吐量上限。"}
-            ],
-            "page_supplement": None
-        },
-        {
-            "page_num": 2,
-            "status": "ready",
-            "pdf_url": "/slides/slides.pdf",
-            "pdf_page_num": 2,
-            "ppt_text": "停止等待协议（Stop-and-Wait ARQ）\n• 发送一帧，等待ACK\n• 超时重传\n• 信道利用率 = T1 / (T1 + RTT + T2)",
-            "page_start_time": 1200,
-            "page_end_time": 2800,
-            "alignment_confidence": 0.88,
-            "active_notes": None,
-            "passive_notes": {
-                "bullets": [
-                    {
-                        "ppt_text": "停止等待协议（Stop-and-Wait ARQ）",
-                        "level": 0,
-                        "ai_comment": "最简单的ARQ协议，每次只发一帧，等ACK后才发下一帧。实现极简，但信道利用率极低。当RTT很大时，发送方大部分时间在空等，这是滑动窗口协议被提出的根本动机。",
-                        "timestamp_start": 1250,
-                        "timestamp_end": 1360
-                    },
-                    {
-                        "ppt_text": "发送一帧，等待ACK",
-                        "level": 1,
-                        "ai_comment": None,
-                        "timestamp_start": -1,
-                        "timestamp_end": -1
-                    },
-                    {
-                        "ppt_text": "超时重传",
-                        "level": 1,
-                        "ai_comment": "计时器到期未收ACK则重发。超时时间设置是工程难题：太短误重传，太长恢复慢。TCP用SRTT+4×RTTVAR动态估算。",
-                        "timestamp_start": 1920,
-                        "timestamp_end": 2050
-                    },
-                    {
-                        "ppt_text": "信道利用率 = T1 / (T1 + RTT + T2)",
-                        "level": 1,
-                        "ai_comment": "当RTT >> T_f时信道大部分时间在等待，利用率趋近于0，这是引入滑动窗口的核心动机。",
-                        "timestamp_start": 1580,
-                        "timestamp_end": 1720
-                    }
-                ]
-            },
-            "aligned_segments": [
-                {"start": 1250, "end": 1360, "text": "停止等待协议最简单，每次只发一帧，等ACK回来才发下一帧。"},
-                {"start": 1580, "end": 1720, "text": "信道利用率公式是 U = T_f 除以 T_f 加 RTT 加 T_a，RTT 越大利用率越低。"},
-                {"start": 1920, "end": 2050, "text": "超时重传：计时器到期还没收到ACK就重发，超时时间的设置是工程难题。"},
-                {"start": 2400, "end": 2480, "text": "停止等待协议序号只需要1位，因为任意时刻最多只有1帧在飞。"}
-            ],
-            "page_supplement": None
-        },
-        {
-            "page_num": 3,
-            "status": "partial_ready",
-            "pdf_url": "/slides/slides.pdf",
-            "pdf_page_num": 3,
-            "ppt_text": "Go-Back-N 协议\n• 发送窗口 ≤ 2^n - 1\n• 累积确认\n• 接收方丢弃失序帧",
-            "page_start_time": 2800,
-            "page_end_time": 3600,
-            "alignment_confidence": 0.51,
-            "active_notes": None,
-            "passive_notes": {
-                "error": "LLM generation failed after 3 retries: connection timeout",
-                "bullets": []
-            },
-            "aligned_segments": [
-                {"start": 2810, "end": 2950, "text": "Go-Back-N 协议的发送窗口大小最大是 2 的 n 次方减 1。"},
-                {"start": 3050, "end": 3180, "text": "累积确认的意思是，ACK n 表示 n 之前的帧都已经收到了。"},
-                {"start": 3200, "end": 3350, "text": "接收方会丢弃所有失序帧，这是和选择重传协议最大的区别。"}
-            ],
-            "page_supplement": {
-                "content": "老师在讲GBN时打开了Wireshark演示TCP重传过程，展示了一个丢包场景：发送方在第3帧丢失后，从第3帧开始重传了第3、4、5帧（回退N帧）。重传率约为18%，老师强调实际网络中GBN的回退重传会造成大量冗余流量，这是SR协议被提出的原因。",
-                "timestamp_start": 3200,
-                "timestamp_end": 3550
-            }
-        }
-    ]
-}
 
 
 class RenameRequest(BaseModel):
@@ -314,7 +161,7 @@ def list_sessions(request: Request):
 
 @router.get("/sessions/{session_id}")
 def get_session(session_id: str, request: Request):
-    return _owned_session_or_404(session_id, request, allow_mock=True)
+    return _owned_session_or_404(session_id, request)
 
 
 MY_NOTES_SYSTEM_PROMPT = """# Role & Philosophy
@@ -338,6 +185,7 @@ MY_NOTES_SYSTEM_PROMPT = """# Role & Philosophy
    - **支撑 vs 复述的区分**：支撑 = 解释"为什么成立"（原因、机制、具体例子）；复述 = 换措辞重说同一件事。找到支撑材料就必须填，不得以"heading 已完整"为由留空。
 4. **案例提取**：该知识点有什么具体例子？直接织入对应的 bullet 中。
 5. **跨条目隔离**：每条 bullets 只能是当前 heading 的增量信息。禁止把其他锚点的内容写入当前条目。
+6. **遗漏扫描**：处理完所有学生锚点后，通读 <Transcript> 和 <PPT_Text>，找出学生笔记**完全未覆盖**的重要知识点。判断标准：该知识点在任何一个 heading 或其 bullets 中均未出现，且在 <Transcript> 中有明确讲解。将这些遗漏知识点收集到 supplements 数组，每条格式与 notes 条目相同。如果没有遗漏，supplements 为空数组。
 
 # Few-Shot Examples (学习范例)
 
@@ -349,12 +197,13 @@ MY_NOTES_SYSTEM_PROMPT = """# Role & Philosophy
 <Transcript>
 [14:20] 教授：当我们训练非常深层的神经网络时，会遇到一个大麻烦，叫梯度消失。因为反向传播用的是链式法则，小于1的数连乘，到前面就接近0了，误差信号根本传不回来。
 [15:10] 教授：怎么解决呢？历史上一个重大的突破就是换激活函数。不用 Sigmoid，我们用 ReLU。ReLU 在正区间的导数恒为1，完美解决了连乘衰减的问题。
+[15:40] 教授：另外要注意，学习率的选择也很关键。学习率太大会导致训练不稳定，太小则收敛太慢。
 </Transcript>
 </Example_Input>
 
 <Example_Output>
 {
-  "_thought_process": "1. 锚点A='梯度消失，太深传不回来'（残缺速记，升级为完整 heading）；锚点B='relu解决'（残缺，升级）。2. A在[14:20]，B在[15:10]。3. 两条 heading 均为事实描述，bullets 填底层机制。4. 注意跨条目隔离：ReLU 的内容只写进锚点B，不写进锚点A。",
+  "_thought_process": "1. 锚点A='梯度消失，太深传不回来'；锚点B='relu解决'。2. A在[14:20]，B在[15:10]。3. 两条 heading 均为事实描述，bullets 填底层机制。4. 跨条目隔离：ReLU 只写进锚点B。5. 遗漏扫描：[15:40] 讲了学习率选择，学生笔记完全未提及，收入 supplements。",
   "notes": [
     {
       "heading": "梯度消失：网络太深，误差信号传不回来",
@@ -374,11 +223,22 @@ MY_NOTES_SYSTEM_PROMPT = """# Role & Philosophy
       "timestamp_start": "15:10",
       "timestamp_end": "15:30"
     }
+  ],
+  "supplements": [
+    {
+      "heading": "学习率的选择影响训练稳定性",
+      "bullets": [
+        "**太大**：训练不稳定，参数更新幅度过大",
+        "**太小**：收敛速度过慢，训练效率低"
+      ],
+      "timestamp_start": "15:40",
+      "timestamp_end": "15:55"
+    }
   ]
 }
 </Example_Output>
 
-## Example 2 — 完整句主张，bullets 必须填支撑，禁止串扰
+## Example 2 — 完整句主张，supplements 捡回遗漏知识点
 <Example_Input>
 <Student_Note>
 没有意义的比较，因为树模型和神经网络完全不一样，不能直接说谁更复杂。有意义的比较是在同一个模型家族内，通过参数数量或参数值来调整和比较模型的复杂度。
@@ -386,12 +246,14 @@ MY_NOTES_SYSTEM_PROMPT = """# Role & Philosophy
 <Transcript>
 [17:07] 教授：一般来说，很难在不同模型之间比较复杂度。比如树模型和神经网络，你很难说哪个更复杂，因为它们的结构完全不一样，参数的含义也不同。决策树用的是分裂阈值，神经网络用的是连续权重，根本不是同一个东西。
 [17:21] 教授：但是在同一个家族里，比如都是神经网络，我们就可以用参数数量来比较了。参数越多，模型越复杂，比如多层感知机比线性回归参数更多。还有一种是看参数取值，很多参数为零的模型其实更简单，卷积网络通过权重共享减少了需要描述的参数数量。
+[18:51] 教授：这给了我们一个实践指引：想增加复杂度就增加层数或隐藏单元，想降低复杂度则相反。
+[19:13] 教授：如果你想评估数据的复杂度，数据点的数量肯定是一个重要因素。
 </Transcript>
 </Example_Input>
 
 <Example_Output>
 {
-  "_thought_process": "1. 锚点A='跨家族比较没有意义'（完整句主张，逐字升级为 heading）；锚点B='同家族内通过参数数量/参数值比较'（完整句，升级）。2. A在[17:07]，B在[17:21]。3. 锚点A是主张句——必须找支撑：逐字稿提供了'结构不同（分裂阈值 vs 连续权重）、参数含义不同'作为底层原因，这是支撑不是复述，必须填入。锚点B是描述句，bullets 填具体例子。4. 跨条目隔离：锚点A的 bullets 只写为什么跨家族不可比，不写同家族怎么比（那是锚点B的内容）。",
+  "_thought_process": "1. 锚点A='跨家族比较没有意义'；锚点B='同家族内通过参数数量/参数值比较'。2. A在[17:07]，B在[17:21]。3. 锚点A是主张句，bullets 填支撑原因。4. 跨条目隔离。5. 遗漏扫描：[18:51] 讲了如何调整复杂度，[19:13] 讲了数据点数量影响数据复杂度，两者在学生笔记中完全未提及，收入 supplements。",
   "notes": [
     {
       "heading": "跨家族模型比较复杂度没有意义",
@@ -410,7 +272,26 @@ MY_NOTES_SYSTEM_PROMPT = """# Role & Philosophy
         "**权重共享**：卷积网络通过权重共享减少需要独立描述的参数数量，比同规模全连接网络更简单"
       ],
       "timestamp_start": "17:21",
-      "timestamp_end": "18:51"
+      "timestamp_end": "18:22"
+    }
+  ],
+  "supplements": [
+    {
+      "heading": "实践操作：如何调整模型复杂度",
+      "bullets": [
+        "**增加复杂度**：增加层数或隐藏单元数量",
+        "**降低复杂度**：减少层数或隐藏单元数量"
+      ],
+      "timestamp_start": "18:51",
+      "timestamp_end": "19:00"
+    },
+    {
+      "heading": "数据复杂度的评估",
+      "bullets": [
+        "**数据点数量**：样本数量是衡量数据复杂度的重要因素之一"
+      ],
+      "timestamp_start": "19:13",
+      "timestamp_end": "19:20"
     }
   ]
 }
@@ -418,12 +299,13 @@ MY_NOTES_SYSTEM_PROMPT = """# Role & Philosophy
 
 # Output Constraints
 1. **纯净 JSON**：输出且仅输出一个合法的 JSON 对象，不要使用 ```json 这样的 Markdown 格式包裹。
-2. **heading 来自用户原词**：标题必须以学生的关键词/短语为主干，最小改写使其语法完整；禁止 AI 自创与原笔记无关的标题。
+2. **heading 来自用户原词**：notes 中的标题必须以学生的关键词/短语为主干，最小改写使其语法完整；禁止 AI 自创与原笔记无关的标题。supplements 中的标题由 AI 自拟，需简洁准确。
 3. **bullets 格式**：每条必须用 `**要点名**：内容` 格式，禁止使用"比较方法之一是..."、"一是...二是..."等序数句式。
 4. **bullets 是新增知识，主张句禁止留空**：每条 bullet 必须是当前 heading 中未出现的新信息（原理、机制、例子）。如果 heading 是主张或结论，**必须**填入支撑该主张的底层原因或具体例子，禁止留空。
 5. **跨条目隔离**：每条 bullets 只能是当前 heading 的增量，禁止把其他锚点的内容写入当前条目。
 6. **bullets 是陈述事实**：直接写"是什么/为什么/怎么做"，严禁出现"讲稿说"、"老师指出"、"根据逐字稿"等元叙述语言。
-7. **拒绝幻觉**：所有 bullet 内容必须来自 <Transcript> 或 <PPT_Text>，确实找不到支撑内容时 bullets 才可留空数组。"""
+7. **拒绝幻觉**：所有 bullet 内容必须来自 <Transcript> 或 <PPT_Text>，确实找不到支撑内容时 bullets 才可留空数组。
+8. **supplements 只收真正遗漏的知识点**：supplements 中的每条必须满足两个条件——① 在 notes 的任何 heading 或 bullets 中均未出现；② 在 <Transcript> 或 <PPT_Text> 中有明确讲解。不得把 notes 已覆盖的内容重复写入 supplements。"""
 
 
 class MyNoteRequest(BaseModel):
@@ -453,21 +335,25 @@ def _build_my_note_user_msg(user_note: str, ppt_text: str, session_id: str, page
 
 
 def _json_to_markdown(raw: str) -> str:
-    """把 prompt_v4.1 输出的 JSON 转成 Markdown，供前端渲染。"""
+    """把 prompt_v5.0 输出的 JSON 转成 Markdown，供前端渲染。"""
     try:
         data = json.loads(raw)
-        notes = data.get("notes", [])
         parts: list[str] = []
-        for note in notes:
-            heading = note.get("heading", "")
-            bullets = note.get("bullets", [])
-            parts.append(f"## {heading}")
-            for b in bullets:
+        for note in data.get("notes", []):
+            parts.append(f"## {note.get('heading', '')}")
+            for b in note.get("bullets", []):
                 parts.append(f"- {b}")
             parts.append("")
+        supplements = data.get("supplements", [])
+        if supplements:
+            parts.append("## 课堂补充")
+            for note in supplements:
+                parts.append(f"### {note.get('heading', '')}")
+                for b in note.get("bullets", []):
+                    parts.append(f"- {b}")
+                parts.append("")
         return "\n".join(parts).strip()
     except Exception:
-        # Avoid leaking model internal reasoning fields when JSON parse fails.
         if "_thought_process" in raw:
             return "## 生成结果解析失败\n- 请重试一次"
         return raw
