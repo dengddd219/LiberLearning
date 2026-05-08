@@ -8,21 +8,15 @@ import os
 import shutil
 import subprocess
 import tempfile
-from pathlib import Path
 
 
 def _ffmpeg_path() -> str:
     """Find FFmpeg executable."""
-    candidates = [
-        "ffmpeg",
-        r"C:\Users\19841\AppData\Local\Microsoft\WinGet\Links\ffmpeg.exe",
-        r"C:\Users\19841\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1-full_build\bin\ffmpeg.exe",
-    ]
-    for c in candidates:
-        if shutil.which(c) or Path(c).exists():
-            return c
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
     raise RuntimeError(
-        "FFmpeg not found. Run install_deps.bat and restart your terminal."
+        "FFmpeg not found. Install it with: apt-get install -y ffmpeg (Linux) or run install_deps.bat (Windows)."
     )
 
 
