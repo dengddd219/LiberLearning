@@ -21,7 +21,12 @@ def _current_user_id(request: Request) -> str:
 
 def _owned_session_or_404(session_id: str, request: Request) -> dict:
     import db as _db
-    session = _db.get_session(session_id, user_id=_current_user_id(request))
+    import os
+    # In public guest access mode, skip user_id check so anyone can view any session
+    if os.environ.get("PUBLIC_GUEST_ACCESS", "").lower() == "true":
+        session = _db.get_session(session_id)
+    else:
+        session = _db.get_session(session_id, user_id=_current_user_id(request))
     if session:
         return session
     raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
@@ -156,6 +161,9 @@ def get_settings():
 @router.get("/sessions")
 def list_sessions(request: Request):
     import db as _db
+    import os
+    if os.environ.get("PUBLIC_GUEST_ACCESS", "").lower() == "true":
+        return _db.list_sessions()
     return _db.list_sessions(user_id=_current_user_id(request))
 
 
