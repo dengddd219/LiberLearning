@@ -7,12 +7,15 @@ Process router.
 """
 
 import json as _json
+import logging
 import shutil
 import tempfile
 import time as _time
 import uuid
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, Request, UploadFile, File
 
@@ -552,6 +555,7 @@ async def _run_pipeline(
         _save_run_data()
 
     except Exception as exc:
+        logger.exception("Pipeline failed for session %s", session_id)
         db.update_session(session_id, {
             "status": "error", "error": str(exc), "progress": None,
         })
