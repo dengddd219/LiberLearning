@@ -1259,7 +1259,6 @@ export default function LivePage() {
           console.log('[LivePage] createLiveSession done, session_id=', session_id, 'cancelled=', cancelled, 'unmounted=', unmountedRef.current)
           if (cancelled || unmountedRef.current) return
           setDraftSessionId(session_id)
-          openTab({ sessionId: session_id, label: 'Live Session', path: `/live?session=${session_id}` })
           setInitializingSession(false)
         })
         .catch((createError) => {
