@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { uploadPpt, uploadFiles } from '../lib/api'
 import { useTranslation } from '../context/TranslationContext'
+import { capture } from '../lib/analytics'
 import type { PptPage } from '../types/session'
 
 const MAX_AUDIO_MB = 500
@@ -109,6 +110,7 @@ interface NewClassModalProps {
 export default function NewClassModal({ onUploadSuccess, onClose }: NewClassModalProps) {
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const modalOpenTimeRef = useRef(Date.now())
   const pptUploadReqIdRef = useRef(0)
   const [pptFile, setPptFile] = useState<File | null>(null)
   const [audioFile, setAudioFile] = useState<File | null>(null)
@@ -168,6 +170,10 @@ export default function NewClassModal({ onUploadSuccess, onClose }: NewClassModa
 
   const handleSubmit = useCallback(async () => {
     if (!audioFile) return
+    capture('upload_started', {
+      has_ppt: !!pptFile,
+      audio_size_mb: +(audioFile.size / 1024 / 1024).toFixed(2),
+    })
     if (onUploadSuccess) {
       setUploading(true)
       setUploadError(null)
@@ -184,7 +190,14 @@ export default function NewClassModal({ onUploadSuccess, onClose }: NewClassModa
           // uploadFiles 在后台继续，完成后通过 onUploadSuccess 更新 session_id
           onUploadSuccess('__pending__', ensuredPptPages, localPdfUrl ?? undefined)
           uploadFiles(undefined, audioFile, 'en', undefined, ensuredPptId)
-            .then(result => onUploadSuccess(result.session_id, ensuredPptPages, localPdfUrl ?? undefined))
+            .then(result => {
+              capture('upload_completed', {
+                has_ppt: !!pptFile,
+                slide_count: ensuredPptPages.length,
+                time_to_submit_sec: Math.round((Date.now() - modalOpenTimeRef.current) / 1000),
+              })
+              onUploadSuccess(result.session_id, ensuredPptPages, localPdfUrl ?? undefined)
+            })
             .catch(err => {
               console.error('Upload failed:', err)
             })
