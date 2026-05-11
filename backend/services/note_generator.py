@@ -465,7 +465,7 @@ async def _execute_llm_batch(
                     "LLM call failed (attempt %d/%d) for page %s: %s",
                     attempt + 1, MAX_RETRIES, task.page.page_num, e,
                 )
-                await asyncio.sleep(5 * (2 ** attempt))
+                await asyncio.sleep(1 * (2 ** attempt))
 
         # All retries exhausted — return a failed sentinel instead of raising
         logger.error(
