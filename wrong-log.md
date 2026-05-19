@@ -4,6 +4,79 @@
 
 ---
 
+## 2026-05-17 | TanStack Start 子路径部署全流程踩坑
+
+**背景**：将会议助手 Demo 部署到 `https://liberstudy.xyz/meeting`，Nginx 反代到本机 8002 端口，Node.js SSR。
+
+### 坑 1：router.tsx 缺少 basepath 导致路由全 404
+
+**问题**：部署后访问 `/meeting/lobby` 返回 404，所有子路由均不可达。
+
+**根因**：`createRouter()` 没有配置 `basepath: "/meeting"`，TanStack Router 默认以 `/` 为根，Nginx 把 `/meeting/` 前缀剥离后传给 Node，但 SSR 渲染时路由树匹配不到任何路径。
+
+**修复**：在 `src/router.tsx` 的 `createRouter()` 中加 `basepath: "/meeting"`。
+
+**启发**：子路径部署时，`basepath` 是第一个要配的东西，不是最后。先配好再构建，否则所有路由调试都是无效功。
+
+---
+
+### 坑 2：vite.config.ts 缺少 ROUTER_BASEPATH define 导致客户端路由失效
+
+**问题**：SSR 首屏能渲染，但客户端 hydration 后点击链接跳转失效，或刷新后 404。
+
+**根因**：TanStack Start 在客户端 bundle 里通过 `ROUTER_BASEPATH` 全局变量读取 basepath。如果 `vite.config.ts` 没有 `define: { ROUTER_BASEPATH: JSON.stringify("/meeting") }`，客户端 bundle 里这个变量是 `undefined`，客户端路由和 SSR 路由行为不一致。
+
+**修复**：在 `vite.config.ts` 加 `define: { ROUTER_BASEPATH: JSON.stringify("/meeting") }`。
+
+**启发**：TanStack Start 的 basepath 需要在**两个地方**同时配置：`router.tsx`（运行时）+ `vite.config.ts` define（构建时注入客户端 bundle）。漏一个就会出现 SSR/CSR 行为不一致的诡异问题。
+
+---
+
+### 坑 3：server.mjs 静态资源路径双重前缀
+
+**问题**：页面加载后 JS/CSS 资源 404，浏览器请求的是 `/meeting/assets/xxx.js`，但 server.mjs 只处理 `/assets/` 前缀。
+
+**根因**：Nginx `proxy_pass http://127.0.0.1:8002/` 末尾有斜杠，会把 `/meeting/` 前缀剥离后转发。但 TanStack Start 生成的 HTML 里静态资源引用是 `/meeting/assets/xxx.js`（带 basepath），Node 收到的请求路径就是 `/meeting/assets/xxx.js`，原始 server.mjs 只匹配 `/assets/` 开头，导致资源全部 404。
+
+**修复**：在 server.mjs 静态文件处理逻辑里增加对 `/meeting/assets/` 的处理，将其 slice 掉 `/meeting` 前缀后再去 `dist/client` 目录查找文件：
+```js
+if (pathname.startsWith("/assets/")) {
+  staticPath = pathname;
+} else if (pathname.startsWith("/meeting/assets/")) {
+  staticPath = pathname.slice("/meeting".length);
+}
+```
+
+**启发**：Nginx 子路径反代时，`proxy_pass` 末尾斜杠决定前缀是否被剥离。有斜杠 = 剥离，无斜杠 = 保留。要在 server.mjs 里明确处理两种可能的路径形式，或者统一约定好 Nginx 是否剥离前缀。
+
+---
+
+### 坑 4：Nginx proxy_pass 末尾斜杠语义
+
+**问题**：Nginx 配置 `location /meeting/` 时，`proxy_pass` 末尾有无斜杠行为完全不同，容易搞混。
+
+**规则**：
+- `proxy_pass http://127.0.0.1:8002/`（有斜杠）：`/meeting/lobby` → Node 收到 `/lobby`（前缀被剥离）
+- `proxy_pass http://127.0.0.1:8002`（无斜杠）：`/meeting/lobby` → Node 收到 `/meeting/lobby`（前缀保留）
+
+**本项目选择**：有斜杠（剥离前缀），Node 收到不带 `/meeting` 的路径，由 TanStack Router basepath 在框架层处理子路径语义。
+
+**启发**：部署前先在纸上画清楚"Nginx 传给 Node 的 URL 是什么"，再决定 server.mjs 和 router basepath 怎么配。这个决策一旦定了，三处配置（Nginx、server.mjs、router）必须保持一致。
+
+---
+
+### 坑 5：systemd ExecStart Node 路径问题
+
+**问题**：systemd 服务启动失败，`node: command not found`。
+
+**根因**：Node.js 通过 nvm 安装时，可执行文件在 `/root/.nvm/versions/node/vXX.X.X/bin/node`，不在 `/usr/bin/node`。systemd 服务不加载用户 shell 的 PATH，所以找不到 `node`。
+
+**修复**：`ExecStart` 改用绝对路径，或先 `which node` 确认路径再填入 service 文件。
+
+**启发**：写 systemd service 时，所有命令都用绝对路径。`which node`、`which bun` 先查清楚再写，不要依赖 PATH。
+
+---
+
 ## 2026-04-07 | 文件编码 × Edit 工具
 
 **问题**：修改 `LiberStudy-PRD.md` 中的中文内容，Edit 工具反复报 "String to replace not found"。

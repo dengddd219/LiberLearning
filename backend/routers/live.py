@@ -36,7 +36,7 @@ import auth as _auth
 from services.live_store import (
     create_session, get_session, update_session_status,
     update_session_page, save_segment, get_segments,
-    save_annotation, update_segment_assigned_pages,
+    save_annotation, update_segment_assigned_pages, save_ai_notes,
 )
 from services.live_note_builder import stream_notes, generate_detailed_note
 import db as _db
@@ -213,6 +213,7 @@ def live_get_state(session_id: str, request: Request, page_num: int | None = Non
         "current_page": session["current_page"],
         "transcript": transcript_with_page,
         "segment_count": len(segments),
+        "ai_notes": session.get("ai_notes") or None,
     }
 
 
@@ -288,12 +289,29 @@ def live_finalize_stream(req: FinalizeRequest, request: Request):
 
     def generate():
         try:
-            yield from stream_notes(raw_segments, req.ppt_pages, req.my_notes, max_retries=1)
-            update_session_status(req.session_id, "done")
-            try:
-                _db.update_session(req.session_id, {"status": "done"})
-            except Exception:
-                pass
+            collected_notes: list[str] = []
+            for chunk in stream_notes(raw_segments, req.ppt_pages, req.my_notes, max_retries=1):
+                # 收集纯文本 token 用于持久化
+                if chunk.startswith("data: ") and chunk.strip() != "data: [DONE]":
+                    try:
+                        payload = json.loads(chunk[6:].strip())
+                        if payload.get("text"):
+                            collected_notes.append(payload["text"])
+                    except Exception:
+                        pass
+                # 在 [DONE] 发出前先写状态，避免前端收到 [DONE] 时后端还是 finalizing
+                if chunk.strip() == "data: [DONE]":
+                    ai_notes_text = "".join(collected_notes)
+                    try:
+                        save_ai_notes(req.session_id, ai_notes_text)
+                    except Exception:
+                        pass
+                    update_session_status(req.session_id, "done")
+                    try:
+                        _db.update_session(req.session_id, {"status": "done"})
+                    except Exception:
+                        pass
+                yield chunk
         except Exception as e:
             update_session_status(req.session_id, "stopped")
             try:

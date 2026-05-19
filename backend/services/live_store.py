@@ -72,6 +72,8 @@ def init_db():
         }
         if "user_id" not in columns:
             conn.execute("ALTER TABLE live_sessions ADD COLUMN user_id TEXT")
+        if "ai_notes" not in columns:
+            conn.execute("ALTER TABLE live_sessions ADD COLUMN ai_notes TEXT")
 
 
 # ── LiveSession ────────────────────────────────────────────────────────────────
@@ -129,6 +131,14 @@ def update_session_page(session_id: str, page: int):
         conn.execute(
             "UPDATE live_sessions SET current_page=? WHERE session_id=?",
             (page, session_id),
+        )
+
+
+def save_ai_notes(session_id: str, ai_notes: str):
+    with _conn() as conn:
+        conn.execute(
+            "UPDATE live_sessions SET ai_notes=? WHERE session_id=?",
+            (ai_notes, session_id),
         )
 
 
