@@ -710,7 +710,8 @@ export default function LivePage() {
   ])
 
   const handleExpandMyNote = useCallback(async (pageNum: number) => {
-    if (!processedSessionId) return
+    const sessionId = processedSessionId ?? notesSessionId
+    if (!sessionId) return
 
     const userNote = myNoteTexts.get(pageNum) ?? ''
     if (!userNote.trim()) return
@@ -719,7 +720,7 @@ export default function LivePage() {
     patchMyNoteExpandState(pageNum, { userNote, aiText: '', status: 'expanding' })
 
     try {
-      await generateMyNote(processedSessionId, pageNum, userNote, pptText, '中转站', (chunk) => {
+      await generateMyNote(sessionId, pageNum, userNote, pptText, '中转站', (chunk) => {
         setMyNoteExpandStates((prev) => {
           const current = prev.get(pageNum)
           if (!current) return prev
@@ -729,10 +730,11 @@ export default function LivePage() {
         })
       })
       patchMyNoteExpandState(pageNum, { status: 'expanded' })
-    } catch {
+    } catch (err) {
+      console.error('[expand my note] failed:', err)
       patchMyNoteExpandState(pageNum, { status: 'idle' })
     }
-  }, [myNoteTexts, patchMyNoteExpandState, processedSessionId, session])
+  }, [myNoteTexts, notesSessionId, patchMyNoteExpandState, processedSessionId, session])
 
   const handleRetryPage = useCallback(async (pageNum: number) => {
     if (!processedSessionId || retrying !== null) return
@@ -1001,14 +1003,13 @@ export default function LivePage() {
     }
     stream?.getTracks().forEach((track) => track.stop())
     mediaStreamRef.current = null
-    wsRef.current?.close()
 
-      if (liveBackendSessionId) {
-        try {
-          await apiFetch('/api/live/stop', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+    if (liveBackendSessionId) {
+      try {
+        await apiFetch('/api/live/stop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             session_id: liveBackendSessionId,
             ppt_pages: pptPages.length > 0
               ? pptPages.map(p => ({ page_num: p.page_num, ppt_text: p.ppt_text ?? '' }))
@@ -1017,6 +1018,7 @@ export default function LivePage() {
         })
       } catch { /* ignore */ }
     }
+    wsRef.current?.close()
 
     setWsStatus('stopped')
     setSessionStatus('stopped')
@@ -1165,7 +1167,7 @@ export default function LivePage() {
           try {
             parsed = JSON.parse(payload)
           } catch { continue }
-          if (parsed.error) break
+          if (parsed.error) { outerDone = true; break }
           if (parsed.text) setDetailedNoteText(prev => prev + parsed.text)
         }
       }
@@ -1294,16 +1296,22 @@ export default function LivePage() {
           setSessionStatus(typedData.status as 'stopped' | 'done')
           setWsStatus('stopped')
           setLiveBackendSessionId(sid)
-          const cached = localStorage.getItem(`liberstudy:live-ai-notes:${sid}`)
-          if (cached) setAiNotesText(cached)
           apiFetch(`/api/live/state/${sid}`)
             .then(r => r.json())
             .then(state => {
-              if (!cancelled && !unmountedRef.current && state.transcript) {
-                setPostClassTranscript(state.transcript)
+              if (cancelled || unmountedRef.current) return
+              if (state.transcript) setPostClassTranscript(state.transcript)
+              if (state.ai_notes) {
+                setAiNotesText(state.ai_notes)
+              } else {
+                const cached = localStorage.getItem(`liberstudy:live-ai-notes:${sid}`)
+                if (cached) setAiNotesText(cached)
               }
             })
-            .catch(() => {})
+            .catch(() => {
+              const cached = localStorage.getItem(`liberstudy:live-ai-notes:${sid}`)
+              if (cached) setAiNotesText(cached)
+            })
         }
         if (typedData.status === 'processing') {
           void pollProcessedSession(requestedSessionIdRef.current!)

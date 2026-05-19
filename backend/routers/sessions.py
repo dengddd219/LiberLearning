@@ -22,6 +22,7 @@ def _current_user_id(request: Request) -> str:
 def _owned_session_or_404(session_id: str, request: Request) -> dict:
     import db as _db
     import os
+    from services.live_store import get_session as get_live_session
     # In public guest access mode, skip user_id check so anyone can view any session
     if os.environ.get("PUBLIC_GUEST_ACCESS", "").lower() == "true":
         session = _db.get_session(session_id)
@@ -29,6 +30,10 @@ def _owned_session_or_404(session_id: str, request: Request) -> dict:
         session = _db.get_session(session_id, user_id=_current_user_id(request))
     if session:
         return session
+    # Fall back to live_data.db for live sessions
+    live_session = get_live_session(session_id)
+    if live_session:
+        return live_session
     raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
 
 
@@ -340,8 +345,6 @@ async def generate_my_note(session_id: str, page_num: int, req: MyNoteRequest, r
         api_key = os.environ.get("ANTHROPIC_API_KEY", "")
         base_url = os.environ.get("ANTHROPIC_BASE_URL", "").strip() or None
         kwargs = {"base_url": base_url} if base_url else {}
-        if base_url:
-            kwargs["default_headers"] = {"Authorization": f"Bearer {api_key}"}
         client = _anthropic.AsyncAnthropic(api_key=api_key, **kwargs)
         model = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
         async with client.messages.stream(

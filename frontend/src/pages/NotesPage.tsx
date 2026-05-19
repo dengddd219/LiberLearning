@@ -581,7 +581,8 @@ export default function NotesPage() {
         })
       })
       patchMyNoteExpandState(pageNum, { status: 'expanded' })
-    } catch {
+    } catch (err) {
+      console.error('[expand my note] failed:', err)
       patchMyNoteExpandState(pageNum, { status: 'idle' })
     }
   }, [activeSessionId, session, provider, myNoteTexts, patchMyNoteExpandState])
